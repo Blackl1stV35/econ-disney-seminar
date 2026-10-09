@@ -1,5 +1,5 @@
-# The repository owner reviews every change until more owners are listed.
-# Add a collaborator to a project line, for example: /13F_investor_horizon/ @Blackl1stV35 @their-github-name
-*                              @Blackl1stV35
-/disney-tourism-thailand/      @Blackl1stV35
-/13F_investor_horizon/         @Blackl1stV35
+# Reviewers are requested automatically for changes to the files they own.
+# Each project folder lists both seminar collaborators, so that either can review the other.
+*                              @Blackl1stV35 @chonathorn-collab
+/disney-tourism-thailand/      @Blackl1stV35 @chonathorn-collab
+/13F_investor_horizon/         @Blackl1stV35 @chonathorn-collab
