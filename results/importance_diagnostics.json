@@ -1,0 +1,604 @@
+{
+  "att_pp|all_feasible": {
+    "bootstrap_cv_repeats": 1,
+    "cluster_threshold": 0.8,
+    "clusters": [
+      [
+        "receipts_pct_gdp",
+        "arrivals_per_capita",
+        "capex_pct_gdp"
+      ]
+    ],
+    "cv_r2_best_single": 0.2637676008810742,
+    "cv_r2_null": -0.06549389521407667,
+    "cv_r2_stack": 0.05370676201096469,
+    "cv_repeats": 3,
+    "features_dropped": [],
+    "features_used": [
+      "log_gdp_pc",
+      "log_pop",
+      "receipts_pct_gdp",
+      "log_receipts_per_arrival",
+      "arrivals_per_capita",
+      "air_pax_per_capita",
+      "receipts_growth_pre",
+      "capex_pct_gdp",
+      "is_integrated_resort"
+    ],
+    "mode": "real",
+    "n_boot": 100,
+    "n_cases": 27,
+    "n_economies": 24,
+    "n_features": 9,
+    "n_perm": 100,
+    "n_repeats": 20,
+    "n_resamples": 100,
+    "n_resamples_informative": 100,
+    "no_signal": false,
+    "perm_p_value": 0.7128712871287128,
+    "reasons": [
+      "cv_r2_stack is 0.054, below the minimum of 0.10",
+      "perm_p_value is 0.713, above the maximum of 0.10",
+      "split_half_correlation is -0.173, below the minimum of 0.50"
+    ],
+    "same_as_run": null,
+    "skipped": false,
+    "split_half_correlation": -0.17344121381051236,
+    "usable": false,
+    "verdict_stability": {
+      "by_seed": [
+        {
+          "cv_r2_stack": -0.024738543468795227,
+          "n_cases": 27,
+          "perm_p_value": 0.7142857142857143,
+          "seed": 0,
+          "split_half_correlation": -0.08753941191926896,
+          "usable": false
+        },
+        {
+          "cv_r2_stack": 0.3000271452952886,
+          "n_cases": 27,
+          "perm_p_value": 0.047619047619047616,
+          "seed": 1,
+          "split_half_correlation": -0.1259245826350807,
+          "usable": false
+        },
+        {
+          "cv_r2_stack": -0.250925644633079,
+          "n_cases": 27,
+          "perm_p_value": 0.047619047619047616,
+          "seed": 2,
+          "split_half_correlation": -0.10595615467375262,
+          "usable": false
+        },
+        {
+          "cv_r2_stack": 0.12462284707338178,
+          "n_cases": 27,
+          "perm_p_value": 0.047619047619047616,
+          "seed": 3,
+          "split_half_correlation": -0.20292114569784553,
+          "usable": false
+        },
+        {
+          "cv_r2_stack": -0.11875639039968311,
+          "n_cases": 27,
+          "perm_p_value": 0.9523809523809523,
+          "seed": 4,
+          "split_half_correlation": -0.1863413217598499,
+          "usable": false
+        }
+      ],
+      "configuration": "light",
+      "n_perm": 20,
+      "n_seeds": 5,
+      "n_usable": 0,
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "share_usable": 0.0
+    }
+  },
+  "att_pp|first_episode": {
+    "bootstrap_cv_repeats": 1,
+    "cluster_threshold": 0.8,
+    "clusters": [],
+    "cv_r2_best_single": 0.17947004942363365,
+    "cv_r2_null": -0.16176972897762765,
+    "cv_r2_stack": 0.05602862927816099,
+    "cv_repeats": 3,
+    "features_dropped": [],
+    "features_used": [
+      "log_gdp_pc",
+      "log_pop",
+      "receipts_pct_gdp",
+      "log_receipts_per_arrival",
+      "arrivals_per_capita",
+      "air_pax_per_capita",
+      "receipts_growth_pre",
+      "capex_pct_gdp",
+      "is_integrated_resort"
+    ],
+    "mode": "real",
+    "n_boot": 100,
+    "n_cases": 19,
+    "n_economies": 19,
+    "n_features": 9,
+    "n_perm": 100,
+    "n_repeats": 20,
+    "n_resamples": 100,
+    "n_resamples_informative": 100,
+    "no_signal": false,
+    "perm_p_value": 0.9405940594059405,
+    "reasons": [
+      "cv_r2_stack is 0.056, below the minimum of 0.10",
+      "perm_p_value is 0.941, above the maximum of 0.10",
+      "split_half_correlation is 0.013, below the minimum of 0.50",
+      "n_cases is 19, below the minimum of 20"
+    ],
+    "same_as_run": "att_pp|primary",
+    "skipped": false,
+    "split_half_correlation": 0.01347303873829754,
+    "usable": false,
+    "verdict_stability": {
+      "by_seed": [
+        {
+          "cv_r2_stack": -0.259696869022372,
+          "n_cases": 19,
+          "perm_p_value": 1.0,
+          "seed": 0,
+          "split_half_correlation": 0.01347303873829754,
+          "usable": false
+        },
+        {
+          "cv_r2_stack": -0.27939434284746145,
+          "n_cases": 19,
+          "perm_p_value": 0.047619047619047616,
+          "seed": 1,
+          "split_half_correlation": 0.09769906321780499,
+          "usable": false
+        },
+        {
+          "cv_r2_stack": -0.19380382333415724,
+          "n_cases": 19,
+          "perm_p_value": 0.42857142857142855,
+          "seed": 2,
+          "split_half_correlation": -0.07028269063043059,
+          "usable": false
+        },
+        {
+          "cv_r2_stack": -0.029606006392241646,
+          "n_cases": 19,
+          "perm_p_value": 0.14285714285714285,
+          "seed": 3,
+          "split_half_correlation": -0.10578189639780458,
+          "usable": false
+        },
+        {
+          "cv_r2_stack": -0.031028615885725808,
+          "n_cases": 19,
+          "perm_p_value": 0.2857142857142857,
+          "seed": 4,
+          "split_half_correlation": -0.04784890630905014,
+          "usable": false
+        }
+      ],
+      "configuration": "light",
+      "n_perm": 20,
+      "n_seeds": 5,
+      "n_usable": 0,
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "share_usable": 0.0
+    }
+  },
+  "att_pp|parks_only": {
+    "bootstrap_cv_repeats": 1,
+    "cluster_threshold": 0.8,
+    "clusters": [
+      [
+        "log_pop",
+        "arrivals_per_capita"
+      ]
+    ],
+    "cv_r2_best_single": -0.011607786433056377,
+    "cv_r2_null": -0.16356229814775047,
+    "cv_r2_stack": -0.30446159276267193,
+    "cv_repeats": 3,
+    "features_dropped": [],
+    "features_used": [
+      "log_gdp_pc",
+      "log_pop",
+      "receipts_pct_gdp",
+      "log_receipts_per_arrival",
+      "arrivals_per_capita",
+      "air_pax_per_capita",
+      "receipts_growth_pre",
+      "capex_pct_gdp",
+      "is_integrated_resort"
+    ],
+    "mode": "real",
+    "n_boot": 100,
+    "n_cases": 10,
+    "n_economies": 10,
+    "n_features": 9,
+    "n_perm": 100,
+    "n_repeats": 20,
+    "n_resamples": 100,
+    "n_resamples_informative": 73,
+    "no_signal": false,
+    "perm_p_value": 0.07920792079207921,
+    "reasons": [
+      "cv_r2_stack is -0.304, below the minimum of 0.10",
+      "split_half_correlation is 0.000, below the minimum of 0.50",
+      "n_cases is 10, below the minimum of 20"
+    ],
+    "same_as_run": null,
+    "skipped": false,
+    "split_half_correlation": 0.0,
+    "usable": false,
+    "verdict_stability": {
+      "by_seed": [
+        {
+          "cv_r2_stack": -0.2186888270295182,
+          "n_cases": 10,
+          "perm_p_value": 0.23809523809523808,
+          "seed": 0,
+          "split_half_correlation": 0.0,
+          "usable": false
+        },
+        {
+          "cv_r2_stack": -0.24069943515643266,
+          "n_cases": 10,
+          "perm_p_value": 0.3333333333333333,
+          "seed": 1,
+          "split_half_correlation": 0.0,
+          "usable": false
+        },
+        {
+          "cv_r2_stack": -0.34429204715062256,
+          "n_cases": 10,
+          "perm_p_value": 0.7142857142857143,
+          "seed": 2,
+          "split_half_correlation": 0.0,
+          "usable": false
+        },
+        {
+          "cv_r2_stack": -0.3137668533258997,
+          "n_cases": 10,
+          "perm_p_value": 0.38095238095238093,
+          "seed": 3,
+          "split_half_correlation": 0.0,
+          "usable": false
+        },
+        {
+          "cv_r2_stack": -0.24090754661608593,
+          "n_cases": 10,
+          "perm_p_value": 0.8095238095238095,
+          "seed": 4,
+          "split_half_correlation": 0.0,
+          "usable": false
+        }
+      ],
+      "configuration": "light",
+      "n_perm": 20,
+      "n_seeds": 5,
+      "n_usable": 0,
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "share_usable": 0.0
+    }
+  },
+  "att_pp|primary": {
+    "bootstrap_cv_repeats": 1,
+    "cluster_threshold": 0.8,
+    "clusters": [],
+    "cv_r2_best_single": 0.17947004942363365,
+    "cv_r2_null": -0.16176972897762765,
+    "cv_r2_stack": 0.05602862927816099,
+    "cv_repeats": 3,
+    "features_dropped": [],
+    "features_used": [
+      "log_gdp_pc",
+      "log_pop",
+      "receipts_pct_gdp",
+      "log_receipts_per_arrival",
+      "arrivals_per_capita",
+      "air_pax_per_capita",
+      "receipts_growth_pre",
+      "capex_pct_gdp",
+      "is_integrated_resort"
+    ],
+    "mode": "real",
+    "n_boot": 100,
+    "n_cases": 19,
+    "n_economies": 19,
+    "n_features": 9,
+    "n_perm": 100,
+    "n_repeats": 20,
+    "n_resamples": 100,
+    "n_resamples_informative": 100,
+    "no_signal": false,
+    "perm_p_value": 0.9405940594059405,
+    "reasons": [
+      "cv_r2_stack is 0.056, below the minimum of 0.10",
+      "perm_p_value is 0.941, above the maximum of 0.10",
+      "split_half_correlation is 0.013, below the minimum of 0.50",
+      "n_cases is 19, below the minimum of 20"
+    ],
+    "same_as_run": null,
+    "skipped": false,
+    "split_half_correlation": 0.01347303873829754,
+    "usable": false,
+    "verdict_stability": {
+      "by_seed": [
+        {
+          "cv_r2_stack": -0.259696869022372,
+          "n_cases": 19,
+          "perm_p_value": 1.0,
+          "seed": 0,
+          "split_half_correlation": 0.01347303873829754,
+          "usable": false
+        },
+        {
+          "cv_r2_stack": -0.27939434284746145,
+          "n_cases": 19,
+          "perm_p_value": 0.047619047619047616,
+          "seed": 1,
+          "split_half_correlation": 0.09769906321780499,
+          "usable": false
+        },
+        {
+          "cv_r2_stack": -0.19380382333415724,
+          "n_cases": 19,
+          "perm_p_value": 0.42857142857142855,
+          "seed": 2,
+          "split_half_correlation": -0.07028269063043059,
+          "usable": false
+        },
+        {
+          "cv_r2_stack": -0.029606006392241646,
+          "n_cases": 19,
+          "perm_p_value": 0.14285714285714285,
+          "seed": 3,
+          "split_half_correlation": -0.10578189639780458,
+          "usable": false
+        },
+        {
+          "cv_r2_stack": -0.031028615885725808,
+          "n_cases": 19,
+          "perm_p_value": 0.2857142857142857,
+          "seed": 4,
+          "split_half_correlation": -0.04784890630905014,
+          "usable": false
+        }
+      ],
+      "configuration": "light",
+      "n_perm": 20,
+      "n_seeds": 5,
+      "n_usable": 0,
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "share_usable": 0.0
+    }
+  },
+  "att_pp|primary_first_cost": {
+    "bootstrap_cv_repeats": 1,
+    "cluster_threshold": 0.8,
+    "clusters": [
+      [
+        "air_pax_per_capita",
+        "capex_first_pct_gdp"
+      ]
+    ],
+    "cv_r2_best_single": 0.1656153190584112,
+    "cv_r2_null": -0.16176972897762765,
+    "cv_r2_stack": 0.045009629849057875,
+    "cv_repeats": 3,
+    "features_dropped": [],
+    "features_used": [
+      "log_gdp_pc",
+      "log_pop",
+      "receipts_pct_gdp",
+      "log_receipts_per_arrival",
+      "arrivals_per_capita",
+      "air_pax_per_capita",
+      "receipts_growth_pre",
+      "capex_first_pct_gdp",
+      "is_integrated_resort"
+    ],
+    "mode": "real",
+    "n_boot": 100,
+    "n_cases": 19,
+    "n_economies": 19,
+    "n_features": 9,
+    "n_perm": 100,
+    "n_repeats": 20,
+    "n_resamples": 100,
+    "n_resamples_informative": 100,
+    "no_signal": false,
+    "perm_p_value": 0.9900990099009901,
+    "reasons": [
+      "cv_r2_stack is 0.045, below the minimum of 0.10",
+      "perm_p_value is 0.990, above the maximum of 0.10",
+      "split_half_correlation is -0.092, below the minimum of 0.50",
+      "n_cases is 19, below the minimum of 20"
+    ],
+    "same_as_run": null,
+    "skipped": false,
+    "split_half_correlation": -0.09151296707948472,
+    "usable": false,
+    "verdict_stability": {
+      "by_seed": [
+        {
+          "cv_r2_stack": -0.2095569716580754,
+          "n_cases": 19,
+          "perm_p_value": 1.0,
+          "seed": 0,
+          "split_half_correlation": -0.09151296707948472,
+          "usable": false
+        },
+        {
+          "cv_r2_stack": -0.04228471937892442,
+          "n_cases": 19,
+          "perm_p_value": 0.047619047619047616,
+          "seed": 1,
+          "split_half_correlation": -0.13436766879624357,
+          "usable": false
+        },
+        {
+          "cv_r2_stack": -0.2472307719684168,
+          "n_cases": 19,
+          "perm_p_value": 0.6666666666666666,
+          "seed": 2,
+          "split_half_correlation": 0.01599471576438949,
+          "usable": false
+        },
+        {
+          "cv_r2_stack": 0.10904644020259036,
+          "n_cases": 19,
+          "perm_p_value": 0.14285714285714285,
+          "seed": 3,
+          "split_half_correlation": -0.021218780240885738,
+          "usable": false
+        },
+        {
+          "cv_r2_stack": -0.11394684755336915,
+          "n_cases": 19,
+          "perm_p_value": 0.3333333333333333,
+          "seed": 4,
+          "split_half_correlation": -0.03673957541801697,
+          "usable": false
+        }
+      ],
+      "configuration": "light",
+      "n_perm": 20,
+      "n_seeds": 5,
+      "n_usable": 0,
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "share_usable": 0.0
+    }
+  },
+  "att_rel_pct|primary": {
+    "bootstrap_cv_repeats": 1,
+    "cluster_threshold": 0.8,
+    "clusters": [],
+    "cv_r2_best_single": 0.09153770280388396,
+    "cv_r2_null": -0.15938510759710134,
+    "cv_r2_stack": 0.033024125287935746,
+    "cv_repeats": 3,
+    "features_dropped": [],
+    "features_used": [
+      "log_gdp_pc",
+      "log_pop",
+      "receipts_pct_gdp",
+      "log_receipts_per_arrival",
+      "arrivals_per_capita",
+      "air_pax_per_capita",
+      "receipts_growth_pre",
+      "capex_pct_gdp",
+      "is_integrated_resort"
+    ],
+    "mode": "real",
+    "n_boot": 100,
+    "n_cases": 19,
+    "n_economies": 19,
+    "n_features": 9,
+    "n_perm": 100,
+    "n_repeats": 20,
+    "n_resamples": 100,
+    "n_resamples_informative": 100,
+    "no_signal": false,
+    "perm_p_value": 0.7425742574257426,
+    "reasons": [
+      "cv_r2_stack is 0.033, below the minimum of 0.10",
+      "perm_p_value is 0.743, above the maximum of 0.10",
+      "split_half_correlation is -0.164, below the minimum of 0.50",
+      "n_cases is 19, below the minimum of 20"
+    ],
+    "same_as_run": null,
+    "skipped": false,
+    "split_half_correlation": -0.1638954197150111,
+    "usable": false,
+    "verdict_stability": {
+      "by_seed": [
+        {
+          "cv_r2_stack": -0.10163625183052205,
+          "n_cases": 19,
+          "perm_p_value": 0.8571428571428571,
+          "seed": 0,
+          "split_half_correlation": -0.1638954197150111,
+          "usable": false
+        },
+        {
+          "cv_r2_stack": -0.07590169759092613,
+          "n_cases": 19,
+          "perm_p_value": 0.047619047619047616,
+          "seed": 1,
+          "split_half_correlation": -0.17158780836212562,
+          "usable": false
+        },
+        {
+          "cv_r2_stack": -0.09307563544501374,
+          "n_cases": 19,
+          "perm_p_value": 0.5714285714285714,
+          "seed": 2,
+          "split_half_correlation": -0.08343694478456573,
+          "usable": false
+        },
+        {
+          "cv_r2_stack": -0.012086173579336501,
+          "n_cases": 19,
+          "perm_p_value": 0.047619047619047616,
+          "seed": 3,
+          "split_half_correlation": -0.0748806082328239,
+          "usable": false
+        },
+        {
+          "cv_r2_stack": -0.0607404153158575,
+          "n_cases": 19,
+          "perm_p_value": 0.09523809523809523,
+          "seed": 4,
+          "split_half_correlation": -0.07941216847537902,
+          "usable": false
+        }
+      ],
+      "configuration": "light",
+      "n_perm": 20,
+      "n_seeds": 5,
+      "n_usable": 0,
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "share_usable": 0.0
+    }
+  }
+}

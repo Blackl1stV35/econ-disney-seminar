@@ -1,0 +1,3 @@
+file,panels,x labels,y labels,legend entries
+outcome_coverage_heatmap.png,2,Year | Years observed (count),"Economy (ISO3 code), sorted by number of observed years",3
+outcome_by_year.png,2,Year,Tourism receipts (percent of GDP) | Economies with data (count),4

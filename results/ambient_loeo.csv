@@ -1,0 +1,4 @@
+estimator,description,rmse,mae,mean_error,ratio_to_A1,qualifies,selected,n_episodes,n_economies
+A1,"hierarchical normal model, pooled posterior predictive",1.1375261021157206,0.8199554817956346,0.05684810990294862,1.0,False,False,19,19
+A2,scaling law in the cost share of GDP,1.0380454248236606,0.7519207992534692,-0.2470772524778566,0.9125464663122607,True,True,19,19
+A3,meta-regression on the cost share and the receipts share,1.629598354243043,0.9820508797168441,-0.23950577393253847,1.4325810644802803,False,False,19,19

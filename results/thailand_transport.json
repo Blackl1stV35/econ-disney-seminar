@@ -1,0 +1,834 @@
+{
+  "att_pp": {
+    "between_sd": 0.8710906937267034,
+    "bootstrap_percentiles": {
+      "p25": -1.338413061113745,
+      "p5": -1.8081037704267247,
+      "p50": -0.9846104186522461,
+      "p75": -0.5679628288215764,
+      "p95": -0.13051229573905074
+    },
+    "by_target_year": {
+      "2015": -1.409586336631197,
+      "2016": -1.3440244764428666,
+      "2017": -1.1039864043345722,
+      "2018": -0.7850866188318244,
+      "2019": -0.5991734599589612
+    },
+    "conformal_interval": {
+      "guaranteed_level": 0.9,
+      "half_width": 1.7775472253468019,
+      "level": 0.9,
+      "lower": -2.825918684586686,
+      "n": 19,
+      "rank": 18,
+      "status": "ok",
+      "upper": 0.7291757661069176
+    },
+    "estimate": -1.0483714592398843,
+    "measurement_sd": 0.6945701522553527,
+    "predictive_method": "ot_weighted",
+    "predictive_percentiles": {
+      "p25": -1.8622531995718083,
+      "p5": -3.0938892080527847,
+      "p50": -0.9037342695242884,
+      "p75": -0.019973909691869185,
+      "p95": 0.6591999069903283
+    },
+    "sampling_predictive_percentiles": {
+      "p25": -1.7141605648970606,
+      "p5": -3.0107614291921885,
+      "p50": -0.9081811127761238,
+      "p75": -0.18924291673237884,
+      "p95": 0.7986529208251639
+    }
+  },
+  "att_rel_pct": {
+    "between_sd": 0.0,
+    "bootstrap_percentiles": {
+      "p25": -22.724902409837338,
+      "p5": -33.086218580897295,
+      "p50": -15.723080149997653,
+      "p75": -8.485437300431169,
+      "p95": 3.860135750794514
+    },
+    "by_target_year": {
+      "2015": -22.28681408534928,
+      "2016": -21.04358846423714,
+      "2017": -16.66509622620551,
+      "2018": -11.161865929076098,
+      "2019": -7.852721192866737
+    },
+    "conformal_interval": {
+      "guaranteed_level": 0.9,
+      "half_width": 57.31053231537999,
+      "level": 0.9,
+      "lower": -73.11254949492694,
+      "n": 19,
+      "rank": 18,
+      "status": "ok",
+      "upper": 41.508515135833036
+    },
+    "estimate": -15.802017179546954,
+    "measurement_sd": 29.9139378033255,
+    "predictive_method": "ot_weighted",
+    "predictive_percentiles": {
+      "p25": -36.83898329884153,
+      "p5": -56.02199369513258,
+      "p50": -22.013914694867083,
+      "p75": -12.363480206440094,
+      "p95": 142.1085906649845
+    },
+    "sampling_predictive_percentiles": {
+      "p25": -36.26433384938459,
+      "p5": -66.4905756737883,
+      "p50": -15.196679219568967,
+      "p75": 5.475190136932466,
+      "p95": 39.651288726228316
+    }
+  },
+  "clip": 5.0,
+  "converged": true,
+  "effective_sample_size": {
+    "economies": 6.471676736741048,
+    "episodes": 6.471676736741048
+  },
+  "epsilon": 1.190832575394022,
+  "features": [
+    "log_gdp_pc",
+    "log_pop",
+    "receipts_pct_gdp",
+    "log_receipts_per_arrival",
+    "arrivals_per_capita",
+    "air_pax_per_capita",
+    "receipts_growth_pre",
+    "capex_pct_gdp",
+    "is_integrated_resort"
+  ],
+  "input_digests": {
+    "case_effects": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+    "case_features_imputed": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+    "case_placebos": "c75081aa79277183db4b6fab16395771077639219b56a52397fe565121e94207",
+    "reference_features": "08656183bebce926ccf5742c84b480f57996250f73434063bad849da01d6dd2d",
+    "transport_weights": "e301953a7f5bdd14bc684f4ed2e735a7ef1104cf3aff3211b1a95547c26065c3"
+  },
+  "n_boot": 5000,
+  "n_clipped_sources": 4,
+  "n_economies": 19,
+  "n_episodes": 19,
+  "n_log_domain_bootstrap": 0,
+  "n_nonconverged_bootstrap": 0,
+  "null": {
+    "n_placebos": 808,
+    "n_placebos_comparable": 540,
+    "placebos": "comparable placebos of the sources"
+  },
+  "null_percentiles": {
+    "att_pp": {
+      "p25": -0.19077902211834413,
+      "p5": -1.1693821782752258,
+      "p50": 0.0002742356352919686,
+      "p75": 0.3391196124451206,
+      "p95": 1.2616142309842764
+    },
+    "att_rel_pct": {
+      "p25": -10.046572429492423,
+      "p5": -32.95574969683148,
+      "p50": 0.003273467250325359,
+      "p75": 15.28867681011332,
+      "p95": 40.61457614668265
+    }
+  },
+  "overlap_test": {
+    "features_in_test": [
+      "log_gdp_pc",
+      "log_pop",
+      "receipts_pct_gdp",
+      "log_receipts_per_arrival",
+      "arrivals_per_capita",
+      "air_pax_per_capita",
+      "receipts_growth_pre",
+      "capex_pct_gdp",
+      "is_integrated_resort"
+    ],
+    "n_perm": 9999,
+    "p_value": 0.3517,
+    "statistic": 4.471949925499985
+  },
+  "plan_log_domain": false,
+  "predictive": {
+    "basis": "leave-one-economy-out prediction errors, resampled by economy, subtracted from the transported effect and rescaled about it to the conformal interval",
+    "calibrated": {
+      "att_pp": true,
+      "att_rel_pct": true
+    },
+    "level": 0.9,
+    "method": "ot_weighted",
+    "n_draws": 5000,
+    "n_economies": 19,
+    "n_episodes": 19,
+    "scale": {
+      "att_pp": 1.0,
+      "att_rel_pct": 1.0
+    }
+  },
+  "rho_source": 1.0,
+  "rho_target": null,
+  "sample": "primary",
+  "scenarios": {
+    "complex_total": {
+      "att_pp": {
+        "conformal_interval": {
+          "guaranteed_level": 0.9,
+          "half_width": 1.7775472253468019,
+          "level": 0.9,
+          "lower": -2.825918684586686,
+          "n": 19,
+          "rank": 18,
+          "status": "ok",
+          "upper": 0.7291757661069176
+        },
+        "estimate": -1.0483714592398843,
+        "predictive_percentiles": {
+          "p25": -1.8622531995718083,
+          "p5": -3.0938892080527847,
+          "p50": -0.9037342695242884,
+          "p75": -0.019973909691869185,
+          "p95": 0.6591999069903283
+        }
+      },
+      "att_rel_pct": {
+        "conformal_interval": {
+          "guaranteed_level": 0.9,
+          "half_width": 57.31053231537999,
+          "level": 0.9,
+          "lower": -73.11254949492694,
+          "n": 19,
+          "rank": 18,
+          "status": "ok",
+          "upper": 41.508515135833036
+        },
+        "estimate": -15.802017179546954,
+        "predictive_percentiles": {
+          "p25": -36.83898329884153,
+          "p5": -56.02199369513258,
+          "p50": -22.013914694867083,
+          "p75": -12.363480206440094,
+          "p95": 142.1085906649845
+        }
+      },
+      "capex_pct_gdp": 1.5811356245082113,
+      "capex_thb_bn": 300.0,
+      "capex_usd_bn": 9.123310666974831,
+      "primary": true,
+      "support": {
+        "ess": 6.471676736741048,
+        "ess_ok": true,
+        "features": {
+          "air_pax_per_capita": {
+            "clipped": false,
+            "excess": 0.0,
+            "outside": false,
+            "source_max": 4.183123680386067,
+            "source_min": 0.055622361841772085,
+            "target": 0.9936017874714129,
+            "weight": 0.07007917778865244,
+            "z_target": 0.8696744698414919
+          },
+          "arrivals_per_capita": {
+            "clipped": false,
+            "excess": 0.0,
+            "outside": false,
+            "source_max": 2.660004946513272,
+            "source_min": 0.004930564029041143,
+            "target": 0.5001673196839688,
+            "weight": 0.005118043956228125,
+            "z_target": -0.10598098279314323
+          },
+          "capex_pct_gdp": {
+            "clipped": true,
+            "excess": 0.0,
+            "outside": false,
+            "source_max": 5.72571043067417,
+            "source_min": 0.004245630272419537,
+            "target": 1.5811356245082113,
+            "weight": 0.02293828222217203,
+            "z_target": 12.672013658138303
+          },
+          "is_integrated_resort": {
+            "clipped": false,
+            "excess": 0.0,
+            "outside": false,
+            "source_max": 1.0,
+            "source_min": 0.0,
+            "target": 0.0,
+            "weight": 0.0,
+            "z_target": 0.0
+          },
+          "log_gdp_pc": {
+            "clipped": false,
+            "excess": 0.0,
+            "outside": false,
+            "source_max": 10.781686781947506,
+            "source_min": 7.2490533151237075,
+            "target": 8.76609677766532,
+            "weight": 0.5887835775821335,
+            "z_target": -0.30874507730181866
+          },
+          "log_pop": {
+            "clipped": false,
+            "excess": 0.0,
+            "outside": false,
+            "source_max": 20.955206699859577,
+            "source_min": 15.384615253622814,
+            "target": 18.080444048639286,
+            "weight": 0.3057497307388842,
+            "z_target": 0.9848169242080967
+          },
+          "log_receipts_per_arrival": {
+            "clipped": false,
+            "excess": 0.0,
+            "outside": false,
+            "source_max": 7.933108998043591,
+            "source_min": 5.176582476313517,
+            "target": 7.37968515364603,
+            "weight": 0.007331187711929876,
+            "z_target": 0.8384547483720094
+          },
+          "receipts_growth_pre": {
+            "clipped": false,
+            "excess": 0.0,
+            "outside": false,
+            "source_max": 0.4019072704309504,
+            "source_min": -0.0060142926916263665,
+            "target": 0.08553175761034595,
+            "weight": 0.0,
+            "z_target": 0.32515903315918326
+          },
+          "receipts_pct_gdp": {
+            "clipped": false,
+            "excess": 0.21625095726680346,
+            "outside": true,
+            "source_max": 9.124259073567492,
+            "source_min": 0.5577953525785573,
+            "target": 11.833411425721586,
+            "weight": 0.0,
+            "z_target": 2.7160617841721346
+          }
+        },
+        "max_source_share": 0.26752482491685364,
+        "n_sources": 19,
+        "range_ok": true,
+        "reasons": [],
+        "settings": {
+          "clip": 5.0,
+          "min_ess": 2.0,
+          "min_weight": 0.1,
+          "range_tolerance": 0.1
+        },
+        "supported": true,
+        "weighted_outside_share": 0.0
+      }
+    },
+    "park_high": {
+      "att_pp": {
+        "conformal_interval": {
+          "guaranteed_level": 0.9,
+          "half_width": 1.7775472253468019,
+          "level": 0.9,
+          "lower": -2.825918684586686,
+          "n": 19,
+          "rank": 18,
+          "status": "ok",
+          "upper": 0.7291757661069176
+        },
+        "estimate": -1.0483714592398843,
+        "predictive_percentiles": {
+          "p25": -1.8622531995718083,
+          "p5": -3.0938892080527847,
+          "p50": -0.9037342695242884,
+          "p75": -0.019973909691869185,
+          "p95": 0.6591999069903283
+        }
+      },
+      "att_rel_pct": {
+        "conformal_interval": {
+          "guaranteed_level": 0.9,
+          "half_width": 57.31053231537999,
+          "level": 0.9,
+          "lower": -73.11254949492694,
+          "n": 19,
+          "rank": 18,
+          "status": "ok",
+          "upper": 41.508515135833036
+        },
+        "estimate": -15.802017179546954,
+        "predictive_percentiles": {
+          "p25": -36.83898329884153,
+          "p5": -56.02199369513258,
+          "p50": -22.013914694867083,
+          "p75": -12.363480206440094,
+          "p95": 142.1085906649845
+        }
+      },
+      "capex_pct_gdp": 1.0540904163388076,
+      "capex_thb_bn": 200.0,
+      "capex_usd_bn": 6.082207111316554,
+      "primary": false,
+      "support": {
+        "ess": 6.471676736741048,
+        "ess_ok": true,
+        "features": {
+          "air_pax_per_capita": {
+            "clipped": false,
+            "excess": 0.0,
+            "outside": false,
+            "source_max": 4.183123680386067,
+            "source_min": 0.055622361841772085,
+            "target": 0.9936017874714129,
+            "weight": 0.07007917778865244,
+            "z_target": 0.8696744698414919
+          },
+          "arrivals_per_capita": {
+            "clipped": false,
+            "excess": 0.0,
+            "outside": false,
+            "source_max": 2.660004946513272,
+            "source_min": 0.004930564029041143,
+            "target": 0.5001673196839688,
+            "weight": 0.005118043956228125,
+            "z_target": -0.10598098279314323
+          },
+          "capex_pct_gdp": {
+            "clipped": true,
+            "excess": 0.0,
+            "outside": false,
+            "source_max": 5.72571043067417,
+            "source_min": 0.004245630272419537,
+            "target": 1.0540904163388076,
+            "weight": 0.02293828222217203,
+            "z_target": 8.205767487501236
+          },
+          "is_integrated_resort": {
+            "clipped": false,
+            "excess": 0.0,
+            "outside": false,
+            "source_max": 1.0,
+            "source_min": 0.0,
+            "target": 0.0,
+            "weight": 0.0,
+            "z_target": 0.0
+          },
+          "log_gdp_pc": {
+            "clipped": false,
+            "excess": 0.0,
+            "outside": false,
+            "source_max": 10.781686781947506,
+            "source_min": 7.2490533151237075,
+            "target": 8.76609677766532,
+            "weight": 0.5887835775821335,
+            "z_target": -0.30874507730181866
+          },
+          "log_pop": {
+            "clipped": false,
+            "excess": 0.0,
+            "outside": false,
+            "source_max": 20.955206699859577,
+            "source_min": 15.384615253622814,
+            "target": 18.080444048639286,
+            "weight": 0.3057497307388842,
+            "z_target": 0.9848169242080967
+          },
+          "log_receipts_per_arrival": {
+            "clipped": false,
+            "excess": 0.0,
+            "outside": false,
+            "source_max": 7.933108998043591,
+            "source_min": 5.176582476313517,
+            "target": 7.37968515364603,
+            "weight": 0.007331187711929876,
+            "z_target": 0.8384547483720094
+          },
+          "receipts_growth_pre": {
+            "clipped": false,
+            "excess": 0.0,
+            "outside": false,
+            "source_max": 0.4019072704309504,
+            "source_min": -0.0060142926916263665,
+            "target": 0.08553175761034595,
+            "weight": 0.0,
+            "z_target": 0.32515903315918326
+          },
+          "receipts_pct_gdp": {
+            "clipped": false,
+            "excess": 0.21625095726680346,
+            "outside": true,
+            "source_max": 9.124259073567492,
+            "source_min": 0.5577953525785573,
+            "target": 11.833411425721586,
+            "weight": 0.0,
+            "z_target": 2.7160617841721346
+          }
+        },
+        "max_source_share": 0.26752482491685364,
+        "n_sources": 19,
+        "range_ok": true,
+        "reasons": [],
+        "settings": {
+          "clip": 5.0,
+          "min_ess": 2.0,
+          "min_weight": 0.1,
+          "range_tolerance": 0.1
+        },
+        "supported": true,
+        "weighted_outside_share": 0.0
+      }
+    },
+    "park_low": {
+      "att_pp": {
+        "conformal_interval": {
+          "guaranteed_level": 0.9,
+          "half_width": 1.7775472253468019,
+          "level": 0.9,
+          "lower": -2.6949462648203077,
+          "n": 19,
+          "rank": 18,
+          "status": "ok",
+          "upper": 0.8601481858732961
+        },
+        "estimate": -0.9173990394735058,
+        "predictive_percentiles": {
+          "p25": -1.73128077980543,
+          "p5": -2.9629167882864063,
+          "p50": -0.7727618497579098,
+          "p75": 0.11099851007450934,
+          "p95": 0.7901723267567068
+        }
+      },
+      "att_rel_pct": {
+        "conformal_interval": {
+          "guaranteed_level": 0.9,
+          "half_width": 57.31053231537999,
+          "level": 0.9,
+          "lower": -71.60907995797281,
+          "n": 19,
+          "rank": 18,
+          "status": "ok",
+          "upper": 43.011984672787165
+        },
+        "estimate": -14.298547642592826,
+        "predictive_percentiles": {
+          "p25": -35.3355137618874,
+          "p5": -54.51852415817845,
+          "p50": -20.510445157912955,
+          "p75": -10.860010669485966,
+          "p95": 143.61206020193862
+        }
+      },
+      "capex_pct_gdp": 0.5270452081694038,
+      "capex_thb_bn": 100.0,
+      "capex_usd_bn": 3.041103555658277,
+      "primary": false,
+      "support": {
+        "ess": 7.158037171824608,
+        "ess_ok": true,
+        "features": {
+          "air_pax_per_capita": {
+            "clipped": false,
+            "excess": 0.0,
+            "outside": false,
+            "source_max": 4.183123680386067,
+            "source_min": 0.055622361841772085,
+            "target": 0.9936017874714129,
+            "weight": 0.07007917778865244,
+            "z_target": 0.8696744698414919
+          },
+          "arrivals_per_capita": {
+            "clipped": false,
+            "excess": 0.0,
+            "outside": false,
+            "source_max": 2.660004946513272,
+            "source_min": 0.004930564029041143,
+            "target": 0.5001673196839688,
+            "weight": 0.005118043956228125,
+            "z_target": -0.10598098279314323
+          },
+          "capex_pct_gdp": {
+            "clipped": false,
+            "excess": 0.0,
+            "outside": false,
+            "source_max": 5.72571043067417,
+            "source_min": 0.004245630272419537,
+            "target": 0.5270452081694038,
+            "weight": 0.02293828222217203,
+            "z_target": 3.739521316864169
+          },
+          "is_integrated_resort": {
+            "clipped": false,
+            "excess": 0.0,
+            "outside": false,
+            "source_max": 1.0,
+            "source_min": 0.0,
+            "target": 0.0,
+            "weight": 0.0,
+            "z_target": 0.0
+          },
+          "log_gdp_pc": {
+            "clipped": false,
+            "excess": 0.0,
+            "outside": false,
+            "source_max": 10.781686781947506,
+            "source_min": 7.2490533151237075,
+            "target": 8.76609677766532,
+            "weight": 0.5887835775821335,
+            "z_target": -0.30874507730181866
+          },
+          "log_pop": {
+            "clipped": false,
+            "excess": 0.0,
+            "outside": false,
+            "source_max": 20.955206699859577,
+            "source_min": 15.384615253622814,
+            "target": 18.080444048639286,
+            "weight": 0.3057497307388842,
+            "z_target": 0.9848169242080967
+          },
+          "log_receipts_per_arrival": {
+            "clipped": false,
+            "excess": 0.0,
+            "outside": false,
+            "source_max": 7.933108998043591,
+            "source_min": 5.176582476313517,
+            "target": 7.37968515364603,
+            "weight": 0.007331187711929876,
+            "z_target": 0.8384547483720094
+          },
+          "receipts_growth_pre": {
+            "clipped": false,
+            "excess": 0.0,
+            "outside": false,
+            "source_max": 0.4019072704309504,
+            "source_min": -0.0060142926916263665,
+            "target": 0.08553175761034595,
+            "weight": 0.0,
+            "z_target": 0.32515903315918326
+          },
+          "receipts_pct_gdp": {
+            "clipped": false,
+            "excess": 0.21625095726680346,
+            "outside": true,
+            "source_max": 9.124259073567492,
+            "source_min": 0.5577953525785573,
+            "target": 11.833411425721586,
+            "weight": 0.0,
+            "z_target": 2.7160617841721346
+          }
+        },
+        "max_source_share": 0.2242652159873021,
+        "n_sources": 19,
+        "range_ok": true,
+        "reasons": [],
+        "settings": {
+          "clip": 5.0,
+          "min_ess": 2.0,
+          "min_weight": 0.1,
+          "range_tolerance": 0.1
+        },
+        "supported": true,
+        "weighted_outside_share": 0.0
+      }
+    }
+  },
+  "seeds": {
+    "bootstrap": 2,
+    "importance": 0,
+    "null draws": 0,
+    "overlap test": 3,
+    "validation": 0
+  },
+  "support": {
+    "ess": 6.471676736741048,
+    "ess_ok": true,
+    "features": {
+      "air_pax_per_capita": {
+        "clipped": false,
+        "excess": 0.0,
+        "outside": false,
+        "source_max": 4.183123680386067,
+        "source_min": 0.055622361841772085,
+        "target": 0.9936017874714129,
+        "weight": 0.07007917778865244,
+        "z_target": 0.8696744698414919
+      },
+      "arrivals_per_capita": {
+        "clipped": false,
+        "excess": 0.0,
+        "outside": false,
+        "source_max": 2.660004946513272,
+        "source_min": 0.004930564029041143,
+        "target": 0.5001673196839688,
+        "weight": 0.005118043956228125,
+        "z_target": -0.10598098279314323
+      },
+      "capex_pct_gdp": {
+        "clipped": true,
+        "excess": 0.0,
+        "outside": false,
+        "source_max": 5.72571043067417,
+        "source_min": 0.004245630272419537,
+        "target": 1.5811356245082113,
+        "weight": 0.02293828222217203,
+        "z_target": 12.672013658138303
+      },
+      "is_integrated_resort": {
+        "clipped": false,
+        "excess": 0.0,
+        "outside": false,
+        "source_max": 1.0,
+        "source_min": 0.0,
+        "target": 0.0,
+        "weight": 0.0,
+        "z_target": 0.0
+      },
+      "log_gdp_pc": {
+        "clipped": false,
+        "excess": 0.0,
+        "outside": false,
+        "source_max": 10.781686781947506,
+        "source_min": 7.2490533151237075,
+        "target": 8.76609677766532,
+        "weight": 0.5887835775821335,
+        "z_target": -0.30874507730181866
+      },
+      "log_pop": {
+        "clipped": false,
+        "excess": 0.0,
+        "outside": false,
+        "source_max": 20.955206699859577,
+        "source_min": 15.384615253622814,
+        "target": 18.080444048639286,
+        "weight": 0.3057497307388842,
+        "z_target": 0.9848169242080967
+      },
+      "log_receipts_per_arrival": {
+        "clipped": false,
+        "excess": 0.0,
+        "outside": false,
+        "source_max": 7.933108998043591,
+        "source_min": 5.176582476313517,
+        "target": 7.37968515364603,
+        "weight": 0.007331187711929876,
+        "z_target": 0.8384547483720094
+      },
+      "receipts_growth_pre": {
+        "clipped": false,
+        "excess": 0.0,
+        "outside": false,
+        "source_max": 0.4019072704309504,
+        "source_min": -0.0060142926916263665,
+        "target": 0.08553175761034595,
+        "weight": 0.0,
+        "z_target": 0.32515903315918326
+      },
+      "receipts_pct_gdp": {
+        "clipped": false,
+        "excess": 0.21625095726680346,
+        "outside": true,
+        "source_max": 9.124259073567492,
+        "source_min": 0.5577953525785573,
+        "target": 11.833411425721586,
+        "weight": 0.0,
+        "z_target": 2.7160617841721346
+      }
+    },
+    "max_source_share": 0.26752482491685364,
+    "n_sources": 19,
+    "range_ok": true,
+    "reasons": [],
+    "settings": {
+      "clip": 5.0,
+      "min_ess": 2.0,
+      "min_weight": 0.1,
+      "range_tolerance": 0.1
+    },
+    "supported": true,
+    "weighted_outside_share": 0.0
+  },
+  "target": {
+    "capex_pct_gdp": 1.5811356245082113,
+    "capex_pct_gdp_alternative": 1.776285139827853,
+    "capex_thb_bn": 300.0,
+    "capex_usd_bn": 9.123310666974831,
+    "cost_year": 2025,
+    "cost_year_alternative": 2019,
+    "features_last_target_year": {
+      "air_pax_per_capita": 1.0674215028770548,
+      "arrivals_per_capita": 0.5580918983962352,
+      "capex_pct_gdp": 1.5811356245082113,
+      "is_integrated_resort": 0.0,
+      "log_gdp_pc": 8.936652795236208,
+      "log_pop": 18.08551944168111,
+      "log_receipts_per_arrival": 7.385641254091125,
+      "receipts_growth_pre": 0.09590495169143587,
+      "receipts_pct_gdp": 11.833411425721586
+    },
+    "fx_thb_per_usd": 32.8828,
+    "gdp_usd_bn": 577.01,
+    "iso3": "THA",
+    "name": "Thailand",
+    "receipts_basis": "panel series of international tourism receipts; years without a panel value use the ratio of the panel to the baseline",
+    "receipts_pct_gdp": 12.149698102858224,
+    "receipts_window_years": [
+      2017,
+      2018,
+      2019
+    ],
+    "scenario": "complex_total",
+    "scenarios": {
+      "complex_total": {
+        "capex_pct_gdp": 1.5811356245082113,
+        "capex_pct_gdp_alternative": 1.776285139827853,
+        "capex_thb_bn": 300.0,
+        "capex_usd_bn": 9.123310666974831,
+        "primary": true
+      },
+      "park_high": {
+        "capex_pct_gdp": 1.0540904163388076,
+        "capex_pct_gdp_alternative": 1.1841900932185685,
+        "capex_thb_bn": 200.0,
+        "capex_usd_bn": 6.082207111316554,
+        "primary": false
+      },
+      "park_low": {
+        "capex_pct_gdp": 0.5270452081694038,
+        "capex_pct_gdp_alternative": 0.5920950466092842,
+        "capex_thb_bn": 100.0,
+        "capex_usd_bn": 3.041103555658277,
+        "primary": false
+      }
+    },
+    "years": [
+      2015,
+      2016,
+      2017,
+      2018,
+      2019
+    ]
+  },
+  "target_marginal": "enforced",
+  "transported_mass": 0.9999999999999999,
+  "validation": {
+    "importance_configuration": "light",
+    "importance_repeats": 5,
+    "n_eps_fallback": 0,
+    "n_eps_fallback_rel": 0,
+    "n_folds": 19,
+    "n_folds_uniform_weights": 0,
+    "n_log_domain": 0,
+    "n_log_domain_rel": 0,
+    "n_nonconverged": 0,
+    "ratio_note": "The intervals of the RMSE ratios are descriptive: they describe the cases at hand and are not a test of the route rule.",
+    "weights": "importance relearned in every fold from the training episodes"
+  },
+  "weights": "weight_importance"
+}

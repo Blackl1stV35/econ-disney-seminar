@@ -1,0 +1,4 @@
+file,panels,x labels,y labels,legend entries
+impact_routes.png,2,Annual change in receipts (US$ billion per year),Route and scaling,6
+impact_scaling_law.png,2,Cost of the park as a share of GDP (percent of GDP),Effect on receipts (percentage points of GDP),5
+ot_predictive_distribution.png,2,Mean annual effect over five years (percentage points of GDP) | Mean annual effect over five years (percent of counterfactual receipts),Density,6

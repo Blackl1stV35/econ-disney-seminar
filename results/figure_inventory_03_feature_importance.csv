@@ -1,0 +1,6 @@
+file,panels,x labels,y labels,legend entries
+importance_bars.png,1,Normalised permutation importance (share of the total),Feature,2
+importance_penalty_path.png,2,Base-10 logarithm of the standardised penalty,"Permutation importance (increase of held-out
+mean squared error, squared percentage points) | Penalty weight (share)",9
+importance_selection_frequency.png,1,Share of fold and penalty fits with a non-zero elastic net coefficient,Feature,0
+importance_rank_correlation.png,2,Outcome and sample of the run,Outcome and sample of the run | Spearman rank correlation,0

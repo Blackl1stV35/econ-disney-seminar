@@ -1,0 +1,87 @@
+{
+  "ambient_selection": {
+    "close": true,
+    "margin": 0.09583460888424944,
+    "n_economies": 19,
+    "n_episodes": 19,
+    "outcome": "att_pp",
+    "qualifying": [
+      "A2"
+    ],
+    "ratio_to_A1": {
+      "A1": 1.0,
+      "A2": 0.9125464663122607,
+      "A3": 1.4325810644802803
+    },
+    "rmse": {
+      "A1": 1.1375261021157206,
+      "A2": 1.0380454248236606,
+      "A3": 1.629598354243043
+    },
+    "rule": "A2 or A3 replaces A1 only if its leave-one-economy-out RMSE is at most 0.95 times that of A1; the smaller RMSE wins if both qualify",
+    "runner_up": "A1",
+    "selected": "A2",
+    "selection_ratio": 0.95
+  },
+  "details": "The importance diagnostics do not report a usable importance model. The leave-one-economy-out RMSE of ot_weighted is 0.9843, which is 0.868 times the RMSE of equal (1.134) and 0.978 times the RMSE of ot_uniform (1.006); the limits are 0.95 and 0.95 times, so the RMSE criterion is not met. There are 19 cases and at least 20 are required, so the case-count criterion is not met. The target support check reports that the target is supported (effective number of sources 6.47), so the support criterion is met. The leave-one-economy-out RMSE of ot_weighted is 0.948 times the RMSE of the best ambient estimator A2 (1.038); this is reported and is not used by the rule. The ratio compares like with like only when both RMSE values are computed on the same economies. The leave-one-economy-out RMSE of ot_weighted is 1.177 times the RMSE of the best neighbour predictor nn3 (0.8365); this is reported and is not used by the rule. The RMSE of ot_weighted is computed on 19 cases and the ambient RMSE values on 19 cases. At least one criterion is not met, so the primary route is ambient.",
+  "info": {
+    "best_ambient": "A2",
+    "best_neighbour": "nn3",
+    "n_ambient": 19,
+    "n_ot": 19,
+    "rmse_ratio_to_best_ambient": 0.9481829013109309,
+    "rmse_ratio_to_best_neighbour": 1.1766602794288386
+  },
+  "inputs": {
+    "importance_key": "att_pp|primary",
+    "importance_reasons": [
+      "cv_r2_stack is 0.056, below the minimum of 0.10",
+      "perm_p_value is 0.941, above the maximum of 0.10",
+      "split_half_correlation is 0.013, below the minimum of 0.50",
+      "n_cases is 19, below the minimum of 20"
+    ],
+    "importance_usable": false,
+    "loco_rmse": {
+      "equal": 1.1340615767017275,
+      "kernel": 1.0276403274655763,
+      "nn1": 1.1822904542977344,
+      "nn3": 0.8364835116892051,
+      "ot_uniform": 1.0060985801304803,
+      "ot_weighted": 0.9842569226018363
+    },
+    "n_folds": 19,
+    "n_folds_uniform_weights": 0,
+    "n_primary_episodes": 19,
+    "n_validated_economies": 19,
+    "n_validated_episodes": 19,
+    "support": {
+      "ess": 6.471676736741048,
+      "max_source_share": 0.26752482491685364,
+      "reasons": [],
+      "supported": true,
+      "weighted_outside_share": 0.0
+    },
+    "validation_weights": "importance relearned in every fold from the training economies"
+  },
+  "passed": {
+    "enough_cases": false,
+    "importance_usable": false,
+    "loco_rmse": false,
+    "target_supported": true
+  },
+  "primary": "ambient",
+  "rule": {
+    "importance_usable_required": true,
+    "min_cases": 20,
+    "rmse_ratio_equal": 0.95,
+    "rmse_ratio_uniform": 0.95,
+    "sha256": "fcc4e457562f873aedae889f37a7c181b4fab7e347e4b46fb2fe3168c809e903",
+    "support_settings": {
+      "clip": 5.0,
+      "min_ess": 2.0,
+      "min_weight": 0.1,
+      "range_tolerance": 0.1
+    },
+    "target_supported_required": true
+  }
+}

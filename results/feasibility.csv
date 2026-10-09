@@ -1,0 +1,45 @@
+case_id,iso3,opening_year,n_pre,n_post,window_end,n_donors,feasible,reason
+ARE_2008_ep,ARE,2008,13,5,2012,42,True,
+ARE_2016_ep,ARE,2016,21,4,2019,44,True,
+ARG_1997_ep,ARG,1997,2,5,2001,38,False,n_pre 2 below minimum 5
+AUS_1997_ep,AUS,1997,2,5,2001,38,False,n_pre 2 below minimum 5
+BHS_1998_ep,BHS,1998,3,5,2002,38,False,n_pre 3 below minimum 5
+BHS_2017_ep,BHS,2017,22,3,2019,45,True,
+BRA_1999_ep,BRA,1999,4,5,2003,38,False,n_pre 4 below minimum 5
+BRN_2000_ep,BRN,2000,0,4,2004,38,False,n_pre 0 below minimum 5
+CAN_2004_ep,CAN,2004,9,5,2008,40,True,
+CHN_2014_ep,CHN,2014,8,0,2018,43,False,n_post 0 below minimum 3
+CYP_2023_ep,CYP,2023,25,0,2019,50,False,n_post 0 below minimum 3
+DEU_1996_ep,DEU,1996,1,5,2000,38,False,n_pre 1 below minimum 5
+DEU_2002_ep,DEU,2002,7,5,2006,38,True,
+ESP_1995_ep,ESP,1995,0,2,1996,38,False,n_pre 0 below minimum 5; n_post 2 below minimum 3
+ESP_1997_ep,ESP,1997,2,2,1999,38,False,n_pre 2 below minimum 5; n_post 2 below minimum 3
+ESP_2000_ep,ESP,2000,4,0,2004,38,False,n_pre 4 below minimum 5; n_post 0 below minimum 3
+FRA_2002_ep,FRA,2002,5,5,2006,38,True,
+GBR_1996_ep,GBR,1996,1,3,2000,38,False,n_pre 1 below minimum 5
+GBR_2001_ep,GBR,2001,4,0,2005,38,False,n_pre 4 below minimum 5; n_post 0 below minimum 3
+GRC_2010_ep,GRC,2010,14,5,2014,43,True,
+HKG_2005_ep,HKG,2005,7,5,2009,41,True,
+IDN_2011_ep,IDN,2011,9,5,2015,43,True,
+IND_2013_ep,IND,2013,10,5,2017,43,True,
+ITA_2014_ep,ITA,2014,13,4,2018,43,True,
+JPN_2001_ep,JPN,2001,6,5,2005,38,True,
+JPN_2017_ep,JPN,2017,22,3,2019,45,True,
+KOR_2017_ep,KOR,2017,22,3,2019,45,True,
+MAC_2004_ep,MAC,2004,9,5,2008,40,True,
+MAR_2009_ep,MAR,2009,14,5,2013,42,True,
+MYS_2012_ep,MYS,2012,17,5,2016,43,True,
+NLD_2001_ep,NLD,2001,6,4,2005,38,True,
+PHL_1995_ep,PHL,1995,0,5,1999,38,False,n_pre 0 below minimum 5
+PHL_2009_ep,PHL,2009,14,5,2013,42,True,
+POL_2014_ep,POL,2014,19,5,2018,43,True,
+RUS_2014_ep,RUS,2014,13,5,2018,43,True,
+SGP_2010_ep,SGP,2010,15,5,2014,43,True,
+TUR_2013_ep,TUR,2013,8,5,2017,43,True,
+USA_1998_ep,USA,1998,3,1,1998,38,False,n_pre 3 below minimum 5; n_post 1 below minimum 3
+USA_1999_ep,USA,1999,4,2,2000,38,False,n_pre 4 below minimum 5; n_post 2 below minimum 3; other_openings 1 in post window (years 1999)
+USA_1999_ep2,USA,1999,4,2,2000,38,False,n_pre 4 below minimum 5; n_post 2 below minimum 3; other_openings 1 in post window (years 1999)
+USA_2001_ep,USA,2001,6,5,2005,38,True,
+USA_2011_ep,USA,2011,16,5,2015,43,True,
+VNM_2013_ep,VNM,2013,10,5,2017,43,True,
+ZAF_2000_ep,ZAF,2000,5,5,2004,38,True,

@@ -1,0 +1,1011 @@
+{
+  "a3_shrinkage": {
+    "capex_pct_gdp": {
+      "ratio": 0.8804878794716108,
+      "ridge_slope": 0.4582886264938143,
+      "unpenalised_slope": 0.520493963833821
+    },
+    "receipts_pct_gdp": {
+      "ratio": 0.8705377618189225,
+      "ridge_slope": -0.30619165106800655,
+      "unpenalised_slope": -0.35172701805403866
+    }
+  },
+  "ambient_selected": "A2",
+  "ambient_selection": {
+    "close": true,
+    "margin": 0.09583460888424944,
+    "n_economies": 19,
+    "n_episodes": 19,
+    "outcome": "att_pp",
+    "qualifying": [
+      "A2"
+    ],
+    "ratio_to_A1": {
+      "A1": 1.0,
+      "A2": 0.9125464663122607,
+      "A3": 1.4325810644802803
+    },
+    "rmse": {
+      "A1": 1.1375261021157206,
+      "A2": 1.0380454248236606,
+      "A3": 1.629598354243043
+    },
+    "rule": "A2 or A3 replaces A1 only if its leave-one-economy-out RMSE is at most 0.95 times that of A1; the smaller RMSE wins if both qualify",
+    "runner_up": "A1",
+    "selected": "A2",
+    "selection_ratio": 0.95
+  },
+  "baseline_years": [
+    2019,
+    2024
+  ],
+  "by_baseline_year": {
+    "2019": {
+      "absolute": {
+        "central": {
+          "kind": "median of the draws",
+          "thb_bn": 68.10468240422684,
+          "usd_bn": 2.193557067349065
+        },
+        "interval": {
+          "kind": "percentile interval of the predictive draws of the ambient estimator",
+          "level": 0.9,
+          "thb_bn": {
+            "lower": -191.83525820304172,
+            "upper": 327.04250855594984
+          },
+          "usd_bn": {
+            "lower": -6.1787467695745155,
+            "upper": 10.533584191884392
+          }
+        },
+        "share_of_gdp_pct": {
+          "q5": -1.1358470614703409,
+          "q50": 0.4032444510244119,
+          "q95": 1.936402493466524
+        },
+        "share_of_receipts_pct": {
+          "q5": -9.598649655239962,
+          "q50": 3.407679028365359,
+          "q95": 16.363866014019347
+        },
+        "thb_bn": {
+          "q5": -191.83525820304172,
+          "q50": 68.10468240422684,
+          "q95": 327.0425085559499
+        },
+        "usd_bn": {
+          "q5": -6.1787467695745155,
+          "q50": 2.193557067349065,
+          "q95": 10.533584191884392
+        }
+      },
+      "baseline": {
+        "fx_thb_per_usd": 31.0476,
+        "gdp_usd_bn": 543.977,
+        "receipts_basis": "panel",
+        "receipts_usd_bn": 64.371,
+        "receipts_usd_bn_baseline": 59.81
+      },
+      "relative": {
+        "central": {
+          "kind": "median of the draws",
+          "thb_bn": 199.06333432611117,
+          "usd_bn": 6.4115530451987
+        },
+        "interval": {
+          "kind": "percentile interval of the predictive draws of the ambient estimator",
+          "level": 0.9,
+          "thb_bn": {
+            "lower": -1396.3293883879624,
+            "upper": 1787.3170456757218
+          },
+          "usd_bn": {
+            "lower": -44.97382691054904,
+            "upper": 57.56699537728269
+          }
+        },
+        "share_of_gdp_pct": {
+          "q5": -8.26759714299484,
+          "q50": 1.1786441421601832,
+          "q95": 10.582615694649348
+        },
+        "share_of_receipts_pct": {
+          "q5": -69.8665966204487,
+          "q50": 9.960312944025569,
+          "q95": 89.4300156550041
+        },
+        "thb_bn": {
+          "q5": -1396.329388387962,
+          "q50": 199.06333432611112,
+          "q95": 1787.3170456757218
+        },
+        "usd_bn": {
+          "q5": -44.97382691054903,
+          "q50": 6.4115530451986995,
+          "q95": 57.56699537728268
+        }
+      }
+    },
+    "2024": {
+      "absolute": {
+        "central": {
+          "kind": "median of the draws",
+          "thb_bn": 75.34172865550156,
+          "usd_bn": 2.1347196695000936
+        },
+        "interval": {
+          "kind": "percentile interval of the predictive draws of the ambient estimator",
+          "level": 0.9,
+          "thb_bn": {
+            "lower": -212.22035636707744,
+            "upper": 361.7952109693366
+          },
+          "usd_bn": {
+            "lower": -6.013015324835378,
+            "upper": 10.251043704062692
+          }
+        },
+        "share_of_gdp_pct": {
+          "q5": -1.1358470614703409,
+          "q50": 0.4032444510244119,
+          "q95": 1.936402493466524
+        },
+        "share_of_receipts_pct": {
+          "q5": -13.111261305916512,
+          "q50": 4.65471413087771,
+          "q95": 22.352198589484875
+        },
+        "thb_bn": {
+          "q5": -212.22035636707744,
+          "q50": 75.34172865550154,
+          "q95": 361.79521096933667
+        },
+        "usd_bn": {
+          "q5": -6.013015324835378,
+          "q50": 2.134719669500093,
+          "q95": 10.251043704062694
+        }
+      },
+      "baseline": {
+        "fx_thb_per_usd": 35.2935,
+        "gdp_usd_bn": 529.386,
+        "receipts_basis": "ratio",
+        "receipts_usd_bn": 45.861455923557706,
+        "receipts_usd_bn_baseline": 42.276
+      },
+      "relative": {
+        "central": {
+          "kind": "median of the draws",
+          "thb_bn": 161.21875029329692,
+          "usd_bn": 4.567944530672699
+        },
+        "interval": {
+          "kind": "percentile interval of the predictive draws of the ambient estimator",
+          "level": 0.9,
+          "thb_bn": {
+            "lower": -1130.868624077813,
+            "upper": 1447.5243341885027
+          },
+          "usd_bn": {
+            "lower": -32.04183841437695,
+            "upper": 41.013907212050455
+          }
+        },
+        "share_of_gdp_pct": {
+          "q5": -6.052641817950784,
+          "q50": 0.8628759602015731,
+          "q95": 7.747448404765231
+        },
+        "share_of_receipts_pct": {
+          "q5": -69.86659662044869,
+          "q50": 9.960312944025569,
+          "q95": 89.4300156550041
+        },
+        "thb_bn": {
+          "q5": -1130.8686240778122,
+          "q50": 161.21875029329692,
+          "q95": 1447.524334188503
+        },
+        "usd_bn": {
+          "q5": -32.04183841437693,
+          "q50": 4.567944530672699,
+          "q95": 41.01390721205046
+        }
+      }
+    }
+  },
+  "claim_reference": {
+    "note": "Stated by officials in February 2026; no study cited.",
+    "share_of_gdp_per_year_percent": 1.0,
+    "status": "reference only"
+  },
+  "detection": {
+    "absolute": {
+      "alpha": 0.05,
+      "detection_probability": 0.06683779399999999,
+      "mde_normal": 4.978038847876297,
+      "minimum_detectable_effect": 4.561793210032827,
+      "null_rescale_factor": 2.344498891245949,
+      "null_sd": 1.6068060037574705,
+      "placebo_noise_added": true,
+      "power": 0.8,
+      "threshold": 3.6257167968815693,
+      "unit": "percentage points of GDP"
+    },
+    "relative": {
+      "alpha": 0.05,
+      "detection_probability": 0.4225999555,
+      "mde_normal": 67.07935955674597,
+      "minimum_detectable_effect": 60.51988333324745,
+      "null_rescale_factor": 1.0,
+      "null_sd": 28.919444420029315,
+      "placebo_noise_added": true,
+      "power": 0.8,
+      "threshold": 42.74014106971756,
+      "unit": "percent of the counterfactual receipts"
+    }
+  },
+  "effect": {
+    "att_pp": {
+      "q25": -0.20582320589653524,
+      "q5": -1.1358470614703409,
+      "q50": 0.403244451024412,
+      "q75": 1.0093207777461877,
+      "q95": 1.936402493466524
+    },
+    "att_rel_pct": {
+      "q25": -21.567646249114965,
+      "q5": -69.86659662044869,
+      "q50": 9.96031294402557,
+      "q75": 41.760682870659934,
+      "q95": 89.4300156550041
+    },
+    "interval": {
+      "att_pp": {
+        "kind": "percentile interval of the predictive draws of the ambient estimator",
+        "lower": -1.1358470614703409,
+        "upper": 1.936402493466524
+      },
+      "att_rel_pct": {
+        "kind": "percentile interval of the predictive draws of the ambient estimator",
+        "lower": -69.86659662044872,
+        "upper": 89.4300156550041
+      }
+    }
+  },
+  "predictive_method": "ot_weighted",
+  "primary_estimator": "A2",
+  "primary_route": "ambient",
+  "regression_extrapolation": {
+    "capex_pct_gdp": {
+      "case_max": 5.72571043067417,
+      "case_min": 0.004245630272419537,
+      "position": "inside",
+      "ratio_to_max": 0.27614662733163076,
+      "x_new": 1.5811356245082113
+    },
+    "receipts_pct_gdp": {
+      "case_max": 9.124259073567492,
+      "case_min": 0.5577953525785573,
+      "position": "above",
+      "ratio_to_max": 1.3315818857067827,
+      "x_new": 12.149698102858224
+    }
+  },
+  "route_info": {
+    "best_ambient": "A2",
+    "best_neighbour": "nn3",
+    "n_ambient": 19,
+    "n_ot": 19,
+    "rmse_ratio_to_best_ambient": 0.9481829013109309,
+    "rmse_ratio_to_best_neighbour": 1.1766602794288386
+  },
+  "route_passed": {
+    "enough_cases": false,
+    "importance_usable": false,
+    "loco_rmse": false,
+    "target_supported": true
+  },
+  "rule_sha256": "fcc4e457562f873aedae889f37a7c181b4fab7e347e4b46fb2fe3168c809e903",
+  "scenarios": {
+    "complex_total": {
+      "by_baseline_year": {
+        "2019": {
+          "absolute": {
+            "central": {
+              "kind": "median of the draws",
+              "thb_bn": 68.10468240422684,
+              "usd_bn": 2.193557067349065
+            },
+            "interval": {
+              "kind": "percentile interval of the predictive draws of the ambient estimator",
+              "level": 0.9,
+              "thb_bn": {
+                "lower": -191.83525820304172,
+                "upper": 327.04250855594984
+              },
+              "usd_bn": {
+                "lower": -6.1787467695745155,
+                "upper": 10.533584191884392
+              }
+            },
+            "share_of_gdp_pct": {
+              "q5": -1.1358470614703409,
+              "q50": 0.4032444510244119,
+              "q95": 1.936402493466524
+            },
+            "share_of_receipts_pct": {
+              "q5": -9.598649655239962,
+              "q50": 3.407679028365359,
+              "q95": 16.363866014019347
+            },
+            "thb_bn": {
+              "q5": -191.83525820304172,
+              "q50": 68.10468240422684,
+              "q95": 327.0425085559499
+            },
+            "usd_bn": {
+              "q5": -6.1787467695745155,
+              "q50": 2.193557067349065,
+              "q95": 10.533584191884392
+            }
+          },
+          "baseline": {
+            "fx_thb_per_usd": 31.0476,
+            "gdp_usd_bn": 543.977,
+            "receipts_basis": "panel",
+            "receipts_usd_bn": 64.371,
+            "receipts_usd_bn_baseline": 59.81
+          },
+          "relative": {
+            "central": {
+              "kind": "median of the draws",
+              "thb_bn": 199.06333432611117,
+              "usd_bn": 6.4115530451987
+            },
+            "interval": {
+              "kind": "percentile interval of the predictive draws of the ambient estimator",
+              "level": 0.9,
+              "thb_bn": {
+                "lower": -1396.3293883879624,
+                "upper": 1787.3170456757218
+              },
+              "usd_bn": {
+                "lower": -44.97382691054904,
+                "upper": 57.56699537728269
+              }
+            },
+            "share_of_gdp_pct": {
+              "q5": -8.26759714299484,
+              "q50": 1.1786441421601832,
+              "q95": 10.582615694649348
+            },
+            "share_of_receipts_pct": {
+              "q5": -69.8665966204487,
+              "q50": 9.960312944025569,
+              "q95": 89.4300156550041
+            },
+            "thb_bn": {
+              "q5": -1396.329388387962,
+              "q50": 199.06333432611112,
+              "q95": 1787.3170456757218
+            },
+            "usd_bn": {
+              "q5": -44.97382691054903,
+              "q50": 6.4115530451986995,
+              "q95": 57.56699537728268
+            }
+          }
+        },
+        "2024": {
+          "absolute": {
+            "central": {
+              "kind": "median of the draws",
+              "thb_bn": 75.34172865550156,
+              "usd_bn": 2.1347196695000936
+            },
+            "interval": {
+              "kind": "percentile interval of the predictive draws of the ambient estimator",
+              "level": 0.9,
+              "thb_bn": {
+                "lower": -212.22035636707744,
+                "upper": 361.7952109693366
+              },
+              "usd_bn": {
+                "lower": -6.013015324835378,
+                "upper": 10.251043704062692
+              }
+            },
+            "share_of_gdp_pct": {
+              "q5": -1.1358470614703409,
+              "q50": 0.4032444510244119,
+              "q95": 1.936402493466524
+            },
+            "share_of_receipts_pct": {
+              "q5": -13.111261305916512,
+              "q50": 4.65471413087771,
+              "q95": 22.352198589484875
+            },
+            "thb_bn": {
+              "q5": -212.22035636707744,
+              "q50": 75.34172865550154,
+              "q95": 361.79521096933667
+            },
+            "usd_bn": {
+              "q5": -6.013015324835378,
+              "q50": 2.134719669500093,
+              "q95": 10.251043704062694
+            }
+          },
+          "baseline": {
+            "fx_thb_per_usd": 35.2935,
+            "gdp_usd_bn": 529.386,
+            "receipts_basis": "ratio",
+            "receipts_usd_bn": 45.861455923557706,
+            "receipts_usd_bn_baseline": 42.276
+          },
+          "relative": {
+            "central": {
+              "kind": "median of the draws",
+              "thb_bn": 161.21875029329692,
+              "usd_bn": 4.567944530672699
+            },
+            "interval": {
+              "kind": "percentile interval of the predictive draws of the ambient estimator",
+              "level": 0.9,
+              "thb_bn": {
+                "lower": -1130.868624077813,
+                "upper": 1447.5243341885027
+              },
+              "usd_bn": {
+                "lower": -32.04183841437695,
+                "upper": 41.013907212050455
+              }
+            },
+            "share_of_gdp_pct": {
+              "q5": -6.052641817950784,
+              "q50": 0.8628759602015731,
+              "q95": 7.747448404765231
+            },
+            "share_of_receipts_pct": {
+              "q5": -69.86659662044869,
+              "q50": 9.960312944025569,
+              "q95": 89.4300156550041
+            },
+            "thb_bn": {
+              "q5": -1130.8686240778122,
+              "q50": 161.21875029329692,
+              "q95": 1447.524334188503
+            },
+            "usd_bn": {
+              "q5": -32.04183841437693,
+              "q50": 4.567944530672699,
+              "q95": 41.01390721205046
+            }
+          }
+        }
+      },
+      "capex_pct_gdp": 1.5811356245082113,
+      "capex_thb_bn": 300.0,
+      "detection_probability": {
+        "absolute": 0.06683779399999999,
+        "relative": 0.4225999555
+      },
+      "importance_route_reasons": [],
+      "importance_route_supported": true
+    },
+    "park_high": {
+      "by_baseline_year": {
+        "2019": {
+          "absolute": {
+            "central": {
+              "kind": "median of the draws",
+              "thb_bn": 45.33514266905021,
+              "usd_bn": 1.4601818713539922
+            },
+            "interval": {
+              "kind": "percentile interval of the predictive draws of the ambient estimator",
+              "level": 0.9,
+              "thb_bn": {
+                "lower": -206.35772578184293,
+                "upper": 296.0576905865035
+              },
+              "usd_bn": {
+                "lower": -6.646495245424539,
+                "upper": 9.53560631374095
+              }
+            },
+            "share_of_gdp_pct": {
+              "q5": -1.221833872649862,
+              "q50": 0.2684271341166984,
+              "q95": 1.7529429210685286
+            },
+            "share_of_receipts_pct": {
+              "q5": -10.32529438011611,
+              "q50": 2.268384631827985,
+              "q95": 14.813512783304516
+            },
+            "thb_bn": {
+              "q5": -206.35772578184296,
+              "q50": 45.33514266905021,
+              "q95": 296.0576905865035
+            },
+            "usd_bn": {
+              "q5": -6.64649524542454,
+              "q50": 1.4601818713539922,
+              "q95": 9.53560631374095
+            }
+          },
+          "baseline": {
+            "fx_thb_per_usd": 31.0476,
+            "gdp_usd_bn": 543.977,
+            "receipts_basis": "panel",
+            "receipts_usd_bn": 64.371,
+            "receipts_usd_bn_baseline": 59.81
+          },
+          "relative": {
+            "central": {
+              "kind": "median of the draws",
+              "thb_bn": 131.9318173548231,
+              "usd_bn": 4.249340282496009
+            },
+            "interval": {
+              "kind": "percentile interval of the predictive draws of the ambient estimator",
+              "level": 0.9,
+              "thb_bn": {
+                "lower": -1424.4932393792412,
+                "upper": 1681.392233966262
+              },
+              "usd_bn": {
+                "lower": -45.88094536708928,
+                "upper": 54.155304563517376
+              }
+            },
+            "share_of_gdp_pct": {
+              "q5": -8.434353909648618,
+              "q50": 0.7811617554595155,
+              "q95": 9.955440131387427
+            },
+            "share_of_receipts_pct": {
+              "q5": -71.27580023160937,
+              "q50": 6.601327123232525,
+              "q95": 84.12997244647028
+            },
+            "thb_bn": {
+              "q5": -1424.4932393792405,
+              "q50": 131.93181735482307,
+              "q95": 1681.3922339662622
+            },
+            "usd_bn": {
+              "q5": -45.88094536708926,
+              "q50": 4.249340282496008,
+              "q95": 54.155304563517376
+            }
+          }
+        },
+        "2024": {
+          "absolute": {
+            "central": {
+              "kind": "median of the draws",
+              "thb_bn": 50.15261648614698,
+              "usd_bn": 1.4210156682150248
+            },
+            "interval": {
+              "kind": "percentile interval of the predictive draws of the ambient estimator",
+              "level": 0.9,
+              "thb_bn": {
+                "lower": -228.28603310331388,
+                "upper": 327.517835824434
+              },
+              "usd_bn": {
+                "lower": -6.468217465066198,
+                "upper": 9.27983441212784
+              }
+            },
+            "share_of_gdp_pct": {
+              "q5": -1.2218338726498619,
+              "q50": 0.2684271341166984,
+              "q95": 1.7529429210685283
+            },
+            "share_of_receipts_pct": {
+              "q5": -14.103820593588397,
+              "q50": 3.098496634262084,
+              "q95": 20.234495886034562
+            },
+            "thb_bn": {
+              "q5": -228.28603310331388,
+              "q50": 50.15261648614698,
+              "q95": 327.5178358244339
+            },
+            "usd_bn": {
+              "q5": -6.468217465066198,
+              "q50": 1.4210156682150248,
+              "q95": 9.279834412127839
+            }
+          },
+          "baseline": {
+            "fx_thb_per_usd": 35.2935,
+            "gdp_usd_bn": 529.386,
+            "receipts_basis": "ratio",
+            "receipts_usd_bn": 45.861455923557706,
+            "receipts_usd_bn_baseline": 42.276
+          },
+          "relative": {
+            "central": {
+              "kind": "median of the draws",
+              "thb_bn": 106.84982641264895,
+              "usd_bn": 3.027464728991144
+            },
+            "interval": {
+              "kind": "percentile interval of the predictive draws of the ambient estimator",
+              "level": 0.9,
+              "thb_bn": {
+                "lower": -1153.6781528925073,
+                "upper": 1361.7372361944756
+              },
+              "usd_bn": {
+                "lower": -32.68811970738258,
+                "upper": 38.5832302320392
+              }
+            },
+            "share_of_gdp_pct": {
+              "q5": -6.174723114586063,
+              "q50": 0.5718822804137518,
+              "q95": 7.288298185452431
+            },
+            "share_of_receipts_pct": {
+              "q5": -71.27580023160937,
+              "q50": 6.601327123232524,
+              "q95": 84.12997244647026
+            },
+            "thb_bn": {
+              "q5": -1153.6781528925067,
+              "q50": 106.84982641264895,
+              "q95": 1361.737236194476
+            },
+            "usd_bn": {
+              "q5": -32.68811970738257,
+              "q50": 3.027464728991144,
+              "q95": 38.583230232039206
+            }
+          }
+        }
+      },
+      "capex_pct_gdp": 1.0540904163388076,
+      "capex_thb_bn": 200.0,
+      "detection_probability": {
+        "absolute": 0.0634475885,
+        "relative": 0.407075706
+      },
+      "importance_route_reasons": [],
+      "importance_route_supported": true
+    },
+    "park_low": {
+      "by_baseline_year": {
+        "2019": {
+          "absolute": {
+            "central": {
+              "kind": "median of the draws",
+              "thb_bn": 22.562857330283027,
+              "usd_bn": 0.7267182432871793
+            },
+            "interval": {
+              "kind": "percentile interval of the predictive draws of the ambient estimator",
+              "level": 0.9,
+              "thb_bn": {
+                "lower": -224.04942219512006,
+                "upper": 268.2244028913323
+              },
+              "usd_bn": {
+                "lower": -7.2163201727386355,
+                "upper": 8.63913484106122
+              }
+            },
+            "share_of_gdp_pct": {
+              "q5": -1.3265855307740284,
+              "q50": 0.13359356062612562,
+              "q95": 1.5881434033169086
+            },
+            "share_of_receipts_pct": {
+              "q5": -11.210514319707068,
+              "q50": 1.1289528565459281,
+              "q95": 13.42084920392913
+            },
+            "thb_bn": {
+              "q5": -224.0494221951201,
+              "q50": 22.56285733028303,
+              "q95": 268.2244028913323
+            },
+            "usd_bn": {
+              "q5": -7.216320172738636,
+              "q50": 0.7267182432871794,
+              "q95": 8.63913484106122
+            }
+          },
+          "baseline": {
+            "fx_thb_per_usd": 31.0476,
+            "gdp_usd_bn": 543.977,
+            "receipts_basis": "panel",
+            "receipts_usd_bn": 64.371,
+            "receipts_usd_bn_baseline": 59.81
+          },
+          "relative": {
+            "central": {
+              "kind": "median of the draws",
+              "thb_bn": 64.77647316124855,
+              "usd_bn": 2.0863600781138816
+            },
+            "interval": {
+              "kind": "percentile interval of the predictive draws of the ambient estimator",
+              "level": 0.9,
+              "thb_bn": {
+                "lower": -1467.7924707215386,
+                "upper": 1590.4875274777671
+              },
+              "usd_bn": {
+                "lower": -47.27555336713751,
+                "upper": 51.22739044170136
+              }
+            },
+            "share_of_gdp_pct": {
+              "q5": -8.690726513646258,
+              "q50": 0.38353828895594505,
+              "q95": 9.417197867134337
+            },
+            "share_of_receipts_pct": {
+              "q5": -73.44231620937612,
+              "q50": 3.24114908594535,
+              "q95": 79.58147370974719
+            },
+            "thb_bn": {
+              "q5": -1467.7924707215382,
+              "q50": 64.77647316124853,
+              "q95": 1590.487527477767
+            },
+            "usd_bn": {
+              "q5": -47.2755533671375,
+              "q50": 2.086360078113881,
+              "q95": 51.22739044170135
+            }
+          }
+        },
+        "2024": {
+          "absolute": {
+            "central": {
+              "kind": "median of the draws",
+              "thb_bn": 24.96046695558005,
+              "usd_bn": 0.7072256068562214
+            },
+            "interval": {
+              "kind": "percentile interval of the predictive draws of the ambient estimator",
+              "level": 0.9,
+              "thb_bn": {
+                "lower": -247.8577122238953,
+                "upper": 296.7268837915977
+              },
+              "usd_bn": {
+                "lower": -7.022758077943397,
+                "upper": 8.40740883708325
+              }
+            },
+            "share_of_gdp_pct": {
+              "q5": -1.3265855307740284,
+              "q50": 0.13359356062612562,
+              "q95": 1.5881434033169084
+            },
+            "share_of_receipts_pct": {
+              "q5": -15.31298546136214,
+              "q50": 1.5420914853532595,
+              "q95": 18.332189128702748
+            },
+            "thb_bn": {
+              "q5": -247.85771222389533,
+              "q50": 24.96046695558005,
+              "q95": 296.72688379159763
+            },
+            "usd_bn": {
+              "q5": -7.022758077943398,
+              "q50": 0.7072256068562214,
+              "q95": 8.40740883708325
+            }
+          },
+          "baseline": {
+            "fx_thb_per_usd": 35.2935,
+            "gdp_usd_bn": 529.386,
+            "receipts_basis": "ratio",
+            "receipts_usd_bn": 45.861455923557706,
+            "receipts_usd_bn_baseline": 42.276
+          },
+          "relative": {
+            "central": {
+              "kind": "median of the draws",
+              "thb_bn": 52.46160518117046,
+              "usd_bn": 1.4864381594676204
+            },
+            "interval": {
+              "kind": "percentile interval of the predictive draws of the ambient estimator",
+              "level": 0.9,
+              "thb_bn": {
+                "lower": -1188.7456252087782,
+                "upper": 1288.1147219054053
+              },
+              "usd_bn": {
+                "lower": -33.68171547760291,
+                "upper": 36.49722248871337
+              }
+            },
+            "share_of_gdp_pct": {
+              "q5": -6.362411449793329,
+              "q50": 0.2807853172293223,
+              "q95": 6.894255323849397
+            },
+            "share_of_receipts_pct": {
+              "q5": -73.44231620937612,
+              "q50": 3.2411490859453496,
+              "q95": 79.58147370974719
+            },
+            "thb_bn": {
+              "q5": -1188.7456252087784,
+              "q50": 52.461605181170455,
+              "q95": 1288.1147219054053
+            },
+            "usd_bn": {
+              "q5": -33.68171547760291,
+              "q50": 1.4864381594676201,
+              "q95": 36.49722248871337
+            }
+          }
+        }
+      },
+      "capex_pct_gdp": 0.5270452081694038,
+      "capex_thb_bn": 100.0,
+      "detection_probability": {
+        "absolute": 0.0611986845,
+        "relative": 0.396820338
+      },
+      "importance_route_reasons": [],
+      "importance_route_supported": true
+    }
+  },
+  "sensitivity": {
+    "ot_importance_sampling": {
+      "att_pp": {
+        "q25": -1.338413061113745,
+        "q5": -1.8081037704267247,
+        "q50": -0.9846104186522461,
+        "q75": -0.5679628288215764,
+        "q95": -0.13051229573905074
+      },
+      "att_rel_pct": {
+        "q25": -22.724902409837338,
+        "q5": -33.086218580897295,
+        "q50": -15.723080149997653,
+        "q75": -8.485437300431169,
+        "q95": 3.860135750794514
+      }
+    }
+  },
+  "support": {
+    "ess": 6.471676736741048,
+    "ess_ok": true,
+    "features": {
+      "air_pax_per_capita": {
+        "clipped": false,
+        "excess": 0.0,
+        "outside": false,
+        "source_max": 4.183123680386067,
+        "source_min": 0.055622361841772085,
+        "target": 0.9936017874714129,
+        "weight": 0.07007917778865244,
+        "z_target": 0.8696744698414919
+      },
+      "arrivals_per_capita": {
+        "clipped": false,
+        "excess": 0.0,
+        "outside": false,
+        "source_max": 2.660004946513272,
+        "source_min": 0.004930564029041143,
+        "target": 0.5001673196839688,
+        "weight": 0.005118043956228125,
+        "z_target": -0.10598098279314323
+      },
+      "capex_pct_gdp": {
+        "clipped": true,
+        "excess": 0.0,
+        "outside": false,
+        "source_max": 5.72571043067417,
+        "source_min": 0.004245630272419537,
+        "target": 1.5811356245082113,
+        "weight": 0.02293828222217203,
+        "z_target": 12.672013658138303
+      },
+      "is_integrated_resort": {
+        "clipped": false,
+        "excess": 0.0,
+        "outside": false,
+        "source_max": 1.0,
+        "source_min": 0.0,
+        "target": 0.0,
+        "weight": 0.0,
+        "z_target": 0.0
+      },
+      "log_gdp_pc": {
+        "clipped": false,
+        "excess": 0.0,
+        "outside": false,
+        "source_max": 10.781686781947506,
+        "source_min": 7.2490533151237075,
+        "target": 8.76609677766532,
+        "weight": 0.5887835775821335,
+        "z_target": -0.30874507730181866
+      },
+      "log_pop": {
+        "clipped": false,
+        "excess": 0.0,
+        "outside": false,
+        "source_max": 20.955206699859577,
+        "source_min": 15.384615253622814,
+        "target": 18.080444048639286,
+        "weight": 0.3057497307388842,
+        "z_target": 0.9848169242080967
+      },
+      "log_receipts_per_arrival": {
+        "clipped": false,
+        "excess": 0.0,
+        "outside": false,
+        "source_max": 7.933108998043591,
+        "source_min": 5.176582476313517,
+        "target": 7.37968515364603,
+        "weight": 0.007331187711929876,
+        "z_target": 0.8384547483720094
+      },
+      "receipts_growth_pre": {
+        "clipped": false,
+        "excess": 0.0,
+        "outside": false,
+        "source_max": 0.4019072704309504,
+        "source_min": -0.0060142926916263665,
+        "target": 0.08553175761034595,
+        "weight": 0.0,
+        "z_target": 0.32515903315918326
+      },
+      "receipts_pct_gdp": {
+        "clipped": false,
+        "excess": 0.21625095726680346,
+        "outside": true,
+        "source_max": 9.124259073567492,
+        "source_min": 0.5577953525785573,
+        "target": 11.833411425721586,
+        "weight": 0.0,
+        "z_target": 2.7160617841721346
+      }
+    },
+    "max_source_share": 0.26752482491685364,
+    "n_sources": 19,
+    "range_ok": true,
+    "reasons": [],
+    "settings": {
+      "clip": 5.0,
+      "min_ess": 2.0,
+      "min_weight": 0.1,
+      "range_tolerance": 0.1
+    },
+    "supported": true,
+    "weighted_outside_share": 0.0
+  },
+  "target": {
+    "capex_pct_gdp": 1.5811356245082113,
+    "capex_pct_gdp_alternative": 1.776285139827853,
+    "capex_thb_bn": 300.0,
+    "capex_usd_bn": 9.123310666974831,
+    "cost_year": 2025,
+    "cost_year_alternative": 2019,
+    "fx_thb_per_usd": 32.8828,
+    "name": "Thailand",
+    "receipts_basis": "panel series of international tourism receipts; years without a panel value use the ratio of the panel to the baseline",
+    "receipts_pct_gdp": 12.149698102858224,
+    "scenario": "complex_total"
+  }
+}

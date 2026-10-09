@@ -1,0 +1,5 @@
+file,panels,x labels,y labels,legend entries
+ot_loco_validation.png,2,Leave-one-economy-out RMSE (percentage points of GDP) | RMSE of ot_weighted divided by RMSE of the comparator (ratio),Method | Comparison,5
+ot_plan_heatmap.png,2,Target year of the feature vector,Source episode (sorted by mass sent) | Transported mass,0
+ot_feature_space.png,1,First principal component (58 percent of the variance; weighted standardised units),Second principal component (26 percent of the variance; weighted standardised units),2
+ot_target_support.png,1,"Standardised feature value, not clipped (robust standard deviations from the reference median; linear within the clip bound, logarithmic beyond)",Feature (importance weight),5

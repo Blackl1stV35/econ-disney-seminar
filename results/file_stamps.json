@@ -1,0 +1,732 @@
+{
+  "files": {
+    "data/processed/global_panel.csv": {
+      "inputs": {},
+      "sha256": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+      "stage": "00_build_global_panel"
+    },
+    "figures/case_effect_vs_capex.png": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "results/donor_eligibility.csv": "4554e9fd6a6f01c48656a061bf55983d6f7488e5c4a8c2d2069be0459ed443ff",
+        "results/panel_coverage.csv": "37ded335eabf606430d148ec35e049c842b260efe878e758c043e9cddf9cf345"
+      },
+      "sha256": "3302619e12a096abc931de4bef4371cb1a6d06002b0fca15ac9a12a577c6e125",
+      "stage": "02_case_effects"
+    },
+    "figures/case_effects_forest.png": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "results/donor_eligibility.csv": "4554e9fd6a6f01c48656a061bf55983d6f7488e5c4a8c2d2069be0459ed443ff",
+        "results/panel_coverage.csv": "37ded335eabf606430d148ec35e049c842b260efe878e758c043e9cddf9cf345"
+      },
+      "sha256": "3ebd33db6c78552d46b00b9e5e3bb04bba7ad85038d6ae40dd421b271ffccb02",
+      "stage": "02_case_effects"
+    },
+    "figures/case_estimator_comparison.png": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "results/donor_eligibility.csv": "4554e9fd6a6f01c48656a061bf55983d6f7488e5c4a8c2d2069be0459ed443ff",
+        "results/panel_coverage.csv": "37ded335eabf606430d148ec35e049c842b260efe878e758c043e9cddf9cf345"
+      },
+      "sha256": "7b1821013d8ed7abbad792b6455bdef6f1a688f04d6e38c14fc05dcaaa311663",
+      "stage": "02_case_effects"
+    },
+    "figures/case_gap_paths.png": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "results/donor_eligibility.csv": "4554e9fd6a6f01c48656a061bf55983d6f7488e5c4a8c2d2069be0459ed443ff",
+        "results/panel_coverage.csv": "37ded335eabf606430d148ec35e049c842b260efe878e758c043e9cddf9cf345"
+      },
+      "sha256": "01b5ad7c3aff92ef221b3c3eba4690c84bf015a725bdb11d570b5a40e5a02a67",
+      "stage": "02_case_effects"
+    },
+    "figures/impact_routes.png": {
+      "inputs": {
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features.csv": "c94fa5cff06e1532891925cfe47328397e749dc5a429110e3b7f37185d8e51ec",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/importance_diagnostics.json": "19df02cff65caef540edab5a15e8e156f5d20e83c3de960ad16e6d1eab6bf608",
+        "results/loco_fold_weights.csv": "bcb87e76584b9650ce5672381bae082c7d716a6db52a715047770f8be31fe44c",
+        "results/loco_summary.csv": "602a55112f6cbcd34b0ef152f6e565560b732fa1a77de7955f0cc9568a34fc81",
+        "results/loco_table.csv": "dd6c0c9ed7515c335d830ece780afc67f9c416d81035508fb5ef3cb44d61527b",
+        "results/thailand_null_draws.csv": "0a226f21b4cac5332711706d09e966f01515078cebf9ebc8e2d4ec92f591c916",
+        "results/thailand_scenario_draws.csv": "41488939c12d41104e84a4706e26faaad276a0d3358ddcdf0db1f7ef09639462",
+        "results/thailand_target_baseline.csv": "ad1fad8381e476e2f999be2a7013f4c100434418e46bac28b604f644e3d2fbbf",
+        "results/thailand_transport.json": "bb77e06d8cd27917370a4d75ae4f6c4cd9bedac553b8536cac6817e60ae76313",
+        "results/thailand_transport_draws.csv": "14b442d99c61d6a384c02a6f3bbf51feae0298365dcccbac3f0c990283f48169",
+        "results/transport_sensitivity.csv": "6a819fe5911276700b37a86777a265c2502fd27dd442a86658c7431b3d32fca6",
+        "results/transport_usage.csv": "5105b3f5eee800ed422f6ab5bd3a58843abc6eb86d536afc6d3839a451f6371a"
+      },
+      "sha256": "139981341e8b26ccd876b1d3f3fadd00787c13a889c9090f5580236f27bb4ab9",
+      "stage": "05_thailand_impact"
+    },
+    "figures/impact_scaling_law.png": {
+      "inputs": {
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features.csv": "c94fa5cff06e1532891925cfe47328397e749dc5a429110e3b7f37185d8e51ec",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/importance_diagnostics.json": "19df02cff65caef540edab5a15e8e156f5d20e83c3de960ad16e6d1eab6bf608",
+        "results/loco_fold_weights.csv": "bcb87e76584b9650ce5672381bae082c7d716a6db52a715047770f8be31fe44c",
+        "results/loco_summary.csv": "602a55112f6cbcd34b0ef152f6e565560b732fa1a77de7955f0cc9568a34fc81",
+        "results/loco_table.csv": "dd6c0c9ed7515c335d830ece780afc67f9c416d81035508fb5ef3cb44d61527b",
+        "results/thailand_null_draws.csv": "0a226f21b4cac5332711706d09e966f01515078cebf9ebc8e2d4ec92f591c916",
+        "results/thailand_scenario_draws.csv": "41488939c12d41104e84a4706e26faaad276a0d3358ddcdf0db1f7ef09639462",
+        "results/thailand_target_baseline.csv": "ad1fad8381e476e2f999be2a7013f4c100434418e46bac28b604f644e3d2fbbf",
+        "results/thailand_transport.json": "bb77e06d8cd27917370a4d75ae4f6c4cd9bedac553b8536cac6817e60ae76313",
+        "results/thailand_transport_draws.csv": "14b442d99c61d6a384c02a6f3bbf51feae0298365dcccbac3f0c990283f48169",
+        "results/transport_sensitivity.csv": "6a819fe5911276700b37a86777a265c2502fd27dd442a86658c7431b3d32fca6",
+        "results/transport_usage.csv": "5105b3f5eee800ed422f6ab5bd3a58843abc6eb86d536afc6d3839a451f6371a"
+      },
+      "sha256": "64b1c8582ec466d37187c8760002cb27b07a5af487a43da2c3880722a950fa59",
+      "stage": "05_thailand_impact"
+    },
+    "figures/importance_bars.png": {
+      "inputs": {
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_first_opening_imputed.csv": "d4dbc18fa09fe73ec2e195b0ce15245a079a57a9d96aa4a0e3c0b38c7ea45ffb",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/imputation_report.csv": "1dd00c253bd0c68957522e3fe9856df80cc3f57010890586672650a9b330d2b6",
+        "results/imputation_report_first_opening.csv": "79e2753155fcf96175220433bff8e18b14b1b470ad9645c0470d261be34887e3"
+      },
+      "sha256": "f09baacf9b3a6b1bae3da004558f09bdc52d05a0cff50cfebfc6ee1d1d138c02",
+      "stage": "03_feature_importance"
+    },
+    "figures/importance_penalty_path.png": {
+      "inputs": {
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_first_opening_imputed.csv": "d4dbc18fa09fe73ec2e195b0ce15245a079a57a9d96aa4a0e3c0b38c7ea45ffb",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/imputation_report.csv": "1dd00c253bd0c68957522e3fe9856df80cc3f57010890586672650a9b330d2b6",
+        "results/imputation_report_first_opening.csv": "79e2753155fcf96175220433bff8e18b14b1b470ad9645c0470d261be34887e3"
+      },
+      "sha256": "8c052eab24db9e488c608988d35ad20ca7649033e3f3f4d10a7f7aeeee5fec76",
+      "stage": "03_feature_importance"
+    },
+    "figures/importance_rank_correlation.png": {
+      "inputs": {
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_first_opening_imputed.csv": "d4dbc18fa09fe73ec2e195b0ce15245a079a57a9d96aa4a0e3c0b38c7ea45ffb",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/imputation_report.csv": "1dd00c253bd0c68957522e3fe9856df80cc3f57010890586672650a9b330d2b6",
+        "results/imputation_report_first_opening.csv": "79e2753155fcf96175220433bff8e18b14b1b470ad9645c0470d261be34887e3"
+      },
+      "sha256": "e216ecca08f136b776678f6ad0dd2d0a24acc736b19c3201a3609fc719953108",
+      "stage": "03_feature_importance"
+    },
+    "figures/importance_selection_frequency.png": {
+      "inputs": {
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_first_opening_imputed.csv": "d4dbc18fa09fe73ec2e195b0ce15245a079a57a9d96aa4a0e3c0b38c7ea45ffb",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/imputation_report.csv": "1dd00c253bd0c68957522e3fe9856df80cc3f57010890586672650a9b330d2b6",
+        "results/imputation_report_first_opening.csv": "79e2753155fcf96175220433bff8e18b14b1b470ad9645c0470d261be34887e3"
+      },
+      "sha256": "0cf9b842e138b940dd3d1974646e5a3e1931fff9e95c276cc4c14b379b39d9f7",
+      "stage": "03_feature_importance"
+    },
+    "figures/ot_feature_space.png": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "data/processed/thailand_baseline.csv": "2a5b4d28baea34fd6a37ba54a73c8aade4d29ad55868cec2c59f81817d6ab534",
+        "data/processed/thailand_proposal.json": "4075784fbcf00c96109050f84701b0121364fcc7bde0693b142d437188edc860",
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/case_placebos.csv": "c75081aa79277183db4b6fab16395771077639219b56a52397fe565121e94207",
+        "results/reference_features.csv": "08656183bebce926ccf5742c84b480f57996250f73434063bad849da01d6dd2d",
+        "results/transport_weights.csv": "e301953a7f5bdd14bc684f4ed2e735a7ef1104cf3aff3211b1a95547c26065c3"
+      },
+      "sha256": "6ae750f18050dd77e28406e9c5c1c338e89d234d3e4b5a260956dbf2493e4e75",
+      "stage": "04_optimal_transport"
+    },
+    "figures/ot_loco_validation.png": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "data/processed/thailand_baseline.csv": "2a5b4d28baea34fd6a37ba54a73c8aade4d29ad55868cec2c59f81817d6ab534",
+        "data/processed/thailand_proposal.json": "4075784fbcf00c96109050f84701b0121364fcc7bde0693b142d437188edc860",
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/case_placebos.csv": "c75081aa79277183db4b6fab16395771077639219b56a52397fe565121e94207",
+        "results/reference_features.csv": "08656183bebce926ccf5742c84b480f57996250f73434063bad849da01d6dd2d",
+        "results/transport_weights.csv": "e301953a7f5bdd14bc684f4ed2e735a7ef1104cf3aff3211b1a95547c26065c3"
+      },
+      "sha256": "31bce5d38db950e4bcd4039c9a6a3041eaecaee37012fc0bafd511f78dc1dd69",
+      "stage": "04_optimal_transport"
+    },
+    "figures/ot_plan_heatmap.png": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "data/processed/thailand_baseline.csv": "2a5b4d28baea34fd6a37ba54a73c8aade4d29ad55868cec2c59f81817d6ab534",
+        "data/processed/thailand_proposal.json": "4075784fbcf00c96109050f84701b0121364fcc7bde0693b142d437188edc860",
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/case_placebos.csv": "c75081aa79277183db4b6fab16395771077639219b56a52397fe565121e94207",
+        "results/reference_features.csv": "08656183bebce926ccf5742c84b480f57996250f73434063bad849da01d6dd2d",
+        "results/transport_weights.csv": "e301953a7f5bdd14bc684f4ed2e735a7ef1104cf3aff3211b1a95547c26065c3"
+      },
+      "sha256": "c3dc394b9db7344239395b86bc005c6278aa8f9974e4c0f5de362f4858c29246",
+      "stage": "04_optimal_transport"
+    },
+    "figures/ot_predictive_distribution.png": {
+      "inputs": {
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features.csv": "c94fa5cff06e1532891925cfe47328397e749dc5a429110e3b7f37185d8e51ec",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/importance_diagnostics.json": "19df02cff65caef540edab5a15e8e156f5d20e83c3de960ad16e6d1eab6bf608",
+        "results/loco_fold_weights.csv": "bcb87e76584b9650ce5672381bae082c7d716a6db52a715047770f8be31fe44c",
+        "results/loco_summary.csv": "602a55112f6cbcd34b0ef152f6e565560b732fa1a77de7955f0cc9568a34fc81",
+        "results/loco_table.csv": "dd6c0c9ed7515c335d830ece780afc67f9c416d81035508fb5ef3cb44d61527b",
+        "results/thailand_null_draws.csv": "0a226f21b4cac5332711706d09e966f01515078cebf9ebc8e2d4ec92f591c916",
+        "results/thailand_scenario_draws.csv": "41488939c12d41104e84a4706e26faaad276a0d3358ddcdf0db1f7ef09639462",
+        "results/thailand_target_baseline.csv": "ad1fad8381e476e2f999be2a7013f4c100434418e46bac28b604f644e3d2fbbf",
+        "results/thailand_transport.json": "bb77e06d8cd27917370a4d75ae4f6c4cd9bedac553b8536cac6817e60ae76313",
+        "results/thailand_transport_draws.csv": "14b442d99c61d6a384c02a6f3bbf51feae0298365dcccbac3f0c990283f48169",
+        "results/transport_sensitivity.csv": "6a819fe5911276700b37a86777a265c2502fd27dd442a86658c7431b3d32fca6",
+        "results/transport_usage.csv": "5105b3f5eee800ed422f6ab5bd3a58843abc6eb86d536afc6d3839a451f6371a"
+      },
+      "sha256": "9a6360bda651919dc776a77e885d29d472c01edd64c4934ca807c45c4aba0457",
+      "stage": "05_thailand_impact"
+    },
+    "figures/ot_target_support.png": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "data/processed/thailand_baseline.csv": "2a5b4d28baea34fd6a37ba54a73c8aade4d29ad55868cec2c59f81817d6ab534",
+        "data/processed/thailand_proposal.json": "4075784fbcf00c96109050f84701b0121364fcc7bde0693b142d437188edc860",
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/case_placebos.csv": "c75081aa79277183db4b6fab16395771077639219b56a52397fe565121e94207",
+        "results/reference_features.csv": "08656183bebce926ccf5742c84b480f57996250f73434063bad849da01d6dd2d",
+        "results/transport_weights.csv": "e301953a7f5bdd14bc684f4ed2e735a7ef1104cf3aff3211b1a95547c26065c3"
+      },
+      "sha256": "93202f3a12f0df92de9c16c7fff19b5b18d40e30070df7b4702b070252260308",
+      "stage": "04_optimal_transport"
+    },
+    "figures/outcome_by_year.png": {
+      "inputs": {},
+      "sha256": "4e0a9fa14996974188c63b31ecdb2b8a6e41c71bb5d2775f1e23bd25aa0fdcd2",
+      "stage": "00_build_global_panel"
+    },
+    "figures/outcome_coverage_heatmap.png": {
+      "inputs": {},
+      "sha256": "21a574a06df293667ae6e6070f9e6f4e4f104b3c24f7a7b55a489770cdb92fb6",
+      "stage": "00_build_global_panel"
+    },
+    "results/ambient_loeo.csv": {
+      "inputs": {
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features.csv": "c94fa5cff06e1532891925cfe47328397e749dc5a429110e3b7f37185d8e51ec",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/importance_diagnostics.json": "19df02cff65caef540edab5a15e8e156f5d20e83c3de960ad16e6d1eab6bf608",
+        "results/loco_fold_weights.csv": "bcb87e76584b9650ce5672381bae082c7d716a6db52a715047770f8be31fe44c",
+        "results/loco_summary.csv": "602a55112f6cbcd34b0ef152f6e565560b732fa1a77de7955f0cc9568a34fc81",
+        "results/loco_table.csv": "dd6c0c9ed7515c335d830ece780afc67f9c416d81035508fb5ef3cb44d61527b",
+        "results/thailand_null_draws.csv": "0a226f21b4cac5332711706d09e966f01515078cebf9ebc8e2d4ec92f591c916",
+        "results/thailand_scenario_draws.csv": "41488939c12d41104e84a4706e26faaad276a0d3358ddcdf0db1f7ef09639462",
+        "results/thailand_target_baseline.csv": "ad1fad8381e476e2f999be2a7013f4c100434418e46bac28b604f644e3d2fbbf",
+        "results/thailand_transport.json": "bb77e06d8cd27917370a4d75ae4f6c4cd9bedac553b8536cac6817e60ae76313",
+        "results/thailand_transport_draws.csv": "14b442d99c61d6a384c02a6f3bbf51feae0298365dcccbac3f0c990283f48169",
+        "results/transport_sensitivity.csv": "6a819fe5911276700b37a86777a265c2502fd27dd442a86658c7431b3d32fca6",
+        "results/transport_usage.csv": "5105b3f5eee800ed422f6ab5bd3a58843abc6eb86d536afc6d3839a451f6371a"
+      },
+      "sha256": "d6ce302f2bc71e10f68d0c3c33d0d1bba7edad5a80555d849ff3f7c2b5803059",
+      "stage": "05_thailand_impact"
+    },
+    "results/case_effects.csv": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "results/donor_eligibility.csv": "4554e9fd6a6f01c48656a061bf55983d6f7488e5c4a8c2d2069be0459ed443ff",
+        "results/panel_coverage.csv": "37ded335eabf606430d148ec35e049c842b260efe878e758c043e9cddf9cf345"
+      },
+      "sha256": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+      "stage": "02_case_effects"
+    },
+    "results/case_effects_robustness.csv": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "results/donor_eligibility.csv": "4554e9fd6a6f01c48656a061bf55983d6f7488e5c4a8c2d2069be0459ed443ff",
+        "results/panel_coverage.csv": "37ded335eabf606430d148ec35e049c842b260efe878e758c043e9cddf9cf345"
+      },
+      "sha256": "0788caee2f9bb4d7758426bc70a26d62c3b46d14de6324b4e8a80c06eaefb067",
+      "stage": "02_case_effects"
+    },
+    "results/case_features.csv": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "results/donor_eligibility.csv": "4554e9fd6a6f01c48656a061bf55983d6f7488e5c4a8c2d2069be0459ed443ff",
+        "results/panel_coverage.csv": "37ded335eabf606430d148ec35e049c842b260efe878e758c043e9cddf9cf345"
+      },
+      "sha256": "c94fa5cff06e1532891925cfe47328397e749dc5a429110e3b7f37185d8e51ec",
+      "stage": "02_case_effects"
+    },
+    "results/case_features_first_opening_imputed.csv": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "results/donor_eligibility.csv": "4554e9fd6a6f01c48656a061bf55983d6f7488e5c4a8c2d2069be0459ed443ff",
+        "results/panel_coverage.csv": "37ded335eabf606430d148ec35e049c842b260efe878e758c043e9cddf9cf345"
+      },
+      "sha256": "d4dbc18fa09fe73ec2e195b0ce15245a079a57a9d96aa4a0e3c0b38c7ea45ffb",
+      "stage": "02_case_effects"
+    },
+    "results/case_features_imputed.csv": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "results/donor_eligibility.csv": "4554e9fd6a6f01c48656a061bf55983d6f7488e5c4a8c2d2069be0459ed443ff",
+        "results/panel_coverage.csv": "37ded335eabf606430d148ec35e049c842b260efe878e758c043e9cddf9cf345"
+      },
+      "sha256": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+      "stage": "02_case_effects"
+    },
+    "results/case_placebos.csv": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "results/donor_eligibility.csv": "4554e9fd6a6f01c48656a061bf55983d6f7488e5c4a8c2d2069be0459ed443ff",
+        "results/panel_coverage.csv": "37ded335eabf606430d148ec35e049c842b260efe878e758c043e9cddf9cf345"
+      },
+      "sha256": "c75081aa79277183db4b6fab16395771077639219b56a52397fe565121e94207",
+      "stage": "02_case_effects"
+    },
+    "results/donor_eligibility.csv": {
+      "inputs": {},
+      "sha256": "4554e9fd6a6f01c48656a061bf55983d6f7488e5c4a8c2d2069be0459ed443ff",
+      "stage": "00_build_global_panel"
+    },
+    "results/episodes.csv": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "results/donor_eligibility.csv": "4554e9fd6a6f01c48656a061bf55983d6f7488e5c4a8c2d2069be0459ed443ff",
+        "results/panel_coverage.csv": "37ded335eabf606430d148ec35e049c842b260efe878e758c043e9cddf9cf345"
+      },
+      "sha256": "d942ef2fe5bb5d126fc41528da030b4c57a75f735b2eff646ebec98c93e135ef",
+      "stage": "02_case_effects"
+    },
+    "results/feasibility.csv": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "results/donor_eligibility.csv": "4554e9fd6a6f01c48656a061bf55983d6f7488e5c4a8c2d2069be0459ed443ff",
+        "results/panel_coverage.csv": "37ded335eabf606430d148ec35e049c842b260efe878e758c043e9cddf9cf345"
+      },
+      "sha256": "112db87394a14e4cb313305cf5a074adb8325ec2837e56e44d1f5bc7f644589c",
+      "stage": "02_case_effects"
+    },
+    "results/feature_importance.csv": {
+      "inputs": {
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_first_opening_imputed.csv": "d4dbc18fa09fe73ec2e195b0ce15245a079a57a9d96aa4a0e3c0b38c7ea45ffb",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/imputation_report.csv": "1dd00c253bd0c68957522e3fe9856df80cc3f57010890586672650a9b330d2b6",
+        "results/imputation_report_first_opening.csv": "79e2753155fcf96175220433bff8e18b14b1b470ad9645c0470d261be34887e3"
+      },
+      "sha256": "c986786fc0bbdc63d145b660737e9bfcdabc3398bd60fe8e964f89ea7fd7f75d",
+      "stage": "03_feature_importance"
+    },
+    "results/figure_inventory_00_build_global_panel.csv": {
+      "inputs": {},
+      "sha256": "ec1e929e81bc50f4b466382b055b1f963c4ebd6f1acd91d42a5c5ef6983b2f68",
+      "stage": "00_build_global_panel"
+    },
+    "results/figure_inventory_02_case_effects.csv": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "results/donor_eligibility.csv": "4554e9fd6a6f01c48656a061bf55983d6f7488e5c4a8c2d2069be0459ed443ff",
+        "results/panel_coverage.csv": "37ded335eabf606430d148ec35e049c842b260efe878e758c043e9cddf9cf345"
+      },
+      "sha256": "dafd4d736c4f900018947caa54ead72f58858dff93069a9697717a0a22ac177d",
+      "stage": "02_case_effects"
+    },
+    "results/figure_inventory_03_feature_importance.csv": {
+      "inputs": {
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_first_opening_imputed.csv": "d4dbc18fa09fe73ec2e195b0ce15245a079a57a9d96aa4a0e3c0b38c7ea45ffb",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/imputation_report.csv": "1dd00c253bd0c68957522e3fe9856df80cc3f57010890586672650a9b330d2b6",
+        "results/imputation_report_first_opening.csv": "79e2753155fcf96175220433bff8e18b14b1b470ad9645c0470d261be34887e3"
+      },
+      "sha256": "e28ee274ecc1335bcf3f96c168d671f186af1750d6885466710001418a88aa26",
+      "stage": "03_feature_importance"
+    },
+    "results/figure_inventory_04_optimal_transport.csv": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "data/processed/thailand_baseline.csv": "2a5b4d28baea34fd6a37ba54a73c8aade4d29ad55868cec2c59f81817d6ab534",
+        "data/processed/thailand_proposal.json": "4075784fbcf00c96109050f84701b0121364fcc7bde0693b142d437188edc860",
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/case_placebos.csv": "c75081aa79277183db4b6fab16395771077639219b56a52397fe565121e94207",
+        "results/reference_features.csv": "08656183bebce926ccf5742c84b480f57996250f73434063bad849da01d6dd2d",
+        "results/transport_weights.csv": "e301953a7f5bdd14bc684f4ed2e735a7ef1104cf3aff3211b1a95547c26065c3"
+      },
+      "sha256": "b62c35abb1e0f2ea3c19f21276f4b3159beb9ba73f4ec8c163ffe0c52466b7d1",
+      "stage": "04_optimal_transport"
+    },
+    "results/figure_inventory_05_thailand_impact.csv": {
+      "inputs": {
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features.csv": "c94fa5cff06e1532891925cfe47328397e749dc5a429110e3b7f37185d8e51ec",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/importance_diagnostics.json": "19df02cff65caef540edab5a15e8e156f5d20e83c3de960ad16e6d1eab6bf608",
+        "results/loco_fold_weights.csv": "bcb87e76584b9650ce5672381bae082c7d716a6db52a715047770f8be31fe44c",
+        "results/loco_summary.csv": "602a55112f6cbcd34b0ef152f6e565560b732fa1a77de7955f0cc9568a34fc81",
+        "results/loco_table.csv": "dd6c0c9ed7515c335d830ece780afc67f9c416d81035508fb5ef3cb44d61527b",
+        "results/thailand_null_draws.csv": "0a226f21b4cac5332711706d09e966f01515078cebf9ebc8e2d4ec92f591c916",
+        "results/thailand_scenario_draws.csv": "41488939c12d41104e84a4706e26faaad276a0d3358ddcdf0db1f7ef09639462",
+        "results/thailand_target_baseline.csv": "ad1fad8381e476e2f999be2a7013f4c100434418e46bac28b604f644e3d2fbbf",
+        "results/thailand_transport.json": "bb77e06d8cd27917370a4d75ae4f6c4cd9bedac553b8536cac6817e60ae76313",
+        "results/thailand_transport_draws.csv": "14b442d99c61d6a384c02a6f3bbf51feae0298365dcccbac3f0c990283f48169",
+        "results/transport_sensitivity.csv": "6a819fe5911276700b37a86777a265c2502fd27dd442a86658c7431b3d32fca6",
+        "results/transport_usage.csv": "5105b3f5eee800ed422f6ab5bd3a58843abc6eb86d536afc6d3839a451f6371a"
+      },
+      "sha256": "0ed49dd85fab2a6b4b4618e38887a3aa9e8f6842741fa1e92e8fb484ed2ab10b",
+      "stage": "05_thailand_impact"
+    },
+    "results/importance_diagnostics.json": {
+      "inputs": {
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_first_opening_imputed.csv": "d4dbc18fa09fe73ec2e195b0ce15245a079a57a9d96aa4a0e3c0b38c7ea45ffb",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/imputation_report.csv": "1dd00c253bd0c68957522e3fe9856df80cc3f57010890586672650a9b330d2b6",
+        "results/imputation_report_first_opening.csv": "79e2753155fcf96175220433bff8e18b14b1b470ad9645c0470d261be34887e3"
+      },
+      "sha256": "19df02cff65caef540edab5a15e8e156f5d20e83c3de960ad16e6d1eab6bf608",
+      "stage": "03_feature_importance"
+    },
+    "results/imputation_report.csv": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "results/donor_eligibility.csv": "4554e9fd6a6f01c48656a061bf55983d6f7488e5c4a8c2d2069be0459ed443ff",
+        "results/panel_coverage.csv": "37ded335eabf606430d148ec35e049c842b260efe878e758c043e9cddf9cf345"
+      },
+      "sha256": "1dd00c253bd0c68957522e3fe9856df80cc3f57010890586672650a9b330d2b6",
+      "stage": "02_case_effects"
+    },
+    "results/imputation_report_first_opening.csv": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "results/donor_eligibility.csv": "4554e9fd6a6f01c48656a061bf55983d6f7488e5c4a8c2d2069be0459ed443ff",
+        "results/panel_coverage.csv": "37ded335eabf606430d148ec35e049c842b260efe878e758c043e9cddf9cf345"
+      },
+      "sha256": "79e2753155fcf96175220433bff8e18b14b1b470ad9645c0470d261be34887e3",
+      "stage": "02_case_effects"
+    },
+    "results/loco_fold_weights.csv": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "data/processed/thailand_baseline.csv": "2a5b4d28baea34fd6a37ba54a73c8aade4d29ad55868cec2c59f81817d6ab534",
+        "data/processed/thailand_proposal.json": "4075784fbcf00c96109050f84701b0121364fcc7bde0693b142d437188edc860",
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/case_placebos.csv": "c75081aa79277183db4b6fab16395771077639219b56a52397fe565121e94207",
+        "results/reference_features.csv": "08656183bebce926ccf5742c84b480f57996250f73434063bad849da01d6dd2d",
+        "results/transport_weights.csv": "e301953a7f5bdd14bc684f4ed2e735a7ef1104cf3aff3211b1a95547c26065c3"
+      },
+      "sha256": "bcb87e76584b9650ce5672381bae082c7d716a6db52a715047770f8be31fe44c",
+      "stage": "04_optimal_transport"
+    },
+    "results/loco_ratios.csv": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "data/processed/thailand_baseline.csv": "2a5b4d28baea34fd6a37ba54a73c8aade4d29ad55868cec2c59f81817d6ab534",
+        "data/processed/thailand_proposal.json": "4075784fbcf00c96109050f84701b0121364fcc7bde0693b142d437188edc860",
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/case_placebos.csv": "c75081aa79277183db4b6fab16395771077639219b56a52397fe565121e94207",
+        "results/reference_features.csv": "08656183bebce926ccf5742c84b480f57996250f73434063bad849da01d6dd2d",
+        "results/transport_weights.csv": "e301953a7f5bdd14bc684f4ed2e735a7ef1104cf3aff3211b1a95547c26065c3"
+      },
+      "sha256": "5c4968c62ace869d13862ebd3ad1084fc13c29e2d00205612fb0634a07ab8bb8",
+      "stage": "04_optimal_transport"
+    },
+    "results/loco_ratios_rel.csv": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "data/processed/thailand_baseline.csv": "2a5b4d28baea34fd6a37ba54a73c8aade4d29ad55868cec2c59f81817d6ab534",
+        "data/processed/thailand_proposal.json": "4075784fbcf00c96109050f84701b0121364fcc7bde0693b142d437188edc860",
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/case_placebos.csv": "c75081aa79277183db4b6fab16395771077639219b56a52397fe565121e94207",
+        "results/reference_features.csv": "08656183bebce926ccf5742c84b480f57996250f73434063bad849da01d6dd2d",
+        "results/transport_weights.csv": "e301953a7f5bdd14bc684f4ed2e735a7ef1104cf3aff3211b1a95547c26065c3"
+      },
+      "sha256": "b20e6881b6f2b780abb62de47f8eb68d31c08365e5c76af423f944a216a795c6",
+      "stage": "04_optimal_transport"
+    },
+    "results/loco_summary.csv": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "data/processed/thailand_baseline.csv": "2a5b4d28baea34fd6a37ba54a73c8aade4d29ad55868cec2c59f81817d6ab534",
+        "data/processed/thailand_proposal.json": "4075784fbcf00c96109050f84701b0121364fcc7bde0693b142d437188edc860",
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/case_placebos.csv": "c75081aa79277183db4b6fab16395771077639219b56a52397fe565121e94207",
+        "results/reference_features.csv": "08656183bebce926ccf5742c84b480f57996250f73434063bad849da01d6dd2d",
+        "results/transport_weights.csv": "e301953a7f5bdd14bc684f4ed2e735a7ef1104cf3aff3211b1a95547c26065c3"
+      },
+      "sha256": "602a55112f6cbcd34b0ef152f6e565560b732fa1a77de7955f0cc9568a34fc81",
+      "stage": "04_optimal_transport"
+    },
+    "results/loco_summary_rel.csv": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "data/processed/thailand_baseline.csv": "2a5b4d28baea34fd6a37ba54a73c8aade4d29ad55868cec2c59f81817d6ab534",
+        "data/processed/thailand_proposal.json": "4075784fbcf00c96109050f84701b0121364fcc7bde0693b142d437188edc860",
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/case_placebos.csv": "c75081aa79277183db4b6fab16395771077639219b56a52397fe565121e94207",
+        "results/reference_features.csv": "08656183bebce926ccf5742c84b480f57996250f73434063bad849da01d6dd2d",
+        "results/transport_weights.csv": "e301953a7f5bdd14bc684f4ed2e735a7ef1104cf3aff3211b1a95547c26065c3"
+      },
+      "sha256": "3f4cbcaf46f7823d1e9cee271aee79b26b589b3004cc5046115ce7b7eb19d6f7",
+      "stage": "04_optimal_transport"
+    },
+    "results/loco_table.csv": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "data/processed/thailand_baseline.csv": "2a5b4d28baea34fd6a37ba54a73c8aade4d29ad55868cec2c59f81817d6ab534",
+        "data/processed/thailand_proposal.json": "4075784fbcf00c96109050f84701b0121364fcc7bde0693b142d437188edc860",
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/case_placebos.csv": "c75081aa79277183db4b6fab16395771077639219b56a52397fe565121e94207",
+        "results/reference_features.csv": "08656183bebce926ccf5742c84b480f57996250f73434063bad849da01d6dd2d",
+        "results/transport_weights.csv": "e301953a7f5bdd14bc684f4ed2e735a7ef1104cf3aff3211b1a95547c26065c3"
+      },
+      "sha256": "dd6c0c9ed7515c335d830ece780afc67f9c416d81035508fb5ef3cb44d61527b",
+      "stage": "04_optimal_transport"
+    },
+    "results/loco_table_rel.csv": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "data/processed/thailand_baseline.csv": "2a5b4d28baea34fd6a37ba54a73c8aade4d29ad55868cec2c59f81817d6ab534",
+        "data/processed/thailand_proposal.json": "4075784fbcf00c96109050f84701b0121364fcc7bde0693b142d437188edc860",
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/case_placebos.csv": "c75081aa79277183db4b6fab16395771077639219b56a52397fe565121e94207",
+        "results/reference_features.csv": "08656183bebce926ccf5742c84b480f57996250f73434063bad849da01d6dd2d",
+        "results/transport_weights.csv": "e301953a7f5bdd14bc684f4ed2e735a7ef1104cf3aff3211b1a95547c26065c3"
+      },
+      "sha256": "eec2a7f9225086e2f7150dd985158da4c3ba4340b7a59784cb144f2c8d0dc3f8",
+      "stage": "04_optimal_transport"
+    },
+    "results/overlap_test.json": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "data/processed/thailand_baseline.csv": "2a5b4d28baea34fd6a37ba54a73c8aade4d29ad55868cec2c59f81817d6ab534",
+        "data/processed/thailand_proposal.json": "4075784fbcf00c96109050f84701b0121364fcc7bde0693b142d437188edc860",
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/case_placebos.csv": "c75081aa79277183db4b6fab16395771077639219b56a52397fe565121e94207",
+        "results/reference_features.csv": "08656183bebce926ccf5742c84b480f57996250f73434063bad849da01d6dd2d",
+        "results/transport_weights.csv": "e301953a7f5bdd14bc684f4ed2e735a7ef1104cf3aff3211b1a95547c26065c3"
+      },
+      "sha256": "3129443185e4f48c5eea8946f2153526b4f01f11520eab2247226060b27958f3",
+      "stage": "04_optimal_transport"
+    },
+    "results/panel_coverage.csv": {
+      "inputs": {},
+      "sha256": "37ded335eabf606430d148ec35e049c842b260efe878e758c043e9cddf9cf345",
+      "stage": "00_build_global_panel"
+    },
+    "results/reference_features.csv": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "results/donor_eligibility.csv": "4554e9fd6a6f01c48656a061bf55983d6f7488e5c4a8c2d2069be0459ed443ff",
+        "results/panel_coverage.csv": "37ded335eabf606430d148ec35e049c842b260efe878e758c043e9cddf9cf345"
+      },
+      "sha256": "08656183bebce926ccf5742c84b480f57996250f73434063bad849da01d6dd2d",
+      "stage": "02_case_effects"
+    },
+    "results/route_decision.json": {
+      "inputs": {
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features.csv": "c94fa5cff06e1532891925cfe47328397e749dc5a429110e3b7f37185d8e51ec",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/importance_diagnostics.json": "19df02cff65caef540edab5a15e8e156f5d20e83c3de960ad16e6d1eab6bf608",
+        "results/loco_fold_weights.csv": "bcb87e76584b9650ce5672381bae082c7d716a6db52a715047770f8be31fe44c",
+        "results/loco_summary.csv": "602a55112f6cbcd34b0ef152f6e565560b732fa1a77de7955f0cc9568a34fc81",
+        "results/loco_table.csv": "dd6c0c9ed7515c335d830ece780afc67f9c416d81035508fb5ef3cb44d61527b",
+        "results/thailand_null_draws.csv": "0a226f21b4cac5332711706d09e966f01515078cebf9ebc8e2d4ec92f591c916",
+        "results/thailand_scenario_draws.csv": "41488939c12d41104e84a4706e26faaad276a0d3358ddcdf0db1f7ef09639462",
+        "results/thailand_target_baseline.csv": "ad1fad8381e476e2f999be2a7013f4c100434418e46bac28b604f644e3d2fbbf",
+        "results/thailand_transport.json": "bb77e06d8cd27917370a4d75ae4f6c4cd9bedac553b8536cac6817e60ae76313",
+        "results/thailand_transport_draws.csv": "14b442d99c61d6a384c02a6f3bbf51feae0298365dcccbac3f0c990283f48169",
+        "results/transport_sensitivity.csv": "6a819fe5911276700b37a86777a265c2502fd27dd442a86658c7431b3d32fca6",
+        "results/transport_usage.csv": "5105b3f5eee800ed422f6ab5bd3a58843abc6eb86d536afc6d3839a451f6371a"
+      },
+      "sha256": "dc92205368cad2afe48e455388c5ba8b9b3d91278f3384f48bba8a068e7ce421",
+      "stage": "05_thailand_impact"
+    },
+    "results/thailand_impact.csv": {
+      "inputs": {
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features.csv": "c94fa5cff06e1532891925cfe47328397e749dc5a429110e3b7f37185d8e51ec",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/importance_diagnostics.json": "19df02cff65caef540edab5a15e8e156f5d20e83c3de960ad16e6d1eab6bf608",
+        "results/loco_fold_weights.csv": "bcb87e76584b9650ce5672381bae082c7d716a6db52a715047770f8be31fe44c",
+        "results/loco_summary.csv": "602a55112f6cbcd34b0ef152f6e565560b732fa1a77de7955f0cc9568a34fc81",
+        "results/loco_table.csv": "dd6c0c9ed7515c335d830ece780afc67f9c416d81035508fb5ef3cb44d61527b",
+        "results/thailand_null_draws.csv": "0a226f21b4cac5332711706d09e966f01515078cebf9ebc8e2d4ec92f591c916",
+        "results/thailand_scenario_draws.csv": "41488939c12d41104e84a4706e26faaad276a0d3358ddcdf0db1f7ef09639462",
+        "results/thailand_target_baseline.csv": "ad1fad8381e476e2f999be2a7013f4c100434418e46bac28b604f644e3d2fbbf",
+        "results/thailand_transport.json": "bb77e06d8cd27917370a4d75ae4f6c4cd9bedac553b8536cac6817e60ae76313",
+        "results/thailand_transport_draws.csv": "14b442d99c61d6a384c02a6f3bbf51feae0298365dcccbac3f0c990283f48169",
+        "results/transport_sensitivity.csv": "6a819fe5911276700b37a86777a265c2502fd27dd442a86658c7431b3d32fca6",
+        "results/transport_usage.csv": "5105b3f5eee800ed422f6ab5bd3a58843abc6eb86d536afc6d3839a451f6371a"
+      },
+      "sha256": "5eeeb34f04ebe2351b3334b7216d083e7590ab57e8b77afad791998ce63ce3e4",
+      "stage": "05_thailand_impact"
+    },
+    "results/thailand_null_draws.csv": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "data/processed/thailand_baseline.csv": "2a5b4d28baea34fd6a37ba54a73c8aade4d29ad55868cec2c59f81817d6ab534",
+        "data/processed/thailand_proposal.json": "4075784fbcf00c96109050f84701b0121364fcc7bde0693b142d437188edc860",
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/case_placebos.csv": "c75081aa79277183db4b6fab16395771077639219b56a52397fe565121e94207",
+        "results/reference_features.csv": "08656183bebce926ccf5742c84b480f57996250f73434063bad849da01d6dd2d",
+        "results/transport_weights.csv": "e301953a7f5bdd14bc684f4ed2e735a7ef1104cf3aff3211b1a95547c26065c3"
+      },
+      "sha256": "0a226f21b4cac5332711706d09e966f01515078cebf9ebc8e2d4ec92f591c916",
+      "stage": "04_optimal_transport"
+    },
+    "results/thailand_scenario_draws.csv": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "data/processed/thailand_baseline.csv": "2a5b4d28baea34fd6a37ba54a73c8aade4d29ad55868cec2c59f81817d6ab534",
+        "data/processed/thailand_proposal.json": "4075784fbcf00c96109050f84701b0121364fcc7bde0693b142d437188edc860",
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/case_placebos.csv": "c75081aa79277183db4b6fab16395771077639219b56a52397fe565121e94207",
+        "results/reference_features.csv": "08656183bebce926ccf5742c84b480f57996250f73434063bad849da01d6dd2d",
+        "results/transport_weights.csv": "e301953a7f5bdd14bc684f4ed2e735a7ef1104cf3aff3211b1a95547c26065c3"
+      },
+      "sha256": "41488939c12d41104e84a4706e26faaad276a0d3358ddcdf0db1f7ef09639462",
+      "stage": "04_optimal_transport"
+    },
+    "results/thailand_summary.json": {
+      "inputs": {
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features.csv": "c94fa5cff06e1532891925cfe47328397e749dc5a429110e3b7f37185d8e51ec",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/importance_diagnostics.json": "19df02cff65caef540edab5a15e8e156f5d20e83c3de960ad16e6d1eab6bf608",
+        "results/loco_fold_weights.csv": "bcb87e76584b9650ce5672381bae082c7d716a6db52a715047770f8be31fe44c",
+        "results/loco_summary.csv": "602a55112f6cbcd34b0ef152f6e565560b732fa1a77de7955f0cc9568a34fc81",
+        "results/loco_table.csv": "dd6c0c9ed7515c335d830ece780afc67f9c416d81035508fb5ef3cb44d61527b",
+        "results/thailand_null_draws.csv": "0a226f21b4cac5332711706d09e966f01515078cebf9ebc8e2d4ec92f591c916",
+        "results/thailand_scenario_draws.csv": "41488939c12d41104e84a4706e26faaad276a0d3358ddcdf0db1f7ef09639462",
+        "results/thailand_target_baseline.csv": "ad1fad8381e476e2f999be2a7013f4c100434418e46bac28b604f644e3d2fbbf",
+        "results/thailand_transport.json": "bb77e06d8cd27917370a4d75ae4f6c4cd9bedac553b8536cac6817e60ae76313",
+        "results/thailand_transport_draws.csv": "14b442d99c61d6a384c02a6f3bbf51feae0298365dcccbac3f0c990283f48169",
+        "results/transport_sensitivity.csv": "6a819fe5911276700b37a86777a265c2502fd27dd442a86658c7431b3d32fca6",
+        "results/transport_usage.csv": "5105b3f5eee800ed422f6ab5bd3a58843abc6eb86d536afc6d3839a451f6371a"
+      },
+      "sha256": "d24388f5662bb9c0242275d81aba487a9d45ae1eb8faef2d04c8e601a1597b27",
+      "stage": "05_thailand_impact"
+    },
+    "results/thailand_target_baseline.csv": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "data/processed/thailand_baseline.csv": "2a5b4d28baea34fd6a37ba54a73c8aade4d29ad55868cec2c59f81817d6ab534",
+        "data/processed/thailand_proposal.json": "4075784fbcf00c96109050f84701b0121364fcc7bde0693b142d437188edc860",
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/case_placebos.csv": "c75081aa79277183db4b6fab16395771077639219b56a52397fe565121e94207",
+        "results/reference_features.csv": "08656183bebce926ccf5742c84b480f57996250f73434063bad849da01d6dd2d",
+        "results/transport_weights.csv": "e301953a7f5bdd14bc684f4ed2e735a7ef1104cf3aff3211b1a95547c26065c3"
+      },
+      "sha256": "ad1fad8381e476e2f999be2a7013f4c100434418e46bac28b604f644e3d2fbbf",
+      "stage": "04_optimal_transport"
+    },
+    "results/thailand_transport.json": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "data/processed/thailand_baseline.csv": "2a5b4d28baea34fd6a37ba54a73c8aade4d29ad55868cec2c59f81817d6ab534",
+        "data/processed/thailand_proposal.json": "4075784fbcf00c96109050f84701b0121364fcc7bde0693b142d437188edc860",
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/case_placebos.csv": "c75081aa79277183db4b6fab16395771077639219b56a52397fe565121e94207",
+        "results/reference_features.csv": "08656183bebce926ccf5742c84b480f57996250f73434063bad849da01d6dd2d",
+        "results/transport_weights.csv": "e301953a7f5bdd14bc684f4ed2e735a7ef1104cf3aff3211b1a95547c26065c3"
+      },
+      "sha256": "bb77e06d8cd27917370a4d75ae4f6c4cd9bedac553b8536cac6817e60ae76313",
+      "stage": "04_optimal_transport"
+    },
+    "results/thailand_transport_draws.csv": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "data/processed/thailand_baseline.csv": "2a5b4d28baea34fd6a37ba54a73c8aade4d29ad55868cec2c59f81817d6ab534",
+        "data/processed/thailand_proposal.json": "4075784fbcf00c96109050f84701b0121364fcc7bde0693b142d437188edc860",
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/case_placebos.csv": "c75081aa79277183db4b6fab16395771077639219b56a52397fe565121e94207",
+        "results/reference_features.csv": "08656183bebce926ccf5742c84b480f57996250f73434063bad849da01d6dd2d",
+        "results/transport_weights.csv": "e301953a7f5bdd14bc684f4ed2e735a7ef1104cf3aff3211b1a95547c26065c3"
+      },
+      "sha256": "14b442d99c61d6a384c02a6f3bbf51feae0298365dcccbac3f0c990283f48169",
+      "stage": "04_optimal_transport"
+    },
+    "results/transport_plan.csv": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "data/processed/thailand_baseline.csv": "2a5b4d28baea34fd6a37ba54a73c8aade4d29ad55868cec2c59f81817d6ab534",
+        "data/processed/thailand_proposal.json": "4075784fbcf00c96109050f84701b0121364fcc7bde0693b142d437188edc860",
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/case_placebos.csv": "c75081aa79277183db4b6fab16395771077639219b56a52397fe565121e94207",
+        "results/reference_features.csv": "08656183bebce926ccf5742c84b480f57996250f73434063bad849da01d6dd2d",
+        "results/transport_weights.csv": "e301953a7f5bdd14bc684f4ed2e735a7ef1104cf3aff3211b1a95547c26065c3"
+      },
+      "sha256": "565cc29d389ab0ed78fe585b26d5a151851b8ab263a224da555df41b013cf065",
+      "stage": "04_optimal_transport"
+    },
+    "results/transport_sensitivity.csv": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "data/processed/thailand_baseline.csv": "2a5b4d28baea34fd6a37ba54a73c8aade4d29ad55868cec2c59f81817d6ab534",
+        "data/processed/thailand_proposal.json": "4075784fbcf00c96109050f84701b0121364fcc7bde0693b142d437188edc860",
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/case_placebos.csv": "c75081aa79277183db4b6fab16395771077639219b56a52397fe565121e94207",
+        "results/reference_features.csv": "08656183bebce926ccf5742c84b480f57996250f73434063bad849da01d6dd2d",
+        "results/transport_weights.csv": "e301953a7f5bdd14bc684f4ed2e735a7ef1104cf3aff3211b1a95547c26065c3"
+      },
+      "sha256": "6a819fe5911276700b37a86777a265c2502fd27dd442a86658c7431b3d32fca6",
+      "stage": "04_optimal_transport"
+    },
+    "results/transport_usage.csv": {
+      "inputs": {
+        "data/processed/global_panel.csv": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7",
+        "data/processed/thailand_baseline.csv": "2a5b4d28baea34fd6a37ba54a73c8aade4d29ad55868cec2c59f81817d6ab534",
+        "data/processed/thailand_proposal.json": "4075784fbcf00c96109050f84701b0121364fcc7bde0693b142d437188edc860",
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/case_placebos.csv": "c75081aa79277183db4b6fab16395771077639219b56a52397fe565121e94207",
+        "results/reference_features.csv": "08656183bebce926ccf5742c84b480f57996250f73434063bad849da01d6dd2d",
+        "results/transport_weights.csv": "e301953a7f5bdd14bc684f4ed2e735a7ef1104cf3aff3211b1a95547c26065c3"
+      },
+      "sha256": "5105b3f5eee800ed422f6ab5bd3a58843abc6eb86d536afc6d3839a451f6371a",
+      "stage": "04_optimal_transport"
+    },
+    "results/transport_weights.csv": {
+      "inputs": {
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_first_opening_imputed.csv": "d4dbc18fa09fe73ec2e195b0ce15245a079a57a9d96aa4a0e3c0b38c7ea45ffb",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/imputation_report.csv": "1dd00c253bd0c68957522e3fe9856df80cc3f57010890586672650a9b330d2b6",
+        "results/imputation_report_first_opening.csv": "79e2753155fcf96175220433bff8e18b14b1b470ad9645c0470d261be34887e3"
+      },
+      "sha256": "e301953a7f5bdd14bc684f4ed2e735a7ef1104cf3aff3211b1a95547c26065c3",
+      "stage": "03_feature_importance"
+    },
+    "results/verdict_stability.csv": {
+      "inputs": {
+        "results/case_effects.csv": "489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd",
+        "results/case_features_first_opening_imputed.csv": "d4dbc18fa09fe73ec2e195b0ce15245a079a57a9d96aa4a0e3c0b38c7ea45ffb",
+        "results/case_features_imputed.csv": "a0ae2b5bc734a98c9805c77b1265088f2f470ca5ed3989da948d78798e3dded4",
+        "results/imputation_report.csv": "1dd00c253bd0c68957522e3fe9856df80cc3f57010890586672650a9b330d2b6",
+        "results/imputation_report_first_opening.csv": "79e2753155fcf96175220433bff8e18b14b1b470ad9645c0470d261be34887e3"
+      },
+      "sha256": "64ea5f315dac9f550660bd9c9c00297e88b6eb52e1fa96f8978fc3c9a5088751",
+      "stage": "03_feature_importance"
+    }
+  },
+  "format": 1
+}

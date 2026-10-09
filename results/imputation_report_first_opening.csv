@@ -1,0 +1,10 @@
+feature,n_missing,share_missing,dropped,reason,fill_value,fill_source
+log_gdp_pc,0,0.0,False,,,none
+log_pop,0,0.0,False,,,none
+receipts_pct_gdp,1,0.037037037037037035,False,,3.496944280164506,reference
+log_receipts_per_arrival,4,0.14814814814814814,False,,6.589700895576124,reference
+arrivals_per_capita,3,0.1111111111111111,False,,0.46742652906281473,reference
+air_pax_per_capita,1,0.037037037037037035,False,,0.3087239494914225,reference
+receipts_growth_pre,2,0.07407407407407407,False,,0.06736020571202372,reference
+capex_first_pct_gdp,4,0.14814814814814814,False,,0.12224917546501617,own
+is_integrated_resort,0,0.0,False,,,none

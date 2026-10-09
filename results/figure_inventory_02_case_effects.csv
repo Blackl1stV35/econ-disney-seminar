@@ -1,0 +1,7 @@
+file,panels,x labels,y labels,legend entries
+case_effects_forest.png,1,Effect on receipts: mean gap over the post-opening window (percentage points of GDP),Episode (economy and opening year),4
+case_gap_paths.png,12,Year,Receipts (percent of GDP) | Gap (percentage points of GDP),5
+case_effect_vs_capex.png,2,"Investment of the episode: all openings in the post-opening window
+(percent of the GDP of the year before each opening) | Investment of the first opening alone
+(percent of the GDP of the year before it)",Effect on receipts (percentage points of GDP),6
+case_estimator_comparison.png,3,"Effect, direct synthetic control (percentage points of GDP) | Effect, ridge, low penalty (percentage points of GDP)","Effect, ridge (percentage points of GDP) | Effect, difference-in-differences (percentage points of GDP)",7
