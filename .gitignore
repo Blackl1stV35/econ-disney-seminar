@@ -19,3 +19,12 @@ env/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Executed copies and conversion output
+executed/
+*.nbconvert.ipynb
+
+# Local configuration and editors
+.env
+.idea/
+.vscode/
