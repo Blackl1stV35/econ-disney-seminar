@@ -19,3 +19,7 @@ disney-tourism-thailand/     Python package, notebooks, data, tests, results
 ```
 
 Every project folder is self-contained: open its README and run its commands from inside the folder.
+
+## Contributing
+
+Collaborators work on branches and open pull requests; `main` changes only after a review. The steps are in [CONTRIBUTING.md](CONTRIBUTING.md). Coding agents that work in this repository follow [AGENTS.md](AGENTS.md).

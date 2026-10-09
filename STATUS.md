@@ -65,4 +65,5 @@ Folder: [13F_investor_horizon](13F_investor_horizon).
 
 - Read the project README, run the project once and tell the group where it breaks.
 - Check a claim: pick one number on this page and trace it back to the table or script that produces it.
-- Take an open item above and say so in the group chat, so that two people do not work on the same one.
+- Take an open item above and claim it in a GitHub Issue (template "Task"), so that two people do not work on the same one.
+- Follow [CONTRIBUTING.md](CONTRIBUTING.md): work on a branch, open a pull request, and do not hand-edit generated results.
