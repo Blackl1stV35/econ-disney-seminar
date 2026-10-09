@@ -25,7 +25,6 @@
       "capex_pct_gdp",
       "is_integrated_resort"
     ],
-    "mode": "real",
     "n_boot": 100,
     "n_cases": 27,
     "n_economies": 24,
@@ -122,7 +121,6 @@
       "capex_pct_gdp",
       "is_integrated_resort"
     ],
-    "mode": "real",
     "n_boot": 100,
     "n_cases": 19,
     "n_economies": 19,
@@ -225,7 +223,6 @@
       "capex_pct_gdp",
       "is_integrated_resort"
     ],
-    "mode": "real",
     "n_boot": 100,
     "n_cases": 10,
     "n_economies": 10,
@@ -322,7 +319,6 @@
       "capex_pct_gdp",
       "is_integrated_resort"
     ],
-    "mode": "real",
     "n_boot": 100,
     "n_cases": 19,
     "n_economies": 19,
@@ -425,7 +421,6 @@
       "capex_first_pct_gdp",
       "is_integrated_resort"
     ],
-    "mode": "real",
     "n_boot": 100,
     "n_cases": 19,
     "n_economies": 19,
@@ -523,7 +518,6 @@
       "capex_pct_gdp",
       "is_integrated_resort"
     ],
-    "mode": "real",
     "n_boot": 100,
     "n_cases": 19,
     "n_economies": 19,
