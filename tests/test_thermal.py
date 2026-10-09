@@ -1,15 +1,19 @@
 """Tests for dtt.thermal.
 
-Guard tests use fake temperature and CPU readers, a fake sleep and a fake clock;
-the memory share in the log rows is read from the host.  Probe tests use
+Guard tests use fake temperature and CPU readers, a fake sleep and a fake clock,
+so that no test waits in real time; the memory share in the log rows is read from
+the host.  The load that does not belong to the program is tested with substitute
+``psutil`` load readings and substitute process objects.  Probe tests use
 substitutes for ``psutil``, for sysfs files in a temporary directory, for
 ``subprocess.run`` and for the probe functions, and one test runs a child
-process of the current interpreter that prints undecodable bytes.  Three tests
-run against the host: the default readers of a guard, ``read_temperature_c`` and
-``headroom``.
+process of the current interpreter that prints undecodable bytes.  Four tests
+run against the host: the default readers of a guard, the reader of the load of
+other processes, ``read_temperature_c`` and ``headroom``.
 """
+import ast
 import csv
 import errno
+import inspect
 import math
 import os
 import subprocess
@@ -317,16 +321,14 @@ def test_a_missing_reading_at_the_first_check_waits_while_the_load_is_above_the_
     assert summary["waited_seconds"] == pytest.approx(12.0)
 
 
-def test_a_machine_that_stays_busy_without_a_temperature_ends_in_a_timeout(tmp_path):
+def test_a_machine_that_stays_busy_without_a_temperature_does_not_raise_whatever_the_heat_limit(tmp_path):
     log = tmp_path / "log.csv"
     guard, fake = make_guard([None], cpus=[99.0], poll_seconds=5.0, max_wait_seconds=20.0, log_path=log)
-    with pytest.raises(ThermalTimeout) as caught:
-        guard()
-    assert fake.sleeps == [5.0] * 4
-    assert "CPU load" in str(caught.value) and "92 percent" in str(caught.value)
+    guard()
+    assert fake.sleeps == [5.0] * 60
     row = read_log(log)[0]
-    assert row["action"] == "timeout" and row["temperature_c"] == "" and row["cpu_percent"] == "99.0"
-    assert float(row["waited_seconds"]) == pytest.approx(20.0)
+    assert row["action"] == "cpu_timeout" and row["temperature_c"] == "" and row["cpu_percent"] == "99.0"
+    assert float(row["waited_seconds"]) == pytest.approx(300.0)
 
 
 @pytest.mark.parametrize("cpu", [92.0, 50.0, 0.0])
@@ -372,6 +374,384 @@ def test_a_hot_temperature_that_appears_during_the_cpu_wait_needs_the_resume_tem
     with pytest.raises(ThermalTimeout) as caught:
         guard()
     assert "temperature" in str(caught.value) and "CPU" not in str(caught.value)
+
+
+# ----------------------------------------------------------------------------
+# Guard: a wait for CPU load alone ends without an exception
+# ----------------------------------------------------------------------------
+def test_a_wait_for_cpu_load_alone_returns_at_the_cap_and_logs_cpu_timeout(tmp_path):
+    log = tmp_path / "log.csv"
+    guard, fake = make_guard([None], cpus=[99.0], poll_seconds=5.0, max_cpu_wait_seconds=20.0, log_path=log)
+    guard()
+    assert fake.sleeps == [5.0] * 4
+    rows = read_log(log)
+    assert len(rows) == 1 and rows[0]["action"] == "cpu_timeout"
+    assert float(rows[0]["waited_seconds"]) == pytest.approx(20.0)
+    assert rows[0]["temperature_c"] == "" and rows[0]["cpu_percent"] == "99.0"
+    summary = guard.summary()
+    assert summary["checks"] == 1 and summary["waits"] == 1 and summary["cpu_timeouts"] == 1
+    assert summary["waited_seconds"] == pytest.approx(20.0)
+
+
+def test_the_default_cap_of_a_cpu_wait_is_300_seconds_and_the_wait_does_not_raise():
+    parameters = inspect.signature(ThermalGuard).parameters
+    assert parameters["max_cpu_wait_seconds"].default == 300.0
+    assert parameters["max_wait_seconds"].default == 1800.0
+    guard, fake = make_guard([None], cpus=[99.0], poll_seconds=5.0)
+    guard()
+    assert fake.sleeps == [5.0] * 60 and guard.summary()["cpu_timeouts"] == 1
+
+
+def test_the_next_call_after_a_cpu_timeout_does_not_wait_for_cpu_load(tmp_path):
+    log = tmp_path / "log.csv"
+    guard, fake = make_guard([None], cpus=[99.0], poll_seconds=5.0, max_cpu_wait_seconds=10.0, log_path=log)
+    guard()
+    assert fake.sleeps == [5.0, 5.0]
+    guard()
+    guard()
+    assert fake.sleeps == [5.0, 5.0]
+    rows = read_log(log)
+    assert [row["action"] for row in rows] == ["cpu_timeout", "ok", "ok"]
+    assert [row["cpu_percent"] for row in rows] == ["99.0", "99.0", "99.0"]
+    assert [float(row["waited_seconds"]) for row in rows] == [pytest.approx(10.0), 0.0, 0.0]
+    summary = guard.summary()
+    assert summary["checks"] == 3 and summary["waits"] == 1 and summary["cpu_timeouts"] == 1
+
+
+def test_a_wait_for_cpu_load_that_ends_before_the_cap_does_not_stop_later_waits():
+    guard, fake = make_guard([None], cpus=[99.0, 50.0, 99.0, 50.0], poll_seconds=3.0, max_cpu_wait_seconds=30.0)
+    guard()
+    guard()
+    assert fake.sleeps == [3.0, 3.0]
+    summary = guard.summary()
+    assert summary["waits"] == 2 and summary["cpu_timeouts"] == 0
+
+
+def test_the_guard_still_waits_for_heat_after_a_cpu_timeout():
+    guard, fake = make_guard([None] * 3 + [95.0], cpus=[99.0], poll_seconds=5.0, max_wait_seconds=30.0,
+                             max_cpu_wait_seconds=10.0)
+    guard()
+    assert fake.sleeps == [5.0, 5.0]
+    with pytest.raises(ThermalTimeout) as caught:
+        guard()
+    assert fake.sleeps == [5.0, 5.0] + [5.0] * 6
+    assert "temperature" in str(caught.value) and "CPU" not in str(caught.value)
+    assert guard.summary()["cpu_timeouts"] == 1
+
+
+def test_a_wait_for_heat_keeps_its_own_longer_limit(tmp_path):
+    log = tmp_path / "log.csv"
+    guard, fake = make_guard([95.0], poll_seconds=5.0, max_wait_seconds=40.0, max_cpu_wait_seconds=10.0, log_path=log)
+    with pytest.raises(ThermalTimeout):
+        guard()
+    assert fake.sleeps == [5.0] * 8
+    assert read_log(log)[0]["action"] == "timeout"
+    assert guard.summary()["cpu_timeouts"] == 0
+
+
+def test_a_cpu_wait_that_turns_hot_is_limited_by_the_maximum_wait_and_raises():
+    guard, fake = make_guard([None, None, 90.0], cpus=[99.0], poll_seconds=5.0, max_wait_seconds=40.0,
+                             max_cpu_wait_seconds=10.0)
+    with pytest.raises(ThermalTimeout) as caught:
+        guard()
+    assert fake.sleeps == [5.0] * 8
+    assert "temperature" in str(caught.value) and "CPU" not in str(caught.value)
+    assert guard.summary()["cpu_timeouts"] == 0
+
+
+def test_the_last_sleep_of_a_cpu_wait_is_clipped_to_the_remaining_time():
+    guard, fake = make_guard([None], cpus=[99.0], poll_seconds=5.0, max_cpu_wait_seconds=12.0)
+    guard()
+    assert fake.sleeps == [5.0, 5.0, 2.0]
+    assert guard.summary()["waited_seconds"] == pytest.approx(12.0)
+
+
+def test_the_maximum_wait_for_heat_does_not_limit_a_wait_for_cpu_load():
+    guard, fake = make_guard([None], cpus=[99.0], poll_seconds=5.0, max_wait_seconds=10.0, max_cpu_wait_seconds=25.0)
+    guard()
+    assert fake.sleeps == [5.0] * 5 and guard.summary()["cpu_timeouts"] == 1
+
+
+def test_a_cpu_cap_of_zero_ends_a_cpu_wait_without_sleeping():
+    guard, fake = make_guard([None], cpus=[99.0], max_cpu_wait_seconds=0.0)
+    guard()
+    assert fake.sleeps == [] and guard.summary()["cpu_timeouts"] == 1
+
+
+def test_a_cpu_wait_with_a_real_clock_and_a_fake_sleep_ends_at_the_cap():
+    slept = []
+    guard = ThermalGuard(
+        read_temp=lambda: None,
+        read_cpu=lambda: 99.0,
+        sleep=slept.append,
+        clock=time.monotonic,
+        poll_seconds=5.0,
+        max_cpu_wait_seconds=30.0,
+        verbose=False,
+    )
+    guard()
+    assert slept == [5.0] * 6 and guard.summary()["cpu_timeouts"] == 1
+
+
+@pytest.mark.parametrize("bad", [-1.0, float("nan")])
+def test_an_invalid_cpu_wait_cap_raises(bad):
+    with pytest.raises(ValueError, match="max_cpu_wait_seconds"):
+        ThermalGuard(max_cpu_wait_seconds=bad)
+
+
+def test_the_new_options_are_keyword_only_with_their_documented_defaults():
+    parameters = inspect.signature(ThermalGuard).parameters
+    for name in ("max_cpu_wait_seconds", "verbose"):
+        assert parameters[name].kind is inspect.Parameter.KEYWORD_ONLY
+    assert parameters["verbose"].default is True
+    assert list(parameters)[:10] == [
+        "max_temp_c", "resume_temp_c", "max_cpu_percent", "poll_seconds", "max_wait_seconds", "log_path", "read_temp",
+        "read_cpu", "sleep", "clock",
+    ]
+    assert ThermalGuard(max_cpu_wait_seconds=0).max_cpu_wait_seconds == 0.0
+
+
+def test_the_summary_reports_the_cpu_timeouts_next_to_the_other_totals():
+    guard, _ = make_guard([60.0])
+    assert guard.summary() == {
+        "checks": 0, "waits": 0, "waited_seconds": 0.0, "cpu_timeouts": 0, "max_temperature_c": None,
+        "temperature_source": "unavailable",
+    }
+
+
+# ----------------------------------------------------------------------------
+# Guard: progress lines
+# ----------------------------------------------------------------------------
+def lines_of(capsys):
+    """Lines printed to standard output since the last call."""
+    return capsys.readouterr().out.splitlines()
+
+
+def test_nothing_is_printed_when_the_machine_is_within_its_limits(capsys):
+    guard, _ = make_guard([60.0, None], cpus=[10.0])
+    guard()
+    guard()
+    assert lines_of(capsys) == []
+
+
+def test_a_wait_for_heat_prints_one_line_at_the_start_and_one_at_the_end(capsys):
+    guard, _ = make_guard([90.0, 88.0, 70.0], poll_seconds=5.0)
+    guard()
+    assert lines_of(capsys) == [
+        "thermal guard: waiting, the CPU temperature is 90.0 C, above the limit of 85 C",
+        "thermal guard: resumed after waiting 10.0 seconds",
+    ]
+
+
+def test_a_wait_for_cpu_load_prints_the_load_and_the_waiting_time(capsys):
+    guard, _ = make_guard([None], cpus=[97.4, 97.4, 20.0], poll_seconds=4.0)
+    guard()
+    assert lines_of(capsys) == [
+        "thermal guard: waiting, the CPU load is 97 percent, above the limit of 92 percent (no temperature available)",
+        "thermal guard: resumed after waiting 8.0 seconds",
+    ]
+
+
+def test_a_cpu_timeout_prints_the_start_and_one_closing_line_and_says_that_it_stops_waiting(capsys):
+    guard, _ = make_guard([None], cpus=[99.0], poll_seconds=5.0, max_cpu_wait_seconds=20.0)
+    guard()
+    first = lines_of(capsys)
+    assert len(first) == 2 and first[0].startswith("thermal guard: waiting, the CPU load is 99 percent")
+    assert "for 20.0 seconds" in first[1] and "not waiting for the CPU load again" in first[1]
+    guard()
+    assert lines_of(capsys) == []
+
+
+def test_a_timeout_after_a_wait_for_heat_prints_its_closing_line_before_the_exception(capsys):
+    guard, _ = make_guard([95.0], poll_seconds=5.0, max_wait_seconds=10.0)
+    with pytest.raises(ThermalTimeout):
+        guard()
+    printed = lines_of(capsys)
+    assert len(printed) == 2 and printed[0].startswith("thermal guard: waiting, the CPU temperature is 95.0 C")
+    assert "gave up after waiting 10.0 seconds" in printed[1]
+
+
+def test_a_silent_guard_prints_nothing_and_behaves_in_the_same_way(capsys, tmp_path):
+    log = tmp_path / "log.csv"
+    guard, fake = make_guard([90.0, 70.0], poll_seconds=5.0, verbose=False, log_path=log)
+    guard()
+    guard, fake_cpu = make_guard([None], cpus=[99.0], poll_seconds=5.0, max_cpu_wait_seconds=10.0, verbose=False)
+    guard()
+    assert lines_of(capsys) == []
+    assert fake.sleeps == [5.0] and fake_cpu.sleeps == [5.0, 5.0]
+    assert read_log(log)[0]["action"] == "waited"
+
+
+def test_a_failing_output_stream_does_not_stop_the_guard(monkeypatch):
+    class Broken:
+        def write(self, text):
+            raise OSError("closed")
+
+        def flush(self):
+            raise OSError("closed")
+
+    monkeypatch.setattr(sys, "stdout", Broken())
+    guard, fake = make_guard([90.0, 70.0], poll_seconds=5.0)
+    guard()
+    assert fake.sleeps == [5.0] and guard.summary()["waits"] == 1
+
+
+# ----------------------------------------------------------------------------
+# Guard: the load that does not belong to this program
+# ----------------------------------------------------------------------------
+class FakeProcess:
+    """Substitute for a ``psutil.Process`` with a script of load readings.
+
+    The first reading of every object is 0.0, like the first reading of a
+    ``psutil`` process; the next ones follow ``loads`` and the last one repeats.
+    From the reading number ``fail_from`` on, ``failure`` is raised instead when given.
+    ``children`` is a list of process descriptions that the object returns as
+    new ``FakeProcess`` objects at every call, as ``psutil`` does.
+    """
+
+    def __init__(self, pid, loads=(0.0,), children=(), failure=None, children_failure=None, fail_from=1):
+        self.pid = pid
+        self._loads = list(loads)
+        self._children = list(children)
+        self._failure = failure
+        self._fail_from = fail_from
+        self._children_failure = children_failure
+        self._calls = 0
+
+    def cpu_percent(self, interval=None):
+        assert interval is None
+        self._calls += 1
+        if self._failure is not None and self._calls >= self._fail_from:
+            raise self._failure
+        if self._calls == 1:
+            return 0.0
+        return self._loads[min(self._calls - 2, len(self._loads) - 1)]
+
+    def children(self, recursive=False):
+        assert recursive is True
+        if self._children_failure is not None:
+            raise self._children_failure
+        return [FakeProcess(**description) for description in self._children]
+
+
+def patch_psutil(monkeypatch, system=80.0, cpus=4, process=None, process_failure=None):
+    """Substitute the load readings of ``psutil`` and the process object it creates."""
+    loads = system if isinstance(system, list) else [system]
+    state = {"i": 0}
+
+    def cpu_percent(interval=None):
+        assert interval is None
+        value = loads[min(state["i"], len(loads) - 1)]
+        state["i"] += 1
+        return value
+
+    def make_process():
+        if process_failure is not None:
+            raise process_failure
+        return process
+
+    monkeypatch.setattr(thermal.psutil, "cpu_percent", cpu_percent)
+    monkeypatch.setattr(thermal.psutil, "cpu_count", lambda logical=True: cpus)
+    monkeypatch.setattr(thermal.psutil, "Process", make_process)
+
+
+def test_the_load_of_the_process_tree_is_subtracted_from_the_load_of_the_system(monkeypatch):
+    child = {"pid": 2, "loads": [60.0, 20.0]}
+    process = FakeProcess(1, loads=[100.0], children=[child])
+    patch_psutil(monkeypatch, system=[0.0, 80.0, 80.0, 80.0], cpus=4, process=process)
+    read = thermal._default_cpu_reader()
+    assert read() == pytest.approx(80.0 - 100.0 / 4.0)
+    assert read() == pytest.approx(80.0 - (100.0 + 60.0) / 4.0)
+    assert read() == pytest.approx(80.0 - (100.0 + 20.0) / 4.0)
+
+
+def test_a_child_that_is_seen_for_the_first_time_adds_nothing_and_a_known_child_is_not_forgotten(monkeypatch):
+    process = FakeProcess(1, loads=[40.0], children=[{"pid": 2, "loads": [80.0]}, {"pid": 3, "loads": [120.0]}])
+    patch_psutil(monkeypatch, system=[0.0, 90.0, 90.0], cpus=8, process=process)
+    read = thermal._default_cpu_reader()
+    assert read() == pytest.approx(90.0 - 40.0 / 8.0)
+    assert read() == pytest.approx(90.0 - (40.0 + 80.0 + 120.0) / 8.0)
+    assert sorted(read._children) == [2, 3]
+
+
+def test_the_load_of_other_processes_is_never_negative(monkeypatch):
+    process = FakeProcess(1, loads=[400.0])
+    patch_psutil(monkeypatch, system=[0.0, 30.0], cpus=4, process=process)
+    assert thermal._default_cpu_reader()() == 0.0
+
+
+def test_a_child_that_cannot_be_read_is_skipped_and_forgotten(monkeypatch):
+    gone = {"pid": 5, "failure": psutil.NoSuchProcess(5)}
+    denied = {"pid": 6, "failure": psutil.AccessDenied(6)}
+    alive = {"pid": 7, "loads": [60.0]}
+    process = FakeProcess(1, loads=[20.0], children=[gone, denied, alive])
+    patch_psutil(monkeypatch, system=[0.0, 70.0, 70.0], cpus=2, process=process)
+    read = thermal._default_cpu_reader()
+    assert read() == pytest.approx(70.0 - 20.0 / 2.0)
+    assert read() == pytest.approx(70.0 - (20.0 + 60.0) / 2.0)
+    assert sorted(read._children) == [7]
+
+
+@pytest.mark.parametrize(
+    "kind", ["no process", "process load", "children", "no cpu count"],
+)
+def test_the_load_of_the_system_is_used_when_the_process_cannot_be_read(monkeypatch, kind):
+    process = FakeProcess(1, loads=[100.0], children=[{"pid": 2, "loads": [100.0]}])
+    cpus = 4
+    process_failure = None
+    if kind == "no process":
+        process_failure = psutil.AccessDenied(1)
+    elif kind == "process load":
+        process = FakeProcess(1, loads=[100.0], failure=OSError("denied"), fail_from=2)
+    elif kind == "children":
+        process = FakeProcess(1, loads=[100.0], children_failure=psutil.AccessDenied(1))
+    else:
+        cpus = None
+    patch_psutil(monkeypatch, system=[0.0, 66.0, 66.0], cpus=cpus, process=process, process_failure=process_failure)
+    read = thermal._default_cpu_reader()
+    assert read() == 66.0
+    assert read() == 66.0
+
+
+def test_a_guard_does_not_wait_for_the_load_that_it_causes_itself(monkeypatch, tmp_path):
+    log = tmp_path / "log.csv"
+    process = FakeProcess(1, loads=[390.0])
+    patch_psutil(monkeypatch, system=[0.0, 99.0], cpus=4, process=process)
+    fake = FakeTime()
+    guard = ThermalGuard(read_temp=lambda: None, sleep=fake.sleep, clock=fake.clock, log_path=log, verbose=False)
+    guard()
+    assert fake.sleeps == []
+    row = read_log(log)[0]
+    assert row["action"] == "ok" and float(row["cpu_percent"]) == pytest.approx(99.0 - 390.0 / 4.0, abs=0.05)
+
+
+def test_a_guard_waits_for_the_load_of_other_programs(monkeypatch, tmp_path):
+    log = tmp_path / "log.csv"
+    process = FakeProcess(1, loads=[8.0])
+    patch_psutil(monkeypatch, system=[0.0, 99.0, 99.0, 60.0], cpus=4, process=process)
+    fake = FakeTime()
+    guard = ThermalGuard(
+        read_temp=lambda: None, sleep=fake.sleep, clock=fake.clock, log_path=log, poll_seconds=5.0, verbose=False
+    )
+    guard()
+    assert fake.sleeps == [5.0, 5.0]
+    row = read_log(log)[0]
+    assert row["action"] == "waited" and float(row["cpu_percent"]) == pytest.approx(99.0 - 8.0 / 4.0, abs=0.05)
+
+
+def test_the_default_cpu_reader_is_the_process_tree_reader_and_an_explicit_reader_is_used_as_given():
+    assert isinstance(ThermalGuard()._read_cpu, thermal._OtherProcessesLoad)
+    reader = lambda: 12.0  # noqa: E731
+    assert ThermalGuard(read_cpu=reader)._read_cpu is reader
+
+
+def test_the_real_process_tree_reader_returns_a_load_between_zero_and_one_hundred():
+    read = thermal._default_cpu_reader()
+    for _ in range(3):
+        value = read()
+        assert isinstance(value, float) and 0.0 <= value <= 100.0
+    own = read.own_load()
+    assert own is None or own >= 0.0
 
 
 # ----------------------------------------------------------------------------
@@ -512,6 +892,29 @@ def test_a_guard_that_loses_the_race_to_create_the_log_writes_no_header(tmp_path
 
     monkeypatch.setattr(thermal.os, "link", link_after_the_other_guard)
     first()
+    monkeypatch.undo()
+    assert header_count(log) == 1
+    assert sorted(row["temperature_c"] for row in read_log(log)) == ["60.00", "61.00"]
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["log.csv"]
+
+
+def test_guards_of_one_process_never_collide_on_the_name_of_the_temporary_file(tmp_path, monkeypatch):
+    monkeypatch.setattr(thermal.time, "time_ns", lambda: 123456789)
+    monkeypatch.setattr(thermal.os, "getpid", lambda: 4242)
+    log = tmp_path / "log.csv"
+    first, _ = make_guard([60.0], log_path=log)
+    second, _ = make_guard([61.0], log_path=log)
+    real_link = os.link
+
+    def link_after_the_other_guard(source, destination, **kwargs):
+        monkeypatch.setattr(thermal.os, "link", real_link)
+        second()
+        return real_link(source, destination, **kwargs)
+
+    monkeypatch.setattr(thermal.os, "link", link_after_the_other_guard)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        first()
     monkeypatch.undo()
     assert header_count(log) == 1
     assert sorted(row["temperature_c"] for row in read_log(log)) == ["60.00", "61.00"]
@@ -1108,3 +1511,27 @@ def test_real_headroom_has_sane_values(monkeypatch):
     assert info["temperature_c"] is None or math.isfinite(info["temperature_c"])
     assert info["claude_processes"]["count"] == len(info["claude_processes"]["names"])
     assert all("claude" in name.lower() for name in info["claude_processes"]["names"])
+
+
+# ----------------------------------------------------------------------------
+# Hygiene of the module
+# ----------------------------------------------------------------------------
+def unused_parameters(module):
+    """Parameters of the functions of a module that are never read, as ``(function, parameter)`` pairs."""
+    tree = ast.parse(inspect.getsource(module))
+    unused = []
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            arguments = node.args
+            names = [a.arg for a in arguments.posonlyargs + arguments.args + arguments.kwonlyargs]
+            names += [a.arg for a in (arguments.vararg, arguments.kwarg) if a is not None]
+            read = {
+                n.id for statement in node.body for n in ast.walk(statement)
+                if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)
+            }
+            unused += [(node.name, name) for name in names if name not in read and name not in ("self", "cls")]
+    return unused
+
+
+def test_every_parameter_of_every_function_of_the_module_is_read():
+    assert unused_parameters(thermal) == []

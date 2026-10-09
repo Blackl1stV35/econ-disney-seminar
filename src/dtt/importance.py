@@ -64,10 +64,27 @@ Tolerances
 Floating point results of one computation differ in the last digits between
 machines and between BLAS kernels.  Every decision that compares two computed
 numbers therefore uses an explicit tolerance, explained where it is applied:
-the count of the label permutation test, the zero test of a coefficient, the
-test whether a target or a column is constant, the clustering threshold, the
-sort keys of the canonical row order and of the summary table, and the
-thresholds of the usability verdict.
+the count of the label permutation test, the choice of the best penalty, the
+zero test of a coefficient, the test whether a target, a part of a target or a
+column is constant, the test whether the importance is rounding noise, the
+clustering threshold, the sort keys of the canonical row order and of the
+summary table, and the thresholds of the usability verdict.
+
+The tree learners make a decision that no tolerance on a comparison can
+reach: when several features split a node of the training data into the same
+two parts, the candidate splits have the same gain in exact arithmetic and the
+split that is kept is decided by rounding noise in the sums of the target.  A
+rounding difference of 1e-15 in the target then changes the trees and with it
+the held-out predictions.  The tree learners are therefore fitted to the
+target after it has been centred, divided by its standard deviation and rounded
+to six decimals (``_TREE_DECIMALS``), and their predictions are mapped back to
+the units of the target.  Two targets that differ by rounding noise give the
+same rounded target, except for the rare value that lies within the noise of a
+rounding boundary, so the tree fits, the stack and every statistic computed
+from it agree between kernels and under perturbations of the inputs of
+relative size 1e-13.  The rounding also makes the tree learners independent of
+the origin and the unit of the target.  The penalised learners need no such
+step, because their fits are continuous functions of the data.
 
 Folds and row order
 -------------------
@@ -93,12 +110,14 @@ processed by exactly the procedure applied to the observed target.
 
 Guard
 -----
-``lambda_averaged_importance`` and ``bootstrap_importance`` take an optional
-``guard``, a function without arguments such as a
-:class:`dtt.thermal.ThermalGuard`.  The functions call it before each outer
-fold of each repeat, before every fourth penalty within a fold, before every
-tenth iteration of the label permutation loop and of the split-half loop, and
-once per bootstrap resample.  A guard never changes a result.
+``lambda_averaged_importance``, ``bootstrap_importance`` and
+``verdict_stability`` take an optional ``guard``, a function without arguments
+such as a :class:`dtt.thermal.ThermalGuard`.  The functions call it before each
+outer fold of each repeat, before every fourth penalty within a fold, before
+every tenth iteration of the label permutation loop and of the split-half loop,
+and once per bootstrap resample; ``verdict_stability`` makes the calls of
+``lambda_averaged_importance`` for each seed in turn.  A guard never changes a
+result.
 
 Usability verdict
 -----------------
@@ -128,7 +147,7 @@ import pandas as pd
 from scipy.cluster.hierarchy import fcluster, linkage
 from scipy.optimize import nnls
 from scipy.spatial.distance import squareform
-from sklearn.base import BaseEstimator, RegressorMixin
+from sklearn.base import BaseEstimator, RegressorMixin, TransformerMixin
 from sklearn.compose import TransformedTargetRegressor
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.exceptions import ConvergenceWarning
@@ -174,15 +193,21 @@ MIN_CASES: int = 20
 #   1e-17 times that variance.
 # _TIE_TOLERANCE: a permuted statistic within this relative distance of the observed statistic counts as a tie
 #   and therefore as an exceedance.  Exact ties occur when every fit collapses to the intercept-only model, and
-#   the sign of their rounding noise depends on the kernel.
+#   the sign of their rounding noise depends on the kernel.  Two penalties whose cross-validated errors differ
+#   by at most this multiple of the variance of the target also tie, and the largest of them is the best one.
 # _CONSTANT_TOLERANCE: a vector whose range is at most this fraction of its largest absolute value is constant.
 #   A vector that is constant in exact arithmetic but was computed has a range of order 1e-16 of its size, and
-#   standardising it would turn that noise into a feature of unit variance.
+#   standardising it would turn that noise into a feature of unit variance.  A part of the target (a half, a
+#   bootstrap resample) is compared with the largest absolute value of the whole target, because the values of
+#   a part that is zero in exact arithmetic are noise of order 1e-16 of the whole target.
 # _VERDICT_TOLERANCE: a diagnostic within this distance of a threshold of the usability verdict meets it.
 # _RANK_DECIMALS: sort keys (values of the cases, importance of the features) are rounded to this many decimals
 #   relative to the largest absolute value of their column, so that values equal up to rounding noise tie.
 # _DISTANCE_DECIMALS: the distances of the feature clustering are rounded to this many decimals, so that a
 #   correlation equal to the threshold up to rounding noise is on the same side in every evaluation.
+# _TREE_DECIMALS: the standardised target of the tree learners is rounded to this many decimals, so that two
+#   targets equal up to rounding noise give identical trees (see the module header).  Six decimals are far
+#   below the sampling error of any effect estimate and far above the rounding noise of a computed target.
 _ZERO_COEF = 1e-12
 _NOISE_FACTOR = 1e-9
 _TIE_TOLERANCE = 1e-9
@@ -190,6 +215,7 @@ _CONSTANT_TOLERANCE = 1e-12
 _VERDICT_TOLERANCE = 1e-9
 _RANK_DECIMALS = 10
 _DISTANCE_DECIMALS = 10
+_TREE_DECIMALS = 6
 
 _PENALISED = ("elastic_net", "ridge")
 _LAMBDA_FREE = ("random_forest", "gradient_boosting")
@@ -213,7 +239,7 @@ _DUPLICATE_WARNING = "rows of X are exact duplicates of other rows with a differ
 # ----------------------------------------------------------------------------
 # Input handling
 # ----------------------------------------------------------------------------
-def _is_constant(values: np.ndarray, axis: int | None = None) -> Any:
+def _is_constant(values: np.ndarray, axis: int | None = None, scale: float | None = None) -> Any:
     """Whether values are constant up to rounding noise.
 
     A vector is constant when its range is at most ``_CONSTANT_TOLERANCE`` times
@@ -222,12 +248,20 @@ def _is_constant(values: np.ndarray, axis: int | None = None) -> Any:
     copy) has a range of order 1e-16 of its size, and a variance test would
     pass and standardise that noise to unit variance.
 
+    A part of a target is compared with the largest absolute value of the whole
+    target (``scale``), not with its own: a part whose values are all zero in
+    exact arithmetic holds rounding noise around zero, and that noise is not
+    small relative to itself.
+
     Parameters
     ----------
     values : ndarray
         Finite, non-empty values.
     axis : int or None, default None
         Axis along which the test is made; ``None`` tests all values together.
+    scale : float or None, default None
+        Magnitude the range is compared with; ``None`` uses the largest absolute
+        value of ``values`` along ``axis``.
 
     Returns
     -------
@@ -235,12 +269,16 @@ def _is_constant(values: np.ndarray, axis: int | None = None) -> Any:
         ``True`` where the values are constant; an all-zero vector is constant.
     """
     span = np.ptp(values, axis=axis)
-    size = np.abs(values).max(axis=axis)
+    size = np.abs(values).max(axis=axis) if scale is None else scale
     return span <= _CONSTANT_TOLERANCE * size
 
 
 def _check_scale(values: np.ndarray, label: str) -> None:
-    """Raise ``ValueError`` when the variance of finite values overflows.
+    """Raise ``ValueError`` when the variance of finite values overflows or underflows.
+
+    The standardisation of a column divides by its standard deviation, so the
+    variance of every column that is not constant must be a finite number of
+    normal size.
 
     Parameters
     ----------
@@ -252,12 +290,16 @@ def _check_scale(values: np.ndarray, label: str) -> None:
     Raises
     ------
     ValueError
-        If the variance of any column is not finite.
+        If the variance of any column is not finite, or if a column that is not
+        constant (see :func:`_is_constant`) has a variance below the smallest
+        normal floating point number.
     """
     with np.errstate(over="ignore", invalid="ignore"):
         spread = np.var(values, axis=0)
     if not np.isfinite(spread).all():
         raise ValueError(f"{label} has values so large that its variance overflows")
+    if np.any(~_is_constant(values, axis=0) & ~(spread >= np.finfo(float).tiny)):
+        raise ValueError(f"{label} has values so small that its variance underflows")
 
 
 def _coerce_features(X: Any) -> tuple[np.ndarray, list[str], pd.Index]:
@@ -794,6 +836,72 @@ def _make_folds(
     return folds
 
 
+class _RoundedTarget(TransformerMixin, BaseEstimator):
+    """Target transformer of the tree learners: centre, scale and round.
+
+    The target is centred at its mean, divided by its standard deviation and
+    rounded to ``_TREE_DECIMALS`` decimals.  A target that is constant up to
+    rounding noise (see :func:`_is_constant`) keeps the scale 1.  Rounding makes
+    the tree fit a function of the rounded values only, so rounding noise in the
+    target cannot change which of several equally good splits a tree keeps; the
+    inverse transform maps predictions back to the units of the target.
+
+    Attributes
+    ----------
+    mean_, scale_ : float
+        Mean and scale of the target seen in ``fit``.
+    """
+
+    def fit(self, y: Any) -> "_RoundedTarget":
+        """Learn the mean and the scale of the target.
+
+        Parameters
+        ----------
+        y : array-like
+            Target values.
+
+        Returns
+        -------
+        _RoundedTarget
+            The fitted transformer.
+        """
+        values = np.asarray(y, dtype=float)
+        spread = float(values.std())
+        self.mean_ = float(values.mean())
+        self.scale_ = 1.0 if bool(_is_constant(values)) or not spread > 0.0 else spread
+        return self
+
+    def transform(self, y: Any) -> np.ndarray:
+        """Centre, scale and round a target.
+
+        Parameters
+        ----------
+        y : array-like
+            Target values.
+
+        Returns
+        -------
+        ndarray
+            ``round((y - mean_) / scale_, _TREE_DECIMALS)`` with the shape of ``y``.
+        """
+        return np.round((np.asarray(y, dtype=float) - self.mean_) / self.scale_, _TREE_DECIMALS)
+
+    def inverse_transform(self, y: Any) -> np.ndarray:
+        """Map values of the rounded scale back to the units of the target.
+
+        Parameters
+        ----------
+        y : array-like
+            Values on the scale of :meth:`transform`.
+
+        Returns
+        -------
+        ndarray
+            ``mean_ + scale_ * y`` with the shape of ``y``.
+        """
+        return self.mean_ + self.scale_ * np.asarray(y, dtype=float)
+
+
 def _build_learner(
     name: str,
     lam: float | None,
@@ -831,7 +939,10 @@ def _build_learner(
     -------
     estimator
         A scikit-learn estimator.  The linear learners standardise the features
-        and the target; their fitted pipeline is the attribute ``regressor_``.
+        and the target.  The tree learners are fitted to the centred, scaled and
+        rounded target of :class:`_RoundedTarget`.  The fitted learner is the
+        attribute ``regressor_`` of each of them and their predictions are in
+        the units of the target.
     """
     if name == "elastic_net":
         return TransformedTargetRegressor(
@@ -849,20 +960,28 @@ def _build_learner(
             check_inverse=False,
         )
     if name == "random_forest":
-        return RandomForestRegressor(
-            n_estimators=n_estimators,
-            max_depth=3,
-            min_samples_leaf=2,
-            random_state=random_state,
-            n_jobs=1,
+        return TransformedTargetRegressor(
+            regressor=RandomForestRegressor(
+                n_estimators=n_estimators,
+                max_depth=3,
+                min_samples_leaf=2,
+                random_state=random_state,
+                n_jobs=1,
+            ),
+            transformer=_RoundedTarget(),
+            check_inverse=False,
         )
     if name == "gradient_boosting":
-        return GradientBoostingRegressor(
-            n_estimators=n_estimators,
-            max_depth=2,
-            subsample=0.8,
-            learning_rate=min(1.0, 5.0 / n_estimators),
-            random_state=random_state,
+        return TransformedTargetRegressor(
+            regressor=GradientBoostingRegressor(
+                n_estimators=n_estimators,
+                max_depth=2,
+                subsample=0.8,
+                learning_rate=min(1.0, 5.0 / n_estimators),
+                random_state=random_state,
+            ),
+            transformer=_RoundedTarget(),
+            check_inverse=False,
         )
     raise ValueError(f"unknown learner {name!r}")
 
@@ -1011,7 +1130,10 @@ class StackedEnsemble(RegressorMixin, BaseEstimator):
     subsample 0.8, learning rate ``min(1, 5 / n_estimators)``).  The two linear
     learners standardise the features and the target and map their predictions
     back, so ``lam`` refers to standardised data and does not depend on the
-    units of ``X`` or ``y``.
+    units of ``X`` or ``y``.  The two tree learners are fitted to the target
+    after it has been centred, scaled and rounded to six decimals, so that
+    rounding noise in the target cannot change their splits (see the module
+    header).
 
     Stacking weights are the non-negative least squares coefficients of the
     centred target on the centred out-of-fold predictions of the base learners
@@ -1054,10 +1176,11 @@ class StackedEnsemble(RegressorMixin, BaseEstimator):
     Attributes
     ----------
     base_models_ : dict of str to estimator
-        Base learners fitted on all training rows.  The elastic net and the
-        ridge regression are ``TransformedTargetRegressor`` objects whose
-        fitted pipeline is ``regressor_``; their predictions are in the units
-        of the target.
+        Base learners fitted on all training rows.  Every base learner is a
+        ``TransformedTargetRegressor`` whose fitted regressor is
+        ``regressor_``: the pipeline of the elastic net or the ridge
+        regression, or the forest or the boosting model.  Their predictions
+        are in the units of the target.
     weights_ : pandas.Series
         Stacking weights indexed by learner name.
     target_mean_ : float
@@ -1732,6 +1855,34 @@ def _normalise_importance(values: np.ndarray, variance: float) -> tuple[np.ndarr
     return _normalise(values), False
 
 
+def _best_penalty(cv_mse: np.ndarray, lambdas: np.ndarray, variance: float) -> int:
+    """Index of the penalty with the smallest cross-validated error.
+
+    Penalties whose error is within ``_TIE_TOLERANCE * variance`` of the
+    smallest error tie, because errors that agree up to rounding noise are
+    equal in exact arithmetic; this happens when the stack ignores every
+    feature and every penalty gives the error of the intercept-only model.  The
+    largest penalty among the tied ones is chosen, which is the most regularised
+    fit and does not depend on the order of the grid or on the noise.
+
+    Parameters
+    ----------
+    cv_mse : ndarray of shape (L,)
+        Cross-validated mean squared error per penalty.
+    lambdas : ndarray of shape (L,)
+        The penalties.
+    variance : float
+        Variance of the target, the scale of a mean squared error.
+
+    Returns
+    -------
+    int
+        Position of the chosen penalty.
+    """
+    tied = np.flatnonzero(cv_mse <= float(cv_mse.min()) + _TIE_TOLERANCE * variance)
+    return int(tied[np.argmax(lambdas[tied])])
+
+
 @dataclass
 class _Estimate:
     """Aggregated importance estimates of one pass.
@@ -2073,6 +2224,7 @@ def _split_half_correlation(
     if groups.size < 2 * _MIN_GROUPS_PER_HALF:
         return float("nan")
     rng = np.random.default_rng(seed)
+    scale = float(np.abs(y).max())
     values: list[float] = []
     for i in range(n_halves):
         if guard is not None and i % _GUARD_LOOP_STEP == 0:
@@ -2084,7 +2236,7 @@ def _split_half_correlation(
         silent = False
         for members, half_seed in zip(halves, seeds):
             rows = np.flatnonzero(np.isin(codes, members))
-            if _is_constant(y[rows]):
+            if _is_constant(y[rows], scale=scale):
                 break
             est = _estimate(
                 X[rows], y[rows], codes[rows], None, names, n_splits, _LIGHT_PLAN.max_repeats,
@@ -2200,9 +2352,15 @@ class ImportanceResult:
         Defaults to ``permutation``.
     no_signal : bool, default False
         ``True`` when the raw permutation importance is rounding noise (its
-        clipped sum is at most ``1e-9`` times the variance of the target), so
-        that the stack does not use any feature.  ``permutation_normalised`` is
-        then the uniform vector and carries no information about the features.
+        clipped sum is at most ``1e-9`` times the variance of the target), that
+        is when the stack does not use any feature, for example because its
+        stacking weights are all zero.  ``permutation_normalised`` is then the
+        uniform vector and carries no information about the features.  The flag
+        marks a stack that ignores all features; it is not a verdict on the
+        data.  A target that is unrelated to the features usually gives
+        ``False``, because the stack still fits noise and the normalised
+        importance is then a random vector; the usability verdict, not this
+        flag, tells those cases apart.
     """
 
     permutation: pd.Series
@@ -2409,7 +2567,7 @@ def _importance(
     )
     out = est.out
     total = float(out.n_test.sum())
-    best = int(np.argmin(est.cv_mse))
+    best = _best_penalty(est.cv_mse, est.lambdas, float(np.var(y_c, ddof=1)))
     diagnostics: dict[str, Any] = {
         "cv_r2_stack": _r2_from_sse(float(out.sse_stack.sum(axis=0)[best]), total, y_c),
         "cv_r2_best_single": _r2_from_sse(float(out.sse_learner.sum(axis=0).min()), total, y_c),
@@ -2500,10 +2658,13 @@ def lambda_averaged_importance(
     Penalties refer to standardised features and a standardised target, so the
     penalty path and the weights do not change when a column of ``X`` or the
     target is rescaled or shifted, and the same holds for the normalised
-    importance of the penalised learners; the tree learners follow only up to
-    the numerical tolerances of scikit-learn.  ``permutation``,
-    ``coefficient_path`` and ``cv_mse_by_lambda`` are in the units of the
-    target.
+    importance of the penalised learners.  The tree learners are fitted to the
+    centred, scaled and rounded target (see the module header), which makes
+    them follow a rescaled or shifted target and makes the whole result stable
+    under rounding noise of relative size 1e-13 in ``X`` and ``y``, up to the
+    rare value of ``y`` that lies within the noise of a rounding boundary.
+    ``permutation``, ``coefficient_path`` and ``cv_mse_by_lambda`` are in the
+    units of the target.
 
     The diagnostics hold the grouped cross-validated R2 of the stack at the
     penalty with the smallest error, of the best single base learner and of the
@@ -2737,6 +2898,7 @@ def bootstrap_importance(
         raise ValueError(f"at least {_MIN_GROUPS} distinct groups are required")
     folds_of_data = _fold_count(int(unique.size), options["n_splits"], cap)
     rows_of = {g: np.flatnonzero(codes == g) for g in unique}
+    y_scale = float(np.abs(y_values).max())
     rng = np.random.default_rng(random_state)
     draws: list[np.ndarray] = []
     informative: list[bool] = []
@@ -2749,7 +2911,7 @@ def bootstrap_importance(
         if n_distinct < _MIN_GROUPS or _fold_count(n_distinct, options["n_splits"], cap) > folds_of_data:
             continue
         rows = np.concatenate([rows_of[g] for g in chosen])
-        if _is_constant(y_values[rows]):
+        if _is_constant(y_values[rows], scale=y_scale):
             continue
         seed = None if random_state is None else int(rng.integers(0, 2**32 - 1))
         if guard is not None:
@@ -2868,13 +3030,19 @@ def verdict_stability(
     _check_options(n_splits, n_repeats, weighting, temperature, n_perm, cv_repeats, None, True)
     _check_guard(guard)
     used = _resolve_learners(learners)
-    seed_list = [seeds] if isinstance(seeds, (int, np.integer)) else list(seeds)
+    try:
+        seed_list = [seeds] if isinstance(seeds, (int, np.integer)) else list(seeds)
+    except TypeError:
+        raise ValueError("seeds must be an integer or an iterable of integers") from None
     if not seed_list:
         raise ValueError("seeds must not be empty")
     for value in seed_list:
         if value is None:
             raise ValueError("seeds must be integers between 0 and 4294967295, not None")
-        _check_seed(value)
+        try:
+            _check_seed(value)
+        except ValueError:
+            raise ValueError("seeds must be integers between 0 and 4294967295") from None
     if len({int(value) for value in seed_list}) != len(seed_list):
         raise ValueError("seeds must be distinct")
     if np.unique(codes).size < _MIN_GROUPS:

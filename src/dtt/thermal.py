@@ -6,6 +6,20 @@ worked.  ``headroom`` summarises the free capacity of the machine.
 ``ThermalGuard`` pauses a computation while the machine is too hot, or, when no
 temperature is available, too busy, and records every check in a CSV file.
 
+Waiting for heat and waiting for load
+-------------------------------------
+A wait for a temperature above the limit protects the hardware, so it ends in
+:class:`ThermalTimeout` when the machine does not cool down within
+``max_wait_seconds``.  A wait for CPU load, which the guard uses only when no
+temperature is available, protects nothing: other programs may keep the machine
+busy for as long as they like.  It therefore ends without an exception after
+``max_cpu_wait_seconds``, with a log row whose action is ``cpu_timeout``, and the
+guard does not wait for CPU load again during the run.  The CPU load that counts
+is the load of the system minus the load of this program and its child
+processes, because the guard must not wait for the computation it protects.
+Each wait prints one line when it starts and one when it ends, so that a long
+cell shows activity.
+
 Temperature probes, tried in this order until one returns a value
 -----------------------------------------------------------------
 ``psutil``
@@ -48,6 +62,7 @@ import re
 import subprocess
 import sys
 import time
+import uuid
 import warnings
 from datetime import datetime
 from pathlib import Path
@@ -83,7 +98,10 @@ _ACPI_COMMAND = (
 
 
 class ThermalTimeout(RuntimeError):
-    """The machine stayed too hot or too busy for longer than the allowed waiting time."""
+    """The machine stayed too hot for longer than the allowed waiting time.
+
+    A wait for CPU load never raises this exception; see :class:`ThermalGuard`.
+    """
 
 
 # ----------------------------------------------------------------------------
@@ -511,9 +529,11 @@ def _create_log(path: Path) -> None:
 
     A temporary file in the same directory receives the header and is then
     linked to the final name, which succeeds for only one of several callers, so
-    the log never exists without its header.  Where hard links are not available
-    the file is created exclusively.  A file that exists but is empty receives
-    the header.
+    the log never exists without its header.  The name of the temporary file
+    holds a random identifier, so that callers of one process, which share the
+    process number and can read the same clock value, never collide.  Where hard
+    links are not available the file is created exclusively.  A file that exists
+    but is empty receives the header.
 
     Parameters
     ----------
@@ -527,7 +547,7 @@ def _create_log(path: Path) -> None:
     """
     header = _header_line().encode("utf-8")
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
-    temporary = path.with_name(f".{path.name}.{os.getpid()}.{time.time_ns()}.tmp")
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp")
     descriptor = os.open(temporary, flags, 0o666)
     try:
         with os.fdopen(descriptor, "wb") as handle:
@@ -565,16 +585,39 @@ class ThermalGuard:
     A call of the guard (or of :meth:`check`) reads the temperature.  If a
     temperature is available and above ``max_temp_c``, the guard sleeps in steps
     of ``poll_seconds`` until a reading at or below ``resume_temp_c`` is
-    obtained; a step without a reading does not end the wait.  If no temperature
-    is available, the guard compares the CPU load with ``max_cpu_percent`` and,
-    while the load is higher, sleeps in steps of ``poll_seconds`` and reads again;
-    a temperature that appears during this wait ends it when it is at or below
-    ``max_temp_c`` and starts the wait for ``resume_temp_c`` when it is above.  A
-    CPU load that cannot be read counts as within the limit.  The last step of a
-    wait is shortened so that the wait does not exceed ``max_wait_seconds``, and
-    :class:`ThermalTimeout` is raised when that time has passed without the
-    machine being within its limits.  Every call appends a row to the CSV file
-    ``log_path`` when one is given.
+    obtained; a step without a reading does not end the wait.  The last step of
+    a wait is shortened so that the wait does not exceed ``max_wait_seconds``,
+    and :class:`ThermalTimeout` is raised when that time has passed without the
+    machine being cool enough.
+
+    If no temperature is available, the guard compares the CPU load with
+    ``max_cpu_percent`` and, while the load is higher, sleeps in steps of
+    ``poll_seconds`` and reads again.  A temperature that appears during this
+    wait ends it when it is at or below ``max_temp_c``; when it is above, the
+    wait becomes a wait for ``resume_temp_c`` that is limited by
+    ``max_wait_seconds`` counted from the start of the call, and ends in
+    :class:`ThermalTimeout` like any other wait for heat.  A CPU load that
+    cannot be read counts as within the limit.  A wait that began because of the
+    CPU load alone never raises: after ``max_cpu_wait_seconds`` the guard logs a
+    row with the action ``cpu_timeout``, prints one line and returns.  After the first
+    ``cpu_timeout`` of a guard the guard stops waiting for CPU load; it still
+    reads and logs temperature and load, and still waits for a temperature above
+    ``max_temp_c``.
+
+    The CPU load that counts is the load that does not belong to this program.
+    The default reader subtracts the load of the current process and of all its
+    child processes, ``psutil.Process().cpu_percent()`` of each in percent of one
+    logical CPU summed and divided by the number of logical CPUs, from the load
+    of the system, and the difference is never below zero.  A child that has just
+    started contributes nothing to its first reading.  If the load of the
+    process cannot be read, the load of the system is used.  The column
+    ``cpu_percent`` of the log holds the load as the guard used it.  A function
+    passed as ``read_cpu`` is used as given.
+
+    Every wait prints one line to standard output when it starts, with the
+    reason and the reading, and one when it ends, with the seconds waited;
+    ``verbose=False`` switches the printing off.  Every call appends a row to
+    the CSV file ``log_path`` when one is given.
 
     Parameters
     ----------
@@ -587,7 +630,8 @@ class ThermalGuard:
     poll_seconds : float, default 5.0
         Length of one sleeping step; positive.
     max_wait_seconds : float, default 1800.0
-        Longest total wait of one call before :class:`ThermalTimeout`.
+        Longest total wait of one call for a temperature above ``max_temp_c``
+        before :class:`ThermalTimeout`.
     log_path : str, Path or None, default None
         CSV file that receives one row per call; parent directories are created
         on the first write.  A file that is missing or empty is created together
@@ -599,18 +643,25 @@ class ThermalGuard:
         ``None`` uses a :class:`TemperatureReader` driven by ``clock``.
     read_cpu : callable or None, default None
         Function without arguments that returns the CPU load in percent.  The
-        default reads ``psutil.cpu_percent(interval=None)``, the load since the
-        previous reading.
+        default reads the load of the system with
+        ``psutil.cpu_percent(interval=None)``, the load since the previous
+        reading, and subtracts the load of this program as described above.
     sleep : callable, default ``time.sleep``
         Function that waits for the given number of seconds.
     clock : callable, default ``time.monotonic``
         Function that returns the current time in seconds.
+    max_cpu_wait_seconds : float, default 300.0
+        Longest wait of one call for CPU load alone before the action
+        ``cpu_timeout``; not negative.
+    verbose : bool, default True
+        Whether the start and the end of a wait are printed.
 
     Raises
     ------
     ValueError
         If ``resume_temp_c`` exceeds ``max_temp_c``, ``poll_seconds`` is not
-        positive or ``max_wait_seconds`` is negative.
+        positive, or ``max_wait_seconds`` or ``max_cpu_wait_seconds`` is
+        negative or not a number.
     """
 
     def __init__(
@@ -625,6 +676,9 @@ class ThermalGuard:
         read_cpu: Callable[[], float] | None = None,
         sleep: Callable[[float], Any] = time.sleep,
         clock: Callable[[], float] = time.monotonic,
+        *,
+        max_cpu_wait_seconds: float = 300.0,
+        verbose: bool = True,
     ) -> None:
         if not resume_temp_c <= max_temp_c:
             raise ValueError("resume_temp_c must not exceed max_temp_c")
@@ -632,11 +686,15 @@ class ThermalGuard:
             raise ValueError("poll_seconds must be positive")
         if not max_wait_seconds >= 0:
             raise ValueError("max_wait_seconds must not be negative")
+        if not max_cpu_wait_seconds >= 0:
+            raise ValueError("max_cpu_wait_seconds must not be negative")
         self.max_temp_c = float(max_temp_c)
         self.resume_temp_c = float(resume_temp_c)
         self.max_cpu_percent = float(max_cpu_percent)
         self.poll_seconds = float(poll_seconds)
         self.max_wait_seconds = float(max_wait_seconds)
+        self.max_cpu_wait_seconds = float(max_cpu_wait_seconds)
+        self.verbose = bool(verbose)
         self.log_path = None if log_path is None else Path(log_path)
         self._read_temp = read_temp
         self._with_source: Callable[[], tuple[float, str] | None] | None = None
@@ -648,6 +706,7 @@ class ThermalGuard:
         self._checks = 0
         self._waits = 0
         self._waited_seconds = 0.0
+        self._cpu_timeouts = 0
         self._max_temperature: float | None = None
         self._source = "unavailable"
         self._log_warned = False
@@ -659,13 +718,14 @@ class ThermalGuard:
     def check(self) -> None:
         """Wait until the machine is within its limits.
 
+        A wait for CPU load that reaches ``max_cpu_wait_seconds`` ends with the
+        action ``cpu_timeout`` and returns; later calls do not wait for CPU load.
+
         Raises
         ------
         ThermalTimeout
-            If the machine is not within its limits after ``max_wait_seconds``
-            of waiting: the temperature stays above ``resume_temp_c`` after it
-            exceeded ``max_temp_c``, or the CPU load stays above
-            ``max_cpu_percent`` while no temperature is available.  The row of
+            If the temperature stays above ``resume_temp_c`` for
+            ``max_wait_seconds`` after it exceeded ``max_temp_c``.  The row of
             the call is logged before the exception is raised.
         """
         started = self._clock()
@@ -674,26 +734,24 @@ class ThermalGuard:
         memory = _memory_percent()
         action = "ok"
         waited = 0.0
-        hot = False
         if temperature is not None:
             if temperature > self.max_temp_c:
-                action, waited, hot = self._wait(started, hot=True)
-        elif cpu is not None and cpu > self.max_cpu_percent:
-            action, waited, hot = self._wait(started, hot=False)
+                action, waited = self._wait(started, hot=True, reading=temperature)
+        elif cpu is not None and cpu > self.max_cpu_percent and self._cpu_timeouts == 0:
+            action, waited = self._wait(started, hot=False, reading=cpu)
         self._checks += 1
         if action != "ok":
             self._waits += 1
             self._waited_seconds += waited
+            self._announce_end(action, waited)
+        if action == "cpu_timeout":
+            self._cpu_timeouts += 1
         self._append_log(temperature, cpu, memory, action, waited)
         if action == "timeout":
-            if hot:
-                reason = (
-                    f"temperature stayed above {self.resume_temp_c:g} C for {waited:g} seconds "
-                    f"after exceeding {self.max_temp_c:g} C"
-                )
-            else:
-                reason = f"CPU load stayed above {self.max_cpu_percent:g} percent for {waited:g} seconds"
-            raise ThermalTimeout(reason)
+            raise ThermalTimeout(
+                f"temperature stayed above {self.resume_temp_c:g} C for {waited:g} seconds "
+                f"after exceeding {self.max_temp_c:g} C"
+            )
 
     def guarded(self, iterable: Iterable[T]) -> Iterator[T]:
         """Iterate while calling the guard before each item.
@@ -719,7 +777,9 @@ class ThermalGuard:
         -------
         dict
             ``checks`` (number of calls), ``waits`` (calls that waited or timed
-            out), ``waited_seconds`` (total waiting time),
+            out), ``waited_seconds`` (total waiting time), ``cpu_timeouts``
+            (waits for CPU load that ended at ``max_cpu_wait_seconds``; at most
+            one, because the guard does not wait for CPU load afterwards),
             ``max_temperature_c`` (highest temperature read, ``None`` if none)
             and ``temperature_source`` (probe name, ``custom`` for a user
             supplied reader, or ``unavailable`` if no temperature was read).
@@ -728,6 +788,7 @@ class ThermalGuard:
             "checks": self._checks,
             "waits": self._waits,
             "waited_seconds": self._waited_seconds,
+            "cpu_timeouts": self._cpu_timeouts,
             "max_temperature_c": self._max_temperature,
             "temperature_source": self._source,
         }
@@ -775,15 +836,83 @@ class ThermalGuard:
             return None
         return value if math.isfinite(value) else None
 
-    def _wait(self, started: float, hot: bool) -> tuple[str, float, bool]:
+    def _say(self, text: str) -> None:
+        """Print one line of the progress report unless the guard is silent.
+
+        A failure of the output stream is ignored, because the report must not
+        stop the computation that the guard protects.
+
+        Parameters
+        ----------
+        text : str
+            The line without the line terminator.
+        """
+        if not self.verbose:
+            return
+        try:
+            print(text, flush=True)
+        except Exception:
+            pass
+
+    def _announce_start(self, hot: bool, reading: float) -> None:
+        """Print the line that tells why and at which reading a wait starts.
+
+        Parameters
+        ----------
+        hot : bool
+            ``True`` for a wait for a temperature above ``max_temp_c``, ``False``
+            for a wait for the CPU load.
+        reading : float
+            The temperature in degrees Celsius or the CPU load in percent.
+        """
+        if hot:
+            self._say(
+                f"thermal guard: waiting, the CPU temperature is {reading:.1f} C, "
+                f"above the limit of {self.max_temp_c:g} C"
+            )
+        else:
+            self._say(
+                f"thermal guard: waiting, the CPU load is {reading:.0f} percent, "
+                f"above the limit of {self.max_cpu_percent:g} percent (no temperature available)"
+            )
+
+    def _announce_end(self, action: str, waited: float) -> None:
+        """Print the line that tells how a wait ended and after how many seconds.
+
+        Parameters
+        ----------
+        action : {"waited", "timeout", "cpu_timeout"}
+            Outcome of the wait.
+        waited : float
+            Seconds waited.
+        """
+        if action == "cpu_timeout":
+            self._say(
+                f"thermal guard: the CPU load stayed above {self.max_cpu_percent:g} percent for {waited:.1f} seconds; "
+                "continuing, and not waiting for the CPU load again in this run"
+            )
+        elif action == "timeout":
+            self._say(
+                f"thermal guard: gave up after waiting {waited:.1f} seconds, "
+                f"the temperature is still above {self.resume_temp_c:g} C"
+            )
+        else:
+            self._say(f"thermal guard: resumed after waiting {waited:.1f} seconds")
+
+    def _wait(self, started: float, hot: bool, reading: float) -> tuple[str, float]:
         """Sleep in steps until the machine is within its limits or time runs out.
 
         Each step sleeps for ``poll_seconds`` or for the time that remains of
-        ``max_wait_seconds`` if that is shorter, and is followed by a new
-        temperature reading.  While the machine counts as hot, only a reading at
-        or below ``resume_temp_c`` ends the wait.  Otherwise a temperature
-        reading ends the wait, and without a reading the wait ends when the CPU
-        load is within ``max_cpu_percent`` or cannot be read.
+        the limit of the wait if that is shorter, and is followed by a new
+        temperature reading.  The limit of a wait for heat is
+        ``max_wait_seconds`` and the limit of a wait for CPU load is
+        ``max_cpu_wait_seconds``.  Both count from ``started``, and a wait for
+        CPU load that turns into a wait for heat changes to the limit of the
+        first kind.  While the machine
+        counts as hot, only a reading at or below ``resume_temp_c`` ends the
+        wait.  Otherwise a temperature reading ends the wait, and without a
+        reading the wait ends when the CPU load is within ``max_cpu_percent`` or
+        cannot be read.  One line is printed when the wait starts.
 
         Parameters
         ----------
@@ -793,25 +922,27 @@ class ThermalGuard:
             ``True`` when the wait began with a temperature above ``max_temp_c``
             and ``False`` when it began with a CPU load above ``max_cpu_percent``
             and no temperature.
+        reading : float
+            The temperature or the CPU load that started the wait.
 
         Returns
         -------
-        action : {"waited", "timeout"}
-            Outcome of the wait.
+        action : {"waited", "timeout", "cpu_timeout"}
+            Outcome of the wait: ``timeout`` when the limit of a wait for heat
+            was reached and ``cpu_timeout`` when the limit of a wait for CPU
+            load was reached.
         waited : float
             Seconds waited: the larger of the elapsed clock time and the total
             requested sleeping time.
-        hot : bool
-            Whether the machine counted as hot when the wait ended; a
-            temperature above ``max_temp_c`` that appears during a wait that
-            began without a temperature sets it.
         """
+        self._announce_start(hot, reading)
         slept = 0.0
         while True:
             waited = max(self._clock() - started, slept)
-            remaining = self.max_wait_seconds - waited
+            limit = self.max_wait_seconds if hot else self.max_cpu_wait_seconds
+            remaining = limit - waited
             if remaining <= 0.0:
-                return "timeout", waited, hot
+                return ("timeout" if hot else "cpu_timeout"), waited
             step = min(self.poll_seconds, remaining)
             self._sleep(step)
             slept += step
@@ -826,7 +957,7 @@ class ThermalGuard:
                 cpu = self._measure_cpu()
                 ready = cpu is None or cpu <= self.max_cpu_percent
             if ready:
-                return "waited", max(self._clock() - started, slept), hot
+                return "waited", max(self._clock() - started, slept)
 
     def _append_log(
         self,
@@ -842,7 +973,7 @@ class ThermalGuard:
         ----------
         temperature, cpu, memory : float or None
             Readings at the start of the call; ``None`` is written as an empty field.
-        action : {"ok", "waited", "timeout"}
+        action : {"ok", "waited", "timeout", "cpu_timeout"}
             Outcome of the call.
         waited : float
             Seconds waited.
@@ -873,27 +1004,102 @@ class ThermalGuard:
                 warnings.warn(f"thermal log could not be written: {error}", RuntimeWarning, stacklevel=3)
 
 
-def _default_cpu_reader() -> Callable[[], float]:
-    """CPU load reader based on ``psutil.cpu_percent`` without blocking.
+class _OtherProcessesLoad:
+    """CPU load of the machine without the load of this program and its children.
 
-    One reading of ``psutil.cpu_percent(interval=None)`` is taken when the
-    reader is created, which starts the interval of the first call.
+    The system load is ``psutil.cpu_percent(interval=None)``, the share of the
+    whole machine that was busy since the previous reading.  The load of this
+    program is the sum of ``cpu_percent(interval=None)`` of the current process
+    and of all its descendants, each in percent of one logical CPU, divided by
+    the number of logical CPUs, which puts it on the scale of the system load.
+    Process objects are kept between readings, because ``psutil`` measures the
+    load of a process since the previous reading of the same object; a child
+    seen for the first time contributes nothing to that reading, and a child
+    that cannot be read, for example because it has ended, is skipped.
+
+    A reading of the system alone is returned when the load of the current
+    process cannot be determined: the process object cannot be created or read,
+    its children cannot be listed, or the number of logical CPUs is unknown.
+    The result is never below zero.  Creating the reader starts the intervals of
+    the first reading.
+    """
+
+    def __init__(self) -> None:
+        self._process: Any = None
+        self._children: dict[int, Any] = {}
+        try:
+            psutil.cpu_percent(interval=None)
+        except Exception:
+            pass
+        try:
+            self._process = psutil.Process()
+            self._process.cpu_percent(interval=None)
+        except Exception:
+            self._process = None
+
+    def own_load(self) -> float | None:
+        """Load of this program and its descendants in percent of the machine.
+
+        Returns
+        -------
+        float or None
+            Summed load of the process tree divided by the number of logical
+            CPUs, or ``None`` when the load of the current process cannot be
+            determined.
+        """
+        if self._process is None:
+            return None
+        try:
+            cpus = psutil.cpu_count(logical=True)
+            if not cpus or cpus < 1:
+                return None
+            total = float(self._process.cpu_percent(interval=None))
+            descendants = self._process.children(recursive=True)
+        except Exception:
+            return None
+        if not math.isfinite(total):
+            return None
+        current: dict[int, Any] = {}
+        for child in descendants:
+            watched = self._children.get(child.pid, child)
+            try:
+                value = float(watched.cpu_percent(interval=None))
+            except Exception:
+                continue
+            current[child.pid] = watched
+            if math.isfinite(value):
+                total += value
+        self._children = current
+        return total / float(cpus)
+
+    def __call__(self) -> float:
+        """Load of the machine that does not belong to this program.
+
+        Returns
+        -------
+        float
+            System load in percent minus the load of the process tree, not below
+            zero; the system load itself if the process tree cannot be read.
+        """
+        system = float(psutil.cpu_percent(interval=None))
+        own = self.own_load()
+        if own is None:
+            return system
+        return max(system - own, 0.0)
+
+
+def _default_cpu_reader() -> Callable[[], float]:
+    """CPU load reader for the guard: the load of the machine without this program.
 
     Returns
     -------
     callable
-        Function without arguments that returns the load in percent since its
-        previous call.
+        Function without arguments that returns, in percent, the load since its
+        previous call that does not belong to the current process and its child
+        processes (see :class:`_OtherProcessesLoad`), or the load of the system
+        when the load of the process tree cannot be read.
     """
-    try:
-        psutil.cpu_percent(interval=None)
-    except Exception:
-        pass
-
-    def read() -> float:
-        return float(psutil.cpu_percent(interval=None))
-
-    return read
+    return _OtherProcessesLoad()
 
 
 def _memory_percent() -> float | None:

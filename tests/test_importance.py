@@ -4,6 +4,7 @@ No file of the repository is read.  The default configuration is run once, to ch
 the number of guard calls; every other test uses the linear learners, the light configuration or
 forests of a few trees.
 """
+import ast
 import inspect
 import sys
 import time
@@ -35,6 +36,7 @@ from dtt.importance import (  # noqa: E402
     lambda_averaged_importance,
     lambda_grid,
     make_toy_problem,
+    verdict_stability,
 )
 from dtt.thermal import ThermalGuard, ThermalTimeout  # noqa: E402
 
@@ -214,7 +216,7 @@ def test_pure_noise_is_not_usable_and_every_failed_criterion_is_named(noise30):
         assert sum(name in reason for reason in d["reasons"]) == 1
 
 
-def test_a_sample_below_ten_cases_is_not_usable():
+def test_a_sample_below_the_minimum_number_of_cases_is_not_usable():
     X, y, groups = make_toy_problem(n=9, random_state=0)
     res = lambda_averaged_importance(X, y, groups, learners=LINEAR, light=True, n_perm=9)
     assert res.diagnostics["n_cases"] == 9 and res.diagnostics["usable"] is False
@@ -234,6 +236,16 @@ def test_the_minimum_number_of_cases_is_twenty_rows(quick_halves, n, named):
     if named:
         assert reasons == [f"n_cases is 19, below the minimum of {importance.MIN_CASES}"]
         assert res.diagnostics["usable"] is False
+
+
+def test_the_minimum_counts_cases_and_not_groups():
+    diagnostics = {"cv_r2_stack": 0.5, "perm_p_value": 0.05, "split_half_correlation": 0.9, "n_cases": 20}
+    assert importance._verdict(diagnostics) == (True, [])
+    X, y, groups = make_toy_problem(n=24, random_state=1)
+    assert len(set(groups)) < 24 and importance.MIN_CASES < 24
+    res = lambda_averaged_importance(X, y, groups, learners=LINEAR, light=True, compute_diagnostics=False)
+    assert res.diagnostics["n_cases"] == 24
+    assert "split-half criterion" in importance.__doc__ and "economies" in importance.__doc__
 
 
 @pytest.mark.parametrize(
@@ -705,6 +717,279 @@ def test_the_label_permutation_p_value_counts_permuted_statistics_at_least_as_la
 
 
 # ----------------------------------------------------------------------------
+# Decisions that rounding noise must not change
+# ----------------------------------------------------------------------------
+def label_p_with_statistics(monkeypatch, statistics):
+    """P-value of the label permutation test for the given observed statistic followed by permuted ones."""
+    X, y, groups = noise_problem(n=24)
+    queue = iter(statistics)
+    monkeypatch.setattr(importance, "_stack_cv_r2", lambda *args, **kwargs: next(queue))
+    return importance._label_permutation_p(X.to_numpy(), y.to_numpy(), np.arange(24), LINEAR, 5, len(statistics) - 1, 1, 0, 2)
+
+
+def test_a_permuted_statistic_that_ties_with_the_observed_one_up_to_rounding_noise_counts_as_an_exceedance(monkeypatch):
+    observed = 0.3
+    permuted = [0.1] * 4 + [observed + 1e-12, observed - 1e-12, observed + 5e-13, observed - 5e-10] + [0.5] * 3
+    assert label_p_with_statistics(monkeypatch, [observed] + permuted) == pytest.approx((1 + 3 + 3 + 1) / 12)
+    beyond = [observed - 2e-9, observed - 1e-8, observed - 1e-6, observed - 1e-3]
+    assert label_p_with_statistics(monkeypatch, [observed] + beyond + [0.1] * 4) == pytest.approx(1 / 9)
+
+
+def test_the_tie_tolerance_is_relative_to_the_observed_statistic_when_that_exceeds_one(monkeypatch):
+    observed = -5.0
+    inside = [observed - 4e-9, observed + 1e-12]
+    outside = [observed - 6e-9, observed - 1e-6]
+    assert label_p_with_statistics(monkeypatch, [observed] + inside + outside) == pytest.approx(3 / 5)
+    assert label_p_with_statistics(monkeypatch, [0.0, -5e-10, -2e-9, 3e-10]) == pytest.approx(3 / 4)
+
+
+def tie_prone_problem():
+    """Twenty-four cases whose target is one for three of them and zero for the others, one case per group.
+
+    Many permuted targets put the same values into the same folds as the observed target, so the permuted
+    statistics tie with the observed one.
+    """
+    rng = np.random.default_rng(11)
+    X = pd.DataFrame(rng.standard_normal((24, 6)), columns=[f"x{j}" for j in range(6)])
+    y = pd.Series(np.r_[np.ones(3), np.zeros(21)], name="effect")
+    return X, y, np.arange(24)
+
+
+def perturbed(X, y, seed, scale=1e-13):
+    """Copies of the data with noise of ``scale`` times the standard deviation of each column added."""
+    rng = np.random.default_rng(seed)
+    values = X.to_numpy()
+    noisy = values + scale * values.std(axis=0) * rng.standard_normal(values.shape)
+    target = y.to_numpy() + scale * y.std() * rng.standard_normal(y.size)
+    return pd.DataFrame(noisy, index=X.index, columns=X.columns), pd.Series(target, index=y.index, name=y.name)
+
+
+def test_the_p_value_of_the_label_permutation_test_does_not_change_with_rounding_noise_in_the_data(monkeypatch):
+    X, y, groups = tie_prone_problem()
+    codes = importance._group_codes(groups, 24)
+
+    def p_value(features, target):
+        return importance._label_permutation_p(features.to_numpy(), target.to_numpy(), codes, LINEAR, 5, 20, 7, 3, 4)
+
+    base = p_value(X, y)
+    assert {p_value(*perturbed(X, y, seed)) for seed in range(6)} == {base}
+    monkeypatch.setattr(importance, "_TIE_TOLERANCE", 0.0)
+    assert len({p_value(*perturbed(X, y, seed)) for seed in range(6)}) > 1
+
+
+def grouped_noise_problem():
+    """Thirty cases of 8 standard normal features and an unrelated standard normal target in 24 groups."""
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame(rng.standard_normal((30, 8)), columns=[f"x{j}" for j in range(8)])
+    y = pd.Series(rng.standard_normal(30), name="effect")
+    return X, y, np.arange(30) % 24
+
+
+PERTURBATION_PROBLEMS = {
+    "signal": lambda: make_toy_problem(n=30, random_state=5),
+    "ties": tie_prone_problem,
+    "noise": grouped_noise_problem,
+}
+
+
+@pytest.mark.parametrize(
+    "problem, learners, n_noise",
+    [
+        ("signal", LINEAR, 3),
+        ("ties", LINEAR, 3),
+        ("signal", None, 2),
+        ("noise", None, 2),
+    ],
+    ids=["signal-linear", "ties-linear", "signal-all-learners", "noise-all-learners"],
+)
+def test_the_result_does_not_change_with_noise_of_1e_13_in_the_inputs(quick_halves, problem, learners, n_noise):
+    X, y, groups = PERTURBATION_PROBLEMS[problem]()
+    options = dict(learners=learners, light=True, n_perm=20, random_state=2)
+    base = lambda_averaged_importance(X, y, groups, **options)
+    for seed in range(n_noise):
+        noisy_X, noisy_y = perturbed(X, y, seed)
+        other = lambda_averaged_importance(noisy_X, noisy_y, groups, **options)
+        assert other.diagnostics["perm_p_value"] == base.diagnostics["perm_p_value"]
+        assert other.diagnostics["usable"] is base.diagnostics["usable"]
+        assert other.no_signal is base.no_signal
+        npt.assert_allclose(other.permutation_normalised, base.permutation_normalised, rtol=0.0, atol=1e-6)
+        for key in ("cv_r2_stack", "cv_r2_best_single", "cv_r2_null", "split_half_correlation"):
+            assert other.diagnostics[key] == pytest.approx(base.diagnostics[key], abs=1e-6), key
+        assert other.summary_frame()["feature"].tolist() == base.summary_frame()["feature"].tolist()
+
+
+@pytest.mark.parametrize("name", ["random_forest", "gradient_boosting"])
+def test_tree_learners_give_the_same_predictions_for_targets_that_differ_by_rounding_noise(name):
+    rng = np.random.default_rng(0)
+    X, y, X_new = rng.standard_normal((24, 8)), rng.standard_normal(24), rng.standard_normal((200, 8))
+    base = importance._fit_model(name, None, 0.5, 4, 0, X, y).predict(X_new)
+    assert np.ptp(base) > 0.1
+    for seed in range(5):
+        for level in (1e-15, 1e-13):
+            noisy = y * (1.0 + level * np.random.default_rng(100 + seed).standard_normal(24))
+            other = importance._fit_model(name, None, 0.5, 4, 0, X, noisy).predict(X_new)
+            npt.assert_allclose(other, base, rtol=1e-9, atol=1e-9)
+
+
+@pytest.mark.parametrize("name", ["random_forest", "gradient_boosting"])
+def test_tree_learners_follow_a_target_that_is_rescaled_and_shifted(name):
+    rng = np.random.default_rng(1)
+    X, y, X_new = rng.standard_normal((24, 8)), rng.standard_normal(24), rng.standard_normal((100, 8))
+    base = importance._fit_model(name, None, 0.5, 6, 0, X, y).predict(X_new)
+    for scale, shift in ((1000.0, 50.0), (1e-9, 3e-9), (1e6, -2e7)):
+        other = importance._fit_model(name, None, 0.5, 6, 0, X, scale * y + shift).predict(X_new)
+        npt.assert_allclose(other, scale * base + shift, rtol=1e-9, atol=1e-9 * scale)
+
+
+def test_the_target_of_the_tree_learners_is_centred_scaled_and_rounded_to_six_decimals():
+    y = np.array([3.0, 5.0, 9.0, 1.0])
+    transformer = importance._RoundedTarget().fit(y)
+    assert transformer.mean_ == pytest.approx(4.5) and transformer.scale_ == pytest.approx(y.std())
+    rounded = transformer.transform(y)
+    npt.assert_array_equal(rounded, np.round((y - 4.5) / y.std(), 6))
+    assert importance._TREE_DECIMALS == 6
+    npt.assert_allclose(transformer.inverse_transform(rounded), y, atol=1e-6 * y.std())
+    noisy = y * (1.0 + 1e-14 * np.random.default_rng(0).standard_normal(4))
+    npt.assert_array_equal(importance._RoundedTarget().fit(noisy).transform(noisy), rounded)
+    column = transformer.transform(y.reshape(-1, 1))
+    assert column.shape == (4, 1) and transformer.inverse_transform(column).shape == (4, 1)
+
+
+def test_a_constant_target_keeps_the_scale_one_in_the_tree_learners():
+    for value in (0.0, 7.0):
+        constant = np.full(6, value)
+        transformer = importance._RoundedTarget().fit(constant)
+        assert transformer.scale_ == 1.0 and transformer.mean_ == value
+        npt.assert_array_equal(transformer.transform(constant), np.zeros(6))
+        noisy = value * (1.0 + 1e-16 * np.arange(6.0))
+        assert importance._RoundedTarget().fit(noisy).scale_ == 1.0
+    X = np.random.default_rng(0).standard_normal((12, 3))
+    for name in ("random_forest", "gradient_boosting"):
+        model = importance._fit_model(name, None, 0.5, 4, 0, X, np.full(12, 2.5))
+        npt.assert_allclose(model.predict(X), 2.5)
+
+
+def test_the_best_penalty_is_the_largest_one_among_errors_that_tie_up_to_rounding_noise():
+    best = importance._best_penalty
+    grid = np.array([1.0, 0.5, 0.25, 0.125])
+    assert best(np.array([3.0, 2.0, 1.0, 1.5]), grid, 4.0) == 2
+    tied = np.array([1.0 + 3e-12, 1.0, 1.0 - 4e-12, 1.0 + 1e-12])
+    assert best(tied, grid, 1.0) == 0
+    assert best(tied[::-1], grid[::-1], 1.0) == 3
+    assert best(np.array([1.0 + 5e-9, 1.0, 1.0 + 5e-9, 1.0 + 1e-8]), grid, 1.0) == 1
+    assert best(np.array([1.0 + 5e-6, 1.0]), np.array([1.0, 0.5]), 1e4) == 0
+    assert best(np.array([1.0 + 5e-6, 1.0]), np.array([1.0, 0.5]), 1.0) == 1
+    assert best(np.array([2.0]), np.array([0.3]), 1.0) == 0
+
+
+def test_the_diagnostics_use_the_best_penalty_of_the_tolerant_rule(monkeypatch):
+    X, y, groups = make_toy_problem(n=24, random_state=3)
+    chosen = []
+    original = importance._best_penalty
+
+    def spy(cv_mse, lambdas, variance):
+        chosen.append((cv_mse.copy(), lambdas.copy(), variance))
+        return original(cv_mse, lambdas, variance)
+
+    monkeypatch.setattr(importance, "_best_penalty", spy)
+    res = lambda_averaged_importance(X, y, groups, learners=LINEAR, light=True, compute_diagnostics=False)
+    assert len(chosen) == 1
+    cv_mse, lambdas, variance = chosen[0]
+    npt.assert_array_equal(cv_mse, res.cv_mse_by_lambda)
+    npt.assert_array_equal(lambdas, res.lambdas)
+    assert variance == pytest.approx(float(np.var(y, ddof=1)))
+    sst = float(np.sum((y - y.mean()) ** 2))
+    best = int(np.argmin(res.cv_mse_by_lambda))
+    assert res.diagnostics["cv_r2_stack"] == pytest.approx(1.0 - len(y) * res.cv_mse_by_lambda[best] / sst)
+    monkeypatch.setattr(importance, "_best_penalty", lambda *args: len(args[0]) - 1)
+    last = lambda_averaged_importance(X, y, groups, learners=LINEAR, light=True, compute_diagnostics=False)
+    assert last.diagnostics["cv_r2_stack"] == pytest.approx(1.0 - len(y) * res.cv_mse_by_lambda[-1] / sst)
+
+
+def noisy_copies(X, level=1e-14, n=40):
+    """Copies of a matrix with noise of the given absolute size added."""
+    return [X + level * np.random.default_rng(seed).standard_normal(X.shape) for seed in range(n)]
+
+
+def test_feature_clusters_do_not_depend_on_rounding_noise_when_two_joins_tie():
+    R = np.array([[1.0, 0.9, 0.9], [0.9, 1.0, 0.7], [0.9, 0.7, 1.0]])
+    X = with_correlations(R, n=60, seed=1)
+    npt.assert_allclose(np.corrcoef(X, rowvar=False), R, atol=1e-12)
+    labellings = {tuple(importance._feature_clusters(copy, 0.8)) for copy in noisy_copies(X)}
+    assert labellings == {(0, 0, 1)}
+
+
+def test_a_pair_correlated_exactly_at_the_threshold_is_never_joined():
+    X = with_correlations(np.array([[1.0, 0.8], [0.8, 1.0]]), n=60)
+    assert {tuple(importance._feature_clusters(copy, 0.8)) for copy in noisy_copies(X)} == {(0, 1)}
+    assert {tuple(importance._feature_clusters(copy, 0.79)) for copy in noisy_copies(X)} == {(0, 0)}
+
+
+def result_with_normalised(names, permutation, normalised):
+    """Importance result whose normalised importance is given and need not be the normalised permutation."""
+    zeros = np.zeros(len(names))
+    values = {
+        "permutation": np.asarray(permutation, dtype=float),
+        "permutation_normalised": np.asarray(normalised, dtype=float),
+        "coefficient_path": zeros,
+        "selection_frequency": zeros,
+    }
+    return ImportanceResult(
+        lambdas=np.array([1.0]), lambda_weights=np.array([1.0]), cv_mse_by_lambda=np.array([1.0]),
+        feature_names=list(names), **{key: pd.Series(value, index=list(names), name=key) for key, value in values.items()},
+    )
+
+
+def test_the_summary_frame_treats_values_that_agree_up_to_rounding_noise_as_ties():
+    names = ["a", "b", "c", "d"]
+    near = result_with_normalised(names, [3.0, 2.0, 1.0, 4.0], [0.3, 0.3 + 4e-16, 0.3 - 3e-16, 0.1])
+    assert len({0.3, 0.3 + 4e-16, 0.3 - 3e-16}) == 3
+    assert near.summary_frame()["feature"].tolist() == ["a", "b", "c", "d"]
+    exact = result_with_normalised(names, [2.0, 2.0 + 1e-14, 1.0, 2.0 - 1e-14], [0.25] * 4)
+    assert exact.summary_frame()["feature"].tolist() == ["a", "b", "d", "c"]
+    apart = result_with_normalised(names, [3.0, 2.0, 1.0, 4.0], [0.3, 0.3 + 1e-6, 0.3 - 1e-6, 0.1])
+    assert apart.summary_frame()["feature"].tolist() == ["b", "a", "c", "d"]
+
+
+def test_elastic_net_coefficients_at_the_noise_level_of_the_target_are_not_selected(monkeypatch):
+    X, y, groups = make_toy_problem(n=24, random_state=3)
+    original = importance._fit_linear_paths
+
+    def with_noise(X_fit, y_fit, lambdas, l1_ratio, names):
+        paths = original(X_fit, y_fit, lambdas, l1_ratio, names)
+        shape = paths.coef["elastic_net"].shape
+        noise = 1e-14 * float(y_fit.std()) * np.random.default_rng(0).standard_normal(shape)
+        paths.coef["elastic_net"] = paths.coef["elastic_net"] + noise
+        return paths
+
+    monkeypatch.setattr(importance, "_fit_linear_paths", with_noise)
+    options = dict(learners=LINEAR, light=True, compute_diagnostics=False, n_repeats=2)
+    silent = lambda_averaged_importance(X, y, groups, lambdas=[1e3], **options)
+    assert (silent.selection_frequency == 0.0).all()
+    assert (silent.coefficient_path > 0.0).all() and (silent.coefficient_path < 1e-12 * float(y.std())).all()
+    active = lambda_averaged_importance(X, y, groups, lambdas=[1e-3], **options)
+    assert (active.selection_frequency[["x0", "x1"]] == 1.0).all()
+
+
+def test_a_vector_that_is_constant_up_to_rounding_noise_has_no_correlation():
+    noisy = np.full(9, 1.0 / 9.0)
+    noisy[::2] = np.nextafter(noisy[::2], 1.0)
+    assert noisy.std() > 0.0
+    other = np.random.default_rng(0).standard_normal(9)
+    assert np.isnan(importance._pearson(noisy, other)) and np.isnan(importance._pearson(other, noisy))
+
+
+def test_the_penalty_grid_ignores_a_column_that_is_constant_up_to_rounding_noise():
+    X, y, groups = noise_problem(n=30)
+    flat, noisy = X.copy(), X.copy()
+    flat["x7"] = 5.0
+    noisy["x7"] = 5.0 + np.where(y.to_numpy() > np.median(y), 8.9e-16, 0.0)
+    assert noisy["x7"].nunique() == 2 and noisy["x7"].std() > 0.0
+    npt.assert_allclose(lambda_grid(noisy, y), lambda_grid(flat, y), rtol=1e-12)
+    npt.assert_allclose(lambda_grid(flat, y)[0], lambda_grid(X.drop(columns="x7"), y)[0], rtol=1e-12)
+
+
+# ----------------------------------------------------------------------------
 # Importance estimates
 # ----------------------------------------------------------------------------
 def test_importance_is_unchanged_when_one_column_is_multiplied_by_1000(toy30):
@@ -732,14 +1017,15 @@ def test_penalised_learners_do_not_depend_on_the_units_of_the_target(quick_halve
         assert other.diagnostics[key] == pytest.approx(base.diagnostics[key], rel=1e-8, abs=1e-10)
 
 
-def test_stack_importance_is_nearly_unchanged_when_the_target_is_rescaled_and_shifted(toy30):
+def test_stack_importance_is_unchanged_when_the_target_is_rescaled_and_shifted(toy30):
     X, y, groups, base = toy30
     other = lambda_averaged_importance(
         X, 1000.0 * y + 50.0, groups, light=True, compute_diagnostics=False, random_state=1
     )
-    npt.assert_allclose(other.permutation_normalised, base.permutation_normalised, atol=0.08)
-    npt.assert_allclose(other.lambda_weights, base.lambda_weights, atol=0.05)
-    assert other.diagnostics["cv_r2_stack"] == pytest.approx(base.diagnostics["cv_r2_stack"], abs=0.05)
+    npt.assert_allclose(other.permutation_normalised, base.permutation_normalised, atol=1e-6)
+    npt.assert_allclose(other.permutation, 1e6 * base.permutation, rtol=1e-6)
+    npt.assert_allclose(other.lambda_weights, base.lambda_weights, atol=1e-6)
+    assert other.diagnostics["cv_r2_stack"] == pytest.approx(base.diagnostics["cv_r2_stack"], abs=1e-6)
 
 
 def test_identical_random_state_gives_identical_results(toy30):
@@ -1252,8 +1538,201 @@ def test_normalisation_clips_negatives_and_falls_back_to_uniform():
 
 
 # ----------------------------------------------------------------------------
+# Importance without signal
+# ----------------------------------------------------------------------------
+def test_importance_at_the_noise_level_of_the_target_is_no_signal():
+    uniform = np.full(5, 0.2)
+    noise = np.random.default_rng(0).standard_normal(5) * 1e-17
+    for raw in (np.zeros(5), -np.ones(5), noise, np.array([1e-12, -3.0, 0.0, 2e-12, 0.0]), np.full(5, np.nan)):
+        vector, silent = importance._normalise_importance(raw, 1.0)
+        assert silent is True
+        npt.assert_array_equal(vector, uniform)
+    vector, silent = importance._normalise_importance(np.array([-1.0, 2.0, 3.0, 0.0, np.nan]), 1.0)
+    assert silent is False
+    npt.assert_allclose(vector, [0.0, 0.4, 0.6, 0.0, 0.0])
+    assert vector.dtype == np.float64 and isinstance(silent, bool)
+
+
+def test_the_noise_threshold_is_one_billionth_of_the_variance_of_the_target():
+    for variance in (1.0, 7.5, 1e-8):
+        threshold = 1e-9 * variance
+        at = np.array([threshold / 2, threshold / 2, 0.0])
+        just_above = at * 1.001
+        assert importance._normalise_importance(at, variance)[1] is True
+        vector, silent = importance._normalise_importance(just_above, variance)
+        assert silent is False
+        npt.assert_allclose(vector, [0.5, 0.5, 0.0])
+
+
+@pytest.mark.parametrize("scale", [1e6, 1e-6])
+def test_the_verdict_on_the_noise_level_does_not_depend_on_the_units_of_the_target(scale):
+    rng = np.random.default_rng(3)
+    for level, expected in ((1e-17, True), (1e-3, False)):
+        raw = np.abs(rng.standard_normal(6)) * level
+        base = importance._normalise_importance(raw, 1.0)
+        scaled = importance._normalise_importance(raw * scale**2, scale**2)
+        assert base[1] is scaled[1] is expected
+        npt.assert_allclose(base[0], scaled[0], rtol=1e-12)
+
+
+REAL_CV_CORE = importance._cv_core
+
+
+def noisy_cv_core(monkeypatch, level):
+    """Replace the permutation importance of every fold by ``level`` times the variance of the target as noise."""
+
+    def wrapper(X, y, *args, **kwargs):
+        out = REAL_CV_CORE(X, y, *args, **kwargs)
+        if out.perm is not None:
+            noise = np.random.default_rng(0).standard_normal(out.perm.shape)
+            out.perm = level * float(np.var(y, ddof=1)) * noise
+        return out
+
+    monkeypatch.setattr(importance, "_cv_core", wrapper)
+
+
+@pytest.mark.parametrize("scale", [1.0, 1e6, 1e-6])
+def test_rounding_noise_in_the_importance_gives_the_uniform_vector_and_the_flag(monkeypatch, scale):
+    X, y, groups = make_toy_problem(n=24, random_state=3)
+    noisy_cv_core(monkeypatch, 1e-17)
+    res = lambda_averaged_importance(X, y * scale, groups, learners=LINEAR, light=True, compute_diagnostics=False)
+    assert res.no_signal is True and res.diagnostics["no_signal"] is True
+    npt.assert_array_equal(res.permutation_normalised.to_numpy(), np.full(8, 0.125))
+    npt.assert_allclose(res.weights(), np.full(8, 0.125))
+    noisy_cv_core(monkeypatch, 1e-3)
+    res = lambda_averaged_importance(X, y * scale, groups, learners=LINEAR, light=True, compute_diagnostics=False)
+    assert res.no_signal is False and res.diagnostics["no_signal"] is False
+    assert not np.allclose(res.permutation_normalised, 0.125)
+    npt.assert_allclose(res.permutation_normalised.sum(), 1.0)
+
+
+def no_signal_problem(n=30, d=8, seed=1000):
+    """Features and an unrelated target for a stack whose only penalty sets every coefficient to zero."""
+    X, y, groups = noise_problem(n=n, d=d, seed=seed)
+    return X, y, groups, dict(learners=("elastic_net",), lambdas=[10.0], light=True)
+
+
+def test_an_unrelated_target_does_not_by_itself_set_the_flag_because_the_stack_still_fits_noise(quick_halves):
+    for seed in (1000, 1001):
+        X, y, groups = noise_problem(seed=seed)
+        res = lambda_averaged_importance(X, y, groups, learners=LINEAR, light=True, n_perm=9)
+        assert res.no_signal is False and res.diagnostics["no_signal"] is False
+        assert res.diagnostics["usable"] is False and res.diagnostics["reasons"]
+        assert not np.allclose(res.permutation_normalised, 0.125)
+
+
+def test_a_stack_that_cannot_use_any_feature_gives_no_signal():
+    X, y, groups, options = no_signal_problem()
+    res = lambda_averaged_importance(X, y, groups, compute_diagnostics=False, **options)
+    assert res.no_signal is True and res.diagnostics["no_signal"] is True
+    npt.assert_array_equal(res.permutation.to_numpy(), np.zeros(8))
+    npt.assert_array_equal(res.permutation_normalised.to_numpy(), np.full(8, 0.125))
+    assert (res.selection_frequency == 0.0).all()
+    assert list(res.summary_frame()["feature"]) == list(X.columns)
+    full = lambda_averaged_importance(X, y, groups, n_perm=9, **options)
+    assert full.no_signal is True and full.diagnostics["usable"] is False
+    assert full.diagnostics["no_signal"] is True
+
+
+@pytest.mark.parametrize("scale", [1e6, 1e-6])
+def test_rescaling_the_target_does_not_change_the_verdict_of_a_problem_without_signal(scale):
+    X, y, groups, options = no_signal_problem(seed=1001)
+    base = lambda_averaged_importance(X, y, groups, compute_diagnostics=False, **options)
+    scaled = lambda_averaged_importance(X, y * scale, groups, compute_diagnostics=False, **options)
+    assert base.no_signal is scaled.no_signal is True
+    npt.assert_array_equal(base.permutation_normalised.to_numpy(), scaled.permutation_normalised.to_numpy())
+    band = bootstrap_importance(X, y * scale, groups, n_boot=4, random_state=2, **options)
+    assert (band["n_resamples_informative"] == 0).all() and (band["n_resamples"] == 4).all()
+
+
+@pytest.mark.parametrize("scale", [1e6, 1e-6])
+def test_rescaling_the_target_does_not_change_the_verdict_of_a_problem_with_signal(quick_halves, scale):
+    X, y, groups = make_toy_problem(n=30, random_state=5)
+    options = dict(learners=LINEAR, light=True, n_perm=9, random_state=1)
+    base = lambda_averaged_importance(X, y, groups, **options)
+    scaled = lambda_averaged_importance(X, y * scale, groups, **options)
+    assert base.no_signal is scaled.no_signal is False
+    assert base.diagnostics["usable"] is scaled.diagnostics["usable"]
+    assert base.diagnostics["perm_p_value"] == scaled.diagnostics["perm_p_value"]
+    npt.assert_allclose(scaled.permutation_normalised, base.permutation_normalised, atol=1e-6)
+    npt.assert_allclose(scaled.diagnostics["split_half_correlation"], base.diagnostics["split_half_correlation"], atol=1e-6)
+    band = bootstrap_importance(X, y, groups, n_boot=4, random_state=2, learners=LINEAR, light=True)
+    band_scaled = bootstrap_importance(X, y * scale, groups, n_boot=4, random_state=2, learners=LINEAR, light=True)
+    npt.assert_array_equal(band_scaled[["n_resamples_informative", "n_resamples"]], band[["n_resamples_informative", "n_resamples"]])
+    npt.assert_allclose(band_scaled[["median", "p10", "p90"]], band[["median", "p10", "p90"]], atol=1e-6)
+
+
+def test_the_point_estimate_the_resamples_and_the_halves_use_the_same_rule(monkeypatch, quick_halves):
+    X, y, groups = make_toy_problem(n=24, random_state=3)
+    calls = []
+    original = importance._normalise_importance
+
+    def counted(values, variance):
+        calls.append(variance)
+        return original(values, variance)
+
+    monkeypatch.setattr(importance, "_normalise_importance", counted)
+    lambda_averaged_importance(X, y, groups, learners=LINEAR, light=True, n_perm=9, compute_diagnostics=False)
+    assert len(calls) == 1 and calls[0] == pytest.approx(float(np.var(y, ddof=1)))
+    calls.clear()
+    bootstrap_importance(X, y, groups, n_boot=3, learners=LINEAR, light=True)
+    assert len(calls) == 3
+    calls.clear()
+    lambda_averaged_importance(X, y, groups, learners=LINEAR, light=True, n_perm=9)
+    assert len(calls) == 1 + 2 * 3
+
+
+def test_a_result_built_with_the_flag_orders_its_summary_by_position():
+    names = ["a", "b", "c", "d"]
+    noise = np.array([1e-18, 3e-18, -2e-18, 2e-18])
+    uniform = np.full(4, 0.25)
+    values = {
+        "permutation": noise, "permutation_normalised": uniform, "coefficient_path": np.zeros(4),
+        "selection_frequency": np.zeros(4),
+    }
+    res = ImportanceResult(
+        lambdas=np.array([1.0]), lambda_weights=np.array([1.0]), cv_mse_by_lambda=np.array([1.0]),
+        feature_names=names, no_signal=True,
+        **{key: pd.Series(value, index=names, name=key) for key, value in values.items()},
+    )
+    assert list(res.summary_frame()["feature"]) == names
+    res.no_signal = False
+    assert list(res.summary_frame()["feature"]) == ["b", "d", "a", "c"]
+    assert ImportanceResult.__dataclass_fields__["no_signal"].default is False
+
+
+# ----------------------------------------------------------------------------
 # Split-half correlation
 # ----------------------------------------------------------------------------
+def test_constant_means_constant_up_to_rounding_noise_relative_to_the_whole():
+    rng = np.random.default_rng(0)
+    assert importance._is_constant(np.full(6, 3.0)) and importance._is_constant(np.zeros(4))
+    assert importance._is_constant(7.0 * (1.0 + 1e-15 * rng.standard_normal(10)))
+    assert not importance._is_constant(7.0 * (1.0 + 1e-6 * rng.standard_normal(10)))
+    part = 3e-14 * rng.standard_normal(8)
+    assert not importance._is_constant(part)
+    assert importance._is_constant(part, scale=1.0)
+    assert not importance._is_constant(np.array([0.0, 1e-6]), scale=1.0)
+    X = np.column_stack([np.full(5, 2.0), np.arange(5.0), np.zeros(5), 5.0 + 1e-16 * rng.standard_normal(5)])
+    npt.assert_array_equal(importance._is_constant(X, axis=0), [True, False, True, True])
+
+
+def test_a_target_that_is_constant_up_to_rounding_noise_is_rejected():
+    X, _, groups = make_toy_problem(n=24, random_state=1)
+    y = 5.0 * (1.0 + 1e-15 * np.random.default_rng(0).standard_normal(24))
+    with pytest.raises(ValueError, match="constant"):
+        lambda_averaged_importance(X, y, groups, learners=LINEAR, light=True)
+    options = dict(lambdas=[0.5], learners=LINEAR, light=True)
+    with pytest.raises(ValueError, match="y is constant"):
+        lambda_averaged_importance(X, y, groups, compute_diagnostics=False, **options)
+    with pytest.raises(ValueError, match="y is constant"):
+        bootstrap_importance(X, y, groups, n_boot=2, **options)
+    with pytest.raises(ValueError, match="y is constant"):
+        verdict_stability(X, y, groups, seeds=(0,), lambdas=[0.5], learners=LINEAR)
+    with pytest.raises(ValueError, match="constant"):
+        lambda_grid(X, y)
+
+
 def test_pearson_helper():
     assert importance._pearson(np.array([1.0, 2.0, 3.0]), np.array([10.0, 20.0, 30.0])) == pytest.approx(1.0)
     assert importance._pearson(np.array([1.0, 2.0, 3.0]), np.array([3.0, 2.0, 1.0])) == pytest.approx(-1.0)
@@ -1300,6 +1779,36 @@ def test_split_half_correlation_is_the_median_pearson_correlation_of_the_normali
     assert importance._split_half_correlation(
         X.to_numpy(), y.to_numpy(), np.arange(16), LEARNER_NAMES, 5, 2, "cv", 1.0, 0, 0
     ) == pytest.approx(0.0)
+
+
+def test_a_half_without_signal_counts_as_zero_correlation(monkeypatch):
+    X, y, groups = make_toy_problem(n=16, d=4, random_state=3)
+    first, second = np.array([0.7, 0.2, 0.1, 0.0]), np.array([0.4, 0.5, 0.1, 0.0])
+    pearson = float(np.corrcoef(first, second)[0, 1])
+    assert pearson == pytest.approx(0.6305, abs=1e-4)
+    arguments = (X.to_numpy(), y.to_numpy(), np.arange(16), LEARNER_NAMES, 5, 3, "cv", 1.0, 0, 0)
+    for silent, expected in (
+        ((), pearson), ({0}, pearson), ({3}, pearson), ({2, 3}, pearson), ({1, 2}, 0.0), ({0, 2, 4}, 0.0),
+        ({0, 1, 2, 3, 4, 5}, 0.0),
+    ):
+        stub_estimates(monkeypatch, [first, second] * 3, silent=silent)
+        assert importance._split_half_correlation(*arguments) == pytest.approx(expected), silent
+
+
+def test_a_half_whose_target_is_rounding_noise_around_zero_is_skipped_like_a_constant_half(monkeypatch):
+    rng = np.random.default_rng(4)
+    n = 24
+    X = rng.standard_normal((n, 4))
+    exact = np.r_[np.ones(3), np.zeros(n - 3)]
+    noisy = exact + 3e-14 * rng.standard_normal(n) * (exact == 0.0)
+    codes = np.arange(n)
+    seen = []
+    for y in (exact, noisy):
+        calls = stub_estimates(monkeypatch, [[0.5, 0.5]] * 120)
+        importance._split_half_correlation(X, y, codes, LINEAR, 5, 60, "cv", 1.0, 3, 0)
+        seen.append([tuple(call[2]) for call in calls])
+    assert 0 < len(seen[0]) < 120
+    assert seen[0] == seen[1]
 
 
 def test_split_half_halves_are_formed_by_group_and_cover_all_groups(monkeypatch):
@@ -1370,6 +1879,57 @@ def test_bootstrap_importance_band():
     assert (band["n_resamples"] == 5).all() and (band["n_resamples_informative"] == 5).all()
     assert set(band["median"].nlargest(2).index) == {"x0", "x1"}
     assert band.loc[["x0", "x1"], "median"].sum() > 0.7
+
+
+def stub_resamples(monkeypatch, results):
+    """Replace the importance of each resample by a given vector and flag, in call order."""
+    queue = iter(results)
+
+    def stub(X, y, groups, **kwargs):
+        vector, silent = next(queue)
+        return SimpleNamespace(permutation_normalised=pd.Series(np.asarray(vector, dtype=float)), no_signal=silent)
+
+    monkeypatch.setattr(importance, "lambda_averaged_importance", stub)
+
+
+def test_resamples_without_signal_are_left_out_of_the_band_and_counted(monkeypatch):
+    X, y, groups = make_toy_problem(n=24, d=4, random_state=1)
+    rng = np.random.default_rng(0)
+    informative = [(v / v.sum(), False) for v in rng.random((6, 4)) ** 3]
+    uniform = (np.full(4, 0.25), True)
+    stub_resamples(monkeypatch, informative)
+    clean = bootstrap_importance(X, y, groups, n_boot=6, random_state=1)
+    mixed_order = informative[:2] + [uniform] + informative[2:5] + [uniform, uniform] + informative[5:] + [uniform]
+    stub_resamples(monkeypatch, mixed_order)
+    mixed = bootstrap_importance(X, y, groups, n_boot=10, random_state=1)
+    bands = ["median", "p10", "p90"]
+    pd.testing.assert_frame_equal(mixed[bands], clean[bands], check_exact=True)
+    vectors = np.array([vector for vector, _ in informative])
+    npt.assert_array_equal(mixed["median"], np.median(vectors, axis=0))
+    npt.assert_array_equal(mixed["p10"], np.percentile(vectors, 10, axis=0))
+    npt.assert_array_equal(mixed["p90"], np.percentile(vectors, 90, axis=0))
+    assert (clean["n_resamples_informative"] == 6).all() and (clean["n_resamples"] == 6).all()
+    assert (mixed["n_resamples_informative"] == 6).all() and (mixed["n_resamples"] == 10).all()
+    assert mixed["n_resamples"].dtype == np.int64 and mixed["n_resamples_informative"].dtype == np.int64
+    with_uniform = np.vstack([vectors] + [uniform[0]] * 4)
+    assert not np.allclose(np.median(with_uniform, axis=0), mixed["median"])
+    assert list(mixed.columns) == BAND_COLUMNS and mixed.index.name == "feature"
+
+
+def test_the_band_is_nan_when_no_resample_carries_a_signal(monkeypatch):
+    X, y, groups = make_toy_problem(n=24, d=4, random_state=1)
+    stub_resamples(monkeypatch, [(np.full(4, 0.25), True)] * 5)
+    band = bootstrap_importance(X, y, groups, n_boot=5, random_state=1)
+    assert band[["median", "p10", "p90"]].isna().all().all()
+    assert (band["n_resamples_informative"] == 0).all() and (band["n_resamples"] == 5).all()
+    assert list(band.index) == list(X.columns) and band.shape == (4, 5)
+
+
+def test_a_problem_without_signal_has_a_band_of_nan_and_the_counts():
+    X, y, groups, options = no_signal_problem()
+    band = bootstrap_importance(X, y, groups, n_boot=5, random_state=3, **options)
+    assert band[["median", "p10", "p90"]].isna().all().all()
+    assert (band["n_resamples_informative"] == 0).all() and (band["n_resamples"] == 5).all()
 
 
 def test_bootstrap_importance_options_and_validation():
@@ -1450,6 +2010,32 @@ def test_bootstrap_redraws_resamples_whose_target_is_constant(monkeypatch):
         assert np.var(target) > 0.0 and 5 in set(codes)
 
 
+@pytest.mark.parametrize("seed", [1, 3, 6])
+def test_bootstrap_redraws_resamples_whose_target_is_rounding_noise_around_zero(monkeypatch, seed):
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame(rng.standard_normal((24, 3)), columns=list("abc"))
+    y = 3e-14 * rng.standard_normal(24)
+    y[20:] = [1.0, 2.0, 3.0, 4.0]
+    calls = spy_public(monkeypatch)
+    verdicts = []
+    original = importance._is_constant
+
+    def spy(values, axis=None, scale=None):
+        verdict = original(values, axis=axis, scale=scale)
+        if scale is not None:
+            verdicts.append(bool(verdict))
+        return verdict
+
+    monkeypatch.setattr(importance, "_is_constant", spy)
+    band = bootstrap_importance(
+        X, y, np.repeat(np.arange(6), 4), n_boot=5, learners=LINEAR, light=True, n_splits=3, random_state=seed
+    )
+    assert band.shape == (3, 5) and len(calls) == 5
+    assert len(verdicts) > 5 and sum(verdicts) >= 1
+    for codes, _, _ in calls:
+        assert 5 in set(codes)
+
+
 def test_bootstrap_raises_a_clear_error_when_valid_resamples_cannot_be_drawn(monkeypatch):
     X, y, _ = make_toy_problem(n=24, random_state=3)
     four = np.repeat(np.arange(4), 6)
@@ -1464,6 +2050,201 @@ def test_bootstrap_needs_at_least_four_groups_in_the_data():
     X, y, _ = make_toy_problem(n=24, random_state=3)
     with pytest.raises(ValueError, match="at least 4 distinct groups"):
         bootstrap_importance(X, y, np.repeat(np.arange(3), 8), n_boot=2, learners=LINEAR)
+
+
+# ----------------------------------------------------------------------------
+# Stability of the verdict across seeds
+# ----------------------------------------------------------------------------
+STABILITY_COLUMNS = ["seed", "cv_r2_stack", "perm_p_value", "split_half_correlation", "n_cases", "usable"]
+
+
+def test_verdict_stability_has_the_documented_signature():
+    parameters = inspect.signature(verdict_stability).parameters
+    assert list(parameters)[:6] == ["X", "y", "groups", "seeds", "light", "n_perm"]
+    assert parameters["seeds"].default == (0, 1, 2, 3, 4)
+    assert parameters["light"].default is True and parameters["n_perm"].default == 20
+    assert parameters["guard"].default is None
+    assert "verdict_stability" in importance.__all__
+
+
+def test_verdict_stability_returns_one_row_per_seed_and_the_share_of_usable_seeds(quick_halves):
+    X, y, groups = make_toy_problem(n=30, random_state=5)
+    frame, summary = verdict_stability(X, y, groups, seeds=(3, 1, 2), learners=LINEAR)
+    assert list(frame.columns) == STABILITY_COLUMNS and frame.index.equals(pd.RangeIndex(3))
+    assert frame["seed"].tolist() == [3, 1, 2] and (frame["n_cases"] == 30).all()
+    assert [str(dtype) for dtype in frame.dtypes] == ["int64", "float64", "float64", "float64", "int64", "bool"]
+    assert summary == {
+        "share_usable": float(frame["usable"].mean()), "n_usable": int(frame["usable"].sum()), "n_seeds": 3
+    }
+    scaled = frame["perm_p_value"] * 21.0
+    assert np.allclose(scaled, scaled.round(), atol=1e-9) and (frame["perm_p_value"] >= 1.0 / 21.0 - 1e-12).all()
+
+
+def test_each_row_of_the_verdict_stability_is_the_diagnostics_of_the_importance_of_its_seed(quick_halves):
+    X, y, groups = make_toy_problem(n=30, random_state=5)
+    frame, _ = verdict_stability(X, y, groups, seeds=(7, 0), learners=LINEAR)
+    for row in frame.itertuples():
+        for cluster_threshold in (None, 0.8):
+            res = lambda_averaged_importance(
+                X, y, groups, random_state=row.seed, light=True, n_perm=20, learners=LINEAR,
+                cluster_threshold=cluster_threshold,
+            )
+            d = res.diagnostics
+            assert (row.cv_r2_stack, row.perm_p_value, row.split_half_correlation, row.n_cases, row.usable) == (
+                d["cv_r2_stack"], d["perm_p_value"], d["split_half_correlation"], d["n_cases"], d["usable"]
+            )
+    assert frame["cv_r2_stack"].nunique() == 2
+
+
+def test_verdict_stability_is_deterministic_and_changes_nothing_else(quick_halves, restore_global_rng):
+    X, y, groups = noise_problem(n=30)
+    X_before, y_before = X.copy(), y.copy()
+    np.random.seed(123)
+    first, first_summary = verdict_stability(X, y, groups, seeds=range(4), learners=LINEAR)
+    np.random.seed(456)
+    second, second_summary = verdict_stability(X, y, groups, seeds=range(4), learners=LINEAR)
+    pd.testing.assert_frame_equal(first, second, check_exact=True)
+    assert first_summary == second_summary
+    pd.testing.assert_frame_equal(X, X_before, check_exact=True)
+    pd.testing.assert_series_equal(y, y_before, check_exact=True)
+    assert first["cv_r2_stack"].nunique() == 4
+
+
+def test_the_share_of_usable_seeds_is_the_mean_of_the_verdicts(monkeypatch):
+    X, y, groups = make_toy_problem(n=30, random_state=5)
+    flags = iter([True, False, True, True, False])
+    calls = []
+
+    def stub(*args, **kwargs):
+        calls.append(args)
+        diagnostics = {
+            "cv_r2_stack": 0.2, "perm_p_value": 0.05, "split_half_correlation": 0.6, "n_cases": 30,
+            "usable": next(flags),
+        }
+        return SimpleNamespace(diagnostics=diagnostics)
+
+    monkeypatch.setattr(importance, "_importance", stub)
+    frame, summary = verdict_stability(X, y, groups)
+    assert frame["seed"].tolist() == [0, 1, 2, 3, 4]
+    assert frame["usable"].tolist() == [True, False, True, True, False]
+    assert summary == {"share_usable": 0.6, "n_usable": 3, "n_seeds": 5}
+    assert [call[8] for call in calls] == [0, 1, 2, 3, 4]
+    for call in calls:
+        assert call[11] is True and call[12] == 20 and call[13] is None
+        assert call[14] is None and call[15] is True
+
+
+def test_verdict_stability_passes_its_options_to_the_importance(monkeypatch):
+    X, y, groups = make_toy_problem(n=30, random_state=5)
+    calls = []
+
+    def stub(*args, **kwargs):
+        calls.append(args)
+        diagnostics = {
+            "cv_r2_stack": 0.0, "perm_p_value": 1.0, "split_half_correlation": 0.0, "n_cases": 30, "usable": False
+        }
+        return SimpleNamespace(diagnostics=diagnostics)
+
+    monkeypatch.setattr(importance, "_importance", stub)
+    guard = lambda: None  # noqa: E731
+    frame, summary = verdict_stability(
+        X, y, groups, seeds=[np.int64(5)], light=False, n_perm=33, guard=guard, n_splits=4, n_repeats=7,
+        weighting="uniform", temperature=2.0, learners=["ridge"], cv_repeats=2, lambdas=[0.1, 0.2],
+    )
+    assert summary == {"share_usable": 0.0, "n_usable": 0, "n_seeds": 1} and frame["seed"].tolist() == [5]
+    (args,) = calls
+    assert args[4] == ("ridge",) and list(args[5]) == [0.1, 0.2] and args[6] == 4 and args[7] == 7
+    assert args[8] == 5 and args[9] == "uniform" and args[10] == 2.0 and args[11] is False and args[12] == 33
+    assert args[13] is guard and args[14] is None and args[15] is True and args[16] == 2
+
+
+def test_a_single_integer_is_one_seed(quick_halves):
+    X, y, groups = make_toy_problem(n=24, random_state=3)
+    for seed in (4, np.int64(4)):
+        frame, summary = verdict_stability(X, y, groups, seeds=seed, learners=LINEAR)
+        assert frame["seed"].tolist() == [4] and summary["n_seeds"] == 1
+
+
+def test_more_than_twenty_permutations_are_not_used_in_the_light_configuration(monkeypatch, quick_halves):
+    X, y, groups = make_toy_problem(n=24, random_state=3)
+    sizes = []
+    original = importance._label_permutation_p
+
+    def spy(X_, y_, codes, names, n_splits, n_perm, *args, **kwargs):
+        sizes.append(n_perm)
+        return original(X_, y_, codes, names, n_splits, n_perm, *args, **kwargs)
+
+    monkeypatch.setattr(importance, "_label_permutation_p", spy)
+    verdict_stability(X, y, groups, seeds=(0,), n_perm=30, learners=LINEAR)
+    verdict_stability(X, y, groups, seeds=(0,), n_perm=12, learners=LINEAR)
+    assert sizes == [20, 12]
+
+
+@pytest.mark.parametrize(
+    "seeds",
+    [(), [], (0, 0), (1, 2, 1), (-1,), (2**32,), (1.5,), ("a",), (None,), (0, None), 2.5, object()],
+    ids=repr,
+)
+def test_invalid_seeds_raise_a_value_error(seeds):
+    X, y, groups = make_toy_problem(n=24, random_state=3)
+    with pytest.raises(ValueError):
+        verdict_stability(X, y, groups, seeds=seeds, learners=LINEAR)
+
+
+@pytest.mark.parametrize("seeds", [(1.5,), ("a",), "01", (-1,), (2**32,), (0, 2.5), (None,), 2.5, (), (3, 3)], ids=repr)
+def test_the_error_for_an_invalid_seed_names_the_seeds_argument(seeds):
+    X, y, groups = make_toy_problem(n=24, random_state=3)
+    with pytest.raises(ValueError, match="seeds") as info:
+        verdict_stability(X, y, groups, seeds=seeds, learners=LINEAR)
+    assert "random_state" not in str(info.value)
+
+
+def test_verdict_stability_validates_its_inputs_and_options():
+    X, y, groups = make_toy_problem(n=24, random_state=3)
+    with pytest.raises(ValueError, match="at least 9 permutations"):
+        verdict_stability(X, y, groups, n_perm=8)
+    with pytest.raises(TypeError, match="guard"):
+        verdict_stability(X, y, groups, guard=3)
+    with pytest.raises(ValueError, match="weighting"):
+        verdict_stability(X, y, groups, weighting="softmax")
+    with pytest.raises(ValueError, match="at least 4 distinct groups"):
+        verdict_stability(X, y, np.repeat(np.arange(3), 8))
+    with pytest.raises(ValueError, match="constant"):
+        verdict_stability(X, np.ones(24), groups)
+    with pytest.raises(ValueError, match="learners"):
+        verdict_stability(X, y, groups, learners=["lasso"])
+    with pytest.raises(TypeError):
+        verdict_stability(X, y, groups, bogus=1)
+
+
+@pytest.mark.usefixtures("quick_halves")
+def test_verdict_stability_calls_the_guard_21_times_per_seed(staged):
+    X, y, groups = make_toy_problem(n=30, random_state=5)
+    verdict_stability(X, y, groups, seeds=(0, 1), learners=LINEAR, guard=staged)
+    assert staged.stages == (["folds"] * 18 + ["label"] * 2 + ["halves"]) * 2
+
+
+@pytest.mark.usefixtures("restore_global_rng", "quick_halves")
+def test_the_guard_does_not_change_the_verdict_stability():
+    X, y, groups = make_toy_problem(n=30, random_state=5)
+    plain, plain_summary = verdict_stability(X, y, groups, seeds=(0, 1), learners=LINEAR)
+    calls = []
+    guarded, guarded_summary = verdict_stability(
+        X, y, groups, seeds=(0, 1), learners=LINEAR, guard=consuming_guard(calls)
+    )
+    assert len(calls) == 42
+    pd.testing.assert_frame_equal(guarded, plain, check_exact=True)
+    assert guarded_summary == plain_summary
+
+
+@pytest.mark.usefixtures("quick_halves")
+@pytest.mark.parametrize("n", [1, 21, 22, 40])
+def test_an_exception_raised_by_the_guard_ends_the_verdict_stability_at_once(n):
+    X, y, groups = make_toy_problem(n=30, random_state=5)
+    calls = []
+    with pytest.raises(StopRun):
+        verdict_stability(X, y, groups, seeds=(0, 1), learners=LINEAR, guard=stop_at(n, calls))
+    assert len(calls) == n
 
 
 # ----------------------------------------------------------------------------
@@ -1642,6 +2423,48 @@ def test_values_whose_variance_overflows_are_errors():
         lambda_averaged_importance(X * 1e160, y, groups, **options)
     res = lambda_averaged_importance(X, y * 1e100, groups, **options)
     assert np.isfinite(res.permutation_normalised).all()
+
+
+def test_values_whose_variance_underflows_are_errors():
+    X, y, groups = make_toy_problem(n=24, random_state=6)
+    options = dict(learners=LINEAR, light=True, compute_diagnostics=False)
+    small_X = X.copy()
+    small_X["x2"] = small_X["x2"] * 1e-200
+    small_y = y * 1e-200
+    denormal_y = y * 1e-160
+    with pytest.raises(ValueError, match="y has values so small that its variance underflows"):
+        lambda_averaged_importance(X, denormal_y, groups, **options)
+    for call in (
+        lambda: lambda_averaged_importance(X, small_y, groups, **options),
+        lambda: lambda_averaged_importance(X, small_y.to_numpy(), groups, learners=None, light=True),
+        lambda: lambda_grid(X, small_y),
+        lambda: bootstrap_importance(X, small_y, groups, n_boot=2, learners=LINEAR),
+        lambda: verdict_stability(X, small_y, groups, seeds=(0,), learners=LINEAR),
+        lambda: StackedEnsemble().fit(X, small_y, groups),
+    ):
+        with pytest.raises(ValueError, match="y has values so small that its variance underflows"):
+            call()
+    for call in (
+        lambda: lambda_averaged_importance(small_X, y, groups, **options),
+        lambda: lambda_grid(small_X, y),
+        lambda: StackedEnsemble().fit(small_X, y, groups),
+    ):
+        with pytest.raises(ValueError, match="X has values so small that its variance underflows"):
+            call()
+    base = lambda_averaged_importance(X, y, groups, **options)
+    res = lambda_averaged_importance(X, y * 1e-100, groups, **options)
+    npt.assert_allclose(res.permutation_normalised, base.permutation_normalised, atol=1e-8)
+
+
+def test_a_column_or_target_that_is_constant_is_not_a_scale_error():
+    X, y, groups = make_toy_problem(n=24, random_state=6)
+    flat = X.copy()
+    flat["x2"] = 1e-200
+    flat["x3"] = 0.0
+    res = lambda_averaged_importance(flat, y, groups, learners=LINEAR, light=True, compute_diagnostics=False)
+    assert np.isfinite(res.permutation_normalised).all()
+    with pytest.raises(ValueError, match="y is constant"):
+        lambda_averaged_importance(X, np.full(24, 1e-200), groups, learners=LINEAR, light=True)
 
 
 def test_exact_duplicates_of_x_with_another_target_or_group_raise_a_warning():
@@ -2001,3 +2824,27 @@ def test_default_configuration_finishes_within_a_minute_and_calls_the_guard_72_t
     assert abs(p_scaled - round(p_scaled)) < 1e-9
     assert np.isfinite(res.diagnostics["split_half_correlation"])
     assert res.cluster.tolist() == list(range(8))
+
+
+# ----------------------------------------------------------------------------
+# Hygiene of the module
+# ----------------------------------------------------------------------------
+def unused_parameters(module):
+    """Parameters of the functions of a module that are never read, as ``(function, parameter)`` pairs."""
+    tree = ast.parse(inspect.getsource(module))
+    unused = []
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            arguments = node.args
+            names = [a.arg for a in arguments.posonlyargs + arguments.args + arguments.kwonlyargs]
+            names += [a.arg for a in (arguments.vararg, arguments.kwarg) if a is not None]
+            read = {
+                n.id for statement in node.body for n in ast.walk(statement)
+                if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)
+            }
+            unused += [(node.name, name) for name in names if name not in read and name not in ("self", "cls")]
+    return unused
+
+
+def test_every_parameter_of_every_function_of_the_module_is_read():
+    assert unused_parameters(importance) == []

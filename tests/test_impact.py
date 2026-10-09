@@ -1,4 +1,4 @@
-"""Tests for dtt.impact: baseline loader, effect scaling, detection and route decision.
+"""Tests for dtt.impact: baseline, effect scaling, detection, route decision and selection.
 
 All inputs are hand-made or SIMULATED.
 """
@@ -476,6 +476,235 @@ def test_impact_table_takes_posterior_draws_from_the_bayesian_meta_analysis(base
 
 
 # ----------------------------------------------------------------------------
+# Thailand on the basis of the panel
+# ----------------------------------------------------------------------------
+PANEL_RATIOS = {2015: 1.076, 2016: 1.080, 2017: 1.083, 2018: 1.086, 2019: 1.089}
+
+
+@pytest.fixture
+def long_baseline():
+    """Hand-made baseline for 2015 to 2024 on the balance of payments basis."""
+    years = list(range(2015, 2025))
+    gdp = np.array([400.0 + 10.0 * (year - 2015) for year in years])
+    receipts = np.array([50.0 + 2.0 * (year - 2015) for year in years])
+    return pd.DataFrame(
+        {
+            "gdp_usd_bn": gdp,
+            "receipts_usd_bn": receipts,
+            "receipts_pct_gdp": 100.0 * receipts / gdp,
+            "arrivals_million": np.linspace(30.0, 40.0, len(years)),
+            "fx_thb_per_usd": np.linspace(33.0, 35.0, len(years)),
+        },
+        index=pd.Index(years, name="year"),
+    )
+
+
+def panel_from(baseline, ratios, years=None):
+    """Panel receipts equal to the baseline times a yearly ratio."""
+    years = list(ratios) if years is None else years
+    return pd.Series(
+        {year: baseline.loc[year, "receipts_usd_bn"] * ratios[year] for year in years},
+        name="receipts",
+    )
+
+
+def test_to_panel_basis_applies_a_constant_ratio_to_the_years_without_a_panel_value(long_baseline):
+    ratios = {year: 1.08 for year in range(2015, 2022)}
+    panel = panel_from(long_baseline, ratios)
+    out = impact.to_panel_basis(long_baseline, panel)
+    gdp = long_baseline["gdp_usd_bn"]
+    base = long_baseline["receipts_usd_bn"]
+    expected = base * 1.08
+    assert out["receipts_usd_bn"].to_numpy() == pytest.approx(expected.to_numpy(), rel=1e-12)
+    assert out["receipts_pct_gdp"].to_numpy() == pytest.approx(
+        (100.0 * expected / gdp).to_numpy(), rel=1e-12
+    )
+    assert out["receipts_usd_bn_baseline"].to_numpy() == pytest.approx(base.to_numpy())
+    assert out["receipts_basis"].tolist() == ["panel"] * 7 + ["ratio"] * 3
+    assert np.isnan(out["basis_ratio"].to_numpy()[:7]).all()
+    assert out["basis_ratio"].to_numpy()[7:] == pytest.approx(1.08, rel=1e-12)
+
+
+def test_to_panel_basis_uses_the_panel_value_where_the_panel_has_one(long_baseline):
+    panel = pd.Series({2019: 61.0, 2020: 20.0, 2024: 90.0})
+    out = impact.to_panel_basis(long_baseline, panel, ratio_years=[2019])
+    assert out.loc[2019, "receipts_usd_bn"] == 61.0
+    assert out.loc[2020, "receipts_usd_bn"] == 20.0
+    assert out.loc[2024, "receipts_usd_bn"] == 90.0
+    ratio = 61.0 / long_baseline.loc[2019, "receipts_usd_bn"]
+    assert out.loc[2016, "receipts_usd_bn"] == pytest.approx(
+        long_baseline.loc[2016, "receipts_usd_bn"] * ratio, rel=1e-12
+    )
+    assert out.loc[2016, "basis_ratio"] == pytest.approx(ratio, rel=1e-12)
+    assert out.loc[2016, "receipts_basis"] == "ratio"
+    assert out.loc[2019, "receipts_basis"] == "panel" and np.isnan(out.loc[2019, "basis_ratio"])
+    shares = 100.0 * out["receipts_usd_bn"] / out["gdp_usd_bn"]
+    assert out["receipts_pct_gdp"].to_numpy() == pytest.approx(shares.to_numpy(), rel=1e-12)
+
+
+def test_to_panel_basis_averages_the_yearly_ratios_over_the_ratio_years(long_baseline):
+    panel = panel_from(long_baseline, PANEL_RATIOS)
+    out = impact.to_panel_basis(long_baseline, panel)
+    mean_ratio = float(np.mean(list(PANEL_RATIOS.values())))
+    assert mean_ratio == pytest.approx(1.0828)
+    later = out.loc[2022:2024]
+    assert later["basis_ratio"].to_numpy() == pytest.approx(mean_ratio, rel=1e-12)
+    assert later["receipts_usd_bn"].to_numpy() == pytest.approx(
+        long_baseline.loc[2022:2024, "receipts_usd_bn"].to_numpy() * mean_ratio, rel=1e-12
+    )
+    restricted = impact.to_panel_basis(long_baseline, panel, ratio_years=(2018, 2019))
+    assert restricted.loc[2024, "basis_ratio"] == pytest.approx(1.0875, rel=1e-12)
+    from_range = impact.to_panel_basis(long_baseline, panel, ratio_years=range(2015, 2020))
+    pd.testing.assert_frame_equal(from_range, out)
+    from_array = impact.to_panel_basis(long_baseline, panel, ratio_years=np.arange(2015, 2020))
+    pd.testing.assert_frame_equal(from_array, out)
+    repeated = impact.to_panel_basis(long_baseline, panel, ratio_years=[2018, 2018, 2019])
+    pd.testing.assert_frame_equal(repeated, restricted)
+
+
+def test_to_panel_basis_ignores_ratio_years_without_both_values(long_baseline):
+    panel = pd.Series({2017: 54.0 * 1.1, 2018: 56.0 * 1.2, 2019: 58.0 * 1.3})
+    one_sided = impact.to_panel_basis(long_baseline, panel, ratio_years=[2010, 2017, 2023])
+    assert one_sided.loc[2024, "basis_ratio"] == pytest.approx(1.1, rel=1e-12)
+    gap = panel.copy()
+    gap[2017] = np.nan
+    missing = impact.to_panel_basis(long_baseline, gap, ratio_years=[2017, 2018])
+    assert missing.loc[2024, "basis_ratio"] == pytest.approx(1.2, rel=1e-12)
+    assert missing.loc[2017, "receipts_basis"] == "ratio"
+    holes = long_baseline.copy()
+    holes.loc[2018, "receipts_usd_bn"] = np.nan
+    skipped = impact.to_panel_basis(holes, panel, ratio_years=[2017, 2018])
+    assert skipped.loc[2024, "basis_ratio"] == pytest.approx(1.1, rel=1e-12)
+    assert skipped.loc[2018, "receipts_basis"] == "panel"
+    assert np.isnan(skipped.loc[2018, "receipts_usd_bn_baseline"])
+
+
+def test_to_panel_basis_needs_a_year_with_both_values(long_baseline):
+    panel = pd.Series({2020: 30.0, 2021: 31.0})
+    with pytest.raises(ValueError, match="ratio_years"):
+        impact.to_panel_basis(long_baseline, panel)
+    with pytest.raises(ValueError, match="ratio_years"):
+        impact.to_panel_basis(long_baseline, panel, ratio_years=[2015, 2016])
+    alone = impact.to_panel_basis(long_baseline, panel, ratio_years=[2020])
+    assert alone.loc[2024, "basis_ratio"] == pytest.approx(0.5, rel=1e-12)
+    nothing = pd.Series({2015: np.nan, 2016: np.nan})
+    with pytest.raises(ValueError, match="ratio_years"):
+        impact.to_panel_basis(long_baseline, nothing, ratio_years=[2015, 2016])
+    with pytest.raises(ValueError, match="ratio_years"):
+        impact.to_panel_basis(long_baseline, pd.Series({2018: 60.0}), ratio_years=[2030])
+
+
+def test_to_panel_basis_keeps_gdp_other_columns_and_the_index(long_baseline):
+    before = long_baseline.copy()
+    panel = panel_from(long_baseline, PANEL_RATIOS)
+    out = impact.to_panel_basis(long_baseline, panel)
+    pd.testing.assert_frame_equal(long_baseline, before)
+    assert out is not long_baseline
+    pd.testing.assert_index_equal(out.index, long_baseline.index)
+    for column in ("gdp_usd_bn", "arrivals_million", "fx_thb_per_usd"):
+        pd.testing.assert_series_equal(out[column], long_baseline[column])
+    assert list(out.columns) == [
+        *long_baseline.columns,
+        "receipts_usd_bn_baseline",
+        "receipts_basis",
+        "basis_ratio",
+    ]
+    assert out["basis_ratio"].dtype == float
+
+
+def test_to_panel_basis_accepts_a_year_column_a_mapping_and_float_years(long_baseline):
+    panel = panel_from(long_baseline, PANEL_RATIOS)
+    reference = impact.to_panel_basis(long_baseline, panel)
+    as_column = long_baseline.reset_index()
+    out = impact.to_panel_basis(as_column, panel)
+    assert out["year"].tolist() == long_baseline.index.tolist()
+    assert out["receipts_usd_bn"].to_numpy() == pytest.approx(
+        reference["receipts_usd_bn"].to_numpy()
+    )
+    from_mapping = impact.to_panel_basis(long_baseline, dict(panel))
+    pd.testing.assert_frame_equal(from_mapping, reference)
+    floats = panel.copy()
+    floats.index = floats.index.astype(float)
+    pd.testing.assert_frame_equal(impact.to_panel_basis(long_baseline, floats), reference)
+    shuffled = panel.iloc[::-1]
+    pd.testing.assert_frame_equal(impact.to_panel_basis(long_baseline, shuffled), reference)
+
+
+def test_to_panel_basis_ignores_panel_years_outside_the_baseline(long_baseline):
+    panel = panel_from(long_baseline, PANEL_RATIOS)
+    panel[1990] = 12.0
+    panel[2031] = 99.0
+    out = impact.to_panel_basis(long_baseline, panel)
+    reference = impact.to_panel_basis(long_baseline, panel_from(long_baseline, PANEL_RATIOS))
+    pd.testing.assert_frame_equal(out, reference)
+
+
+def test_to_panel_basis_keeps_a_missing_baseline_value_missing(long_baseline):
+    holes = long_baseline.copy()
+    holes.loc[2023, "receipts_usd_bn"] = np.nan
+    panel = panel_from(long_baseline, PANEL_RATIOS)
+    out = impact.to_panel_basis(holes, panel)
+    assert np.isnan(out.loc[2023, "receipts_usd_bn"])
+    assert np.isnan(out.loc[2023, "receipts_pct_gdp"])
+    assert out.loc[2023, "receipts_basis"] == "ratio"
+    assert np.isfinite(out.loc[2022, "receipts_usd_bn"])
+
+
+def test_to_panel_basis_rejects_bad_inputs(long_baseline):
+    panel = panel_from(long_baseline, PANEL_RATIOS)
+    for not_a_series in (None, [60.0, 61.0], 60.0, "panel", np.array([60.0])):
+        with pytest.raises(ValueError, match="panel_receipts_usd_bn"):
+            impact.to_panel_basis(long_baseline, not_a_series)
+    for bad in (0.0, -3.0, np.inf):
+        broken = panel.copy()
+        broken[2016] = bad
+        with pytest.raises(ValueError, match="panel_receipts_usd_bn"):
+            impact.to_panel_basis(long_baseline, broken)
+    repeated = pd.Series([60.0, 61.0], index=[2018, 2018])
+    with pytest.raises(ValueError, match="more than one"):
+        impact.to_panel_basis(long_baseline, repeated, ratio_years=[2018])
+    fractional = pd.Series([60.0], index=[2018.5])
+    with pytest.raises(ValueError, match="whole-number"):
+        impact.to_panel_basis(long_baseline, fractional)
+    with pytest.raises(ValueError, match="whole-number"):
+        impact.to_panel_basis(long_baseline, pd.Series([60.0], index=["x"]))
+    for column in ("gdp_usd_bn", "receipts_usd_bn"):
+        with pytest.raises(ValueError, match=column):
+            impact.to_panel_basis(long_baseline.drop(columns=column), panel)
+    for bad in (0.0, -1.0, np.inf):
+        broken_baseline = long_baseline.copy()
+        broken_baseline.loc[2016, "receipts_usd_bn"] = bad
+        with pytest.raises(ValueError, match="receipts_usd_bn"):
+            impact.to_panel_basis(broken_baseline, panel)
+    converted = impact.to_panel_basis(long_baseline, panel)
+    with pytest.raises(ValueError, match="already has"):
+        impact.to_panel_basis(converted, panel)
+    for years in ([], [2015.5], ["2015"], [True]):
+        with pytest.raises(ValueError):
+            impact.to_panel_basis(long_baseline, panel, ratio_years=years)
+    twice = pd.concat([long_baseline, long_baseline.iloc[:1]])
+    with pytest.raises(ValueError, match="more than one row"):
+        impact.to_panel_basis(twice, panel)
+
+
+def test_to_panel_basis_works_on_the_output_of_the_loader(tmp_path):
+    rows = []
+    for year in (2015, 2019, 2024):
+        rows += long_rows(year, 400.0 + year - 2015, 50.0 + year - 2015, 12.0, 30.0, 33.0)
+    path = write_long_file(tmp_path / "baseline.csv", rows)
+    loaded = impact.load_thailand_baseline(path, years=[2015, 2019, 2024])
+    panel = pd.Series({2015: 54.0, 2019: 58.32})
+    out = impact.to_panel_basis(loaded, panel)
+    assert out.loc[2015, "receipts_usd_bn"] == 54.0
+    assert out.loc[2024, "basis_ratio"] == pytest.approx(1.08, rel=1e-12)
+    assert out.loc[2024, "receipts_usd_bn"] == pytest.approx(59.0 * 1.08, rel=1e-12)
+    assert out.loc[2024, "receipts_pct_gdp"] == pytest.approx(100.0 * 59.0 * 1.08 / 409.0)
+    table = impact.impact_table(np.full(5, 0.5), np.full(5, 10.0), out, years=[2019, 2024])
+    relative = table[table["scaling"] == "relative"].set_index("baseline_year")
+    assert relative.loc[2024, "q50"] == pytest.approx(0.10 * 59.0 * 1.08, rel=1e-12)
+
+
+# ----------------------------------------------------------------------------
 # Detection
 # ----------------------------------------------------------------------------
 def test_minimum_detectable_effect_for_a_standard_normal_null():
@@ -708,163 +937,339 @@ def test_a_null_effect_is_detected_at_the_size_and_the_mde_at_the_target_power()
 
 
 # ----------------------------------------------------------------------------
+# Placebo null on the scale of the target
+# ----------------------------------------------------------------------------
+def test_rescale_null_pp_with_a_factor_of_one_leaves_the_draws_unchanged():
+    null = np.random.default_rng(11).standard_normal(500)
+    draws, factor = impact.rescale_null_pp(null, 5.7, 5.7)
+    assert factor == 1.0 and isinstance(factor, float)
+    assert isinstance(draws, np.ndarray)
+    np.testing.assert_array_equal(draws, null)
+    assert draws is not null
+    draws[0] = 99.0
+    assert null[0] != 99.0
+
+
+def test_rescale_null_pp_multiplies_by_the_ratio_of_target_to_source_share():
+    null = np.array([-1.0, -0.5, 0.0, 0.25, 2.0])
+    draws, factor = impact.rescale_null_pp(null, 5.7, 7.81)
+    assert factor == pytest.approx(7.81 / 5.7, rel=1e-14)
+    np.testing.assert_allclose(draws, null * 7.81 / 5.7, rtol=1e-14)
+    smaller, shrink = impact.rescale_null_pp(null, 8.0, 2.0)
+    assert shrink == 0.25
+    np.testing.assert_allclose(smaller, 0.25 * null, rtol=1e-15)
+    result = impact.rescale_null_pp(null, 5.7, 7.81)
+    assert isinstance(result, tuple) and len(result) == 2
+    np.testing.assert_array_equal(null, [-1.0, -0.5, 0.0, 0.25, 2.0])
+
+
+@pytest.mark.parametrize("scale", [0.25, 1.0, 1.37, 3.0])
+def test_scaling_a_null_by_k_scales_the_minimum_detectable_effect_by_k(scale):
+    rng = np.random.default_rng(12)
+    null = rng.standard_t(5, 4000) * 0.3 + 0.05
+    base = impact.minimum_detectable_effect(null)
+    draws, factor = impact.rescale_null_pp(null, 4.0, 4.0 * scale)
+    assert factor == pytest.approx(scale, rel=1e-14)
+    scaled = impact.minimum_detectable_effect(draws)
+    for key in ("threshold", "mde", "mde_normal"):
+        assert scaled[key] == pytest.approx(scale * base[key], rel=1e-12)
+
+
+def test_a_null_on_the_scale_of_the_target_changes_the_detection_probability():
+    rng = np.random.default_rng(13)
+    null = rng.normal(0.0, 0.25, 6000)
+    effect = np.full(400, 0.6)
+    limits = impact.minimum_detectable_effect(null)
+    plain = impact.detection_probability(effect, limits["threshold"], null_draws=null)
+    wide, factor = impact.rescale_null_pp(null, 5.7, 7.81)
+    wide_limits = impact.minimum_detectable_effect(wide)
+    assert factor > 1.0 and wide_limits["mde"] > limits["mde"]
+    scaled = impact.detection_probability(effect, wide_limits["threshold"], null_draws=wide)
+    assert scaled < plain
+    shrunk, _ = impact.rescale_null_pp(null, 7.81, 5.7)
+    narrow_limits = impact.minimum_detectable_effect(shrunk)
+    narrow = impact.detection_probability(effect, narrow_limits["threshold"], null_draws=shrunk)
+    assert narrow > plain
+
+
+def test_rescale_null_pp_rejects_invalid_shares_and_draws():
+    null = np.linspace(-1.0, 1.0, 11)
+    bad_shares = (0.0, -1.0, np.nan, np.inf, -np.inf, True, "5.7", None, [5.7])
+    for bad in bad_shares:
+        with pytest.raises(ValueError, match="source_receipts_share"):
+            impact.rescale_null_pp(null, bad, 7.81)
+        with pytest.raises(ValueError, match="target_receipts_share"):
+            impact.rescale_null_pp(null, 5.7, bad)
+    for bad_draws in ([], [[1.0, 2.0]], [1.0, np.nan], [np.inf, 0.0], 3.0):
+        with pytest.raises(ValueError, match="null_pp"):
+            impact.rescale_null_pp(bad_draws, 5.7, 7.81)
+    draws, factor = impact.rescale_null_pp(null, np.float32(2.0), np.int64(3))
+    assert factor == pytest.approx(1.5)
+    np.testing.assert_allclose(draws, 1.5 * null)
+
+
+def test_source_receipts_share_is_the_usage_weighted_mean():
+    shares = [4.0, 6.0, 10.0]
+    assert impact.source_receipts_share(shares, [1.0, 1.0, 2.0]) == pytest.approx(7.5)
+    assert impact.source_receipts_share(shares, [0.2, 0.2, 0.4]) == pytest.approx(7.5)
+    assert impact.source_receipts_share(shares, [3.0, 0.0, 0.0]) == pytest.approx(4.0)
+    assert impact.source_receipts_share(shares, [1.0, 1.0, 1.0]) == pytest.approx(20.0 / 3.0)
+    mass = impact.source_receipts_share([5.0, 5.0, 5.0], [0.3, 0.3, 0.4])
+    assert mass == pytest.approx(5.0, rel=1e-14)
+    assert isinstance(impact.source_receipts_share(shares, [1.0, 1.0, 2.0]), float)
+    assert impact.source_receipts_share(np.array(shares), np.array([1, 1, 2])) == pytest.approx(7.5)
+
+
+def test_source_receipts_share_follows_the_sources_that_carry_the_mass():
+    shares = pd.Series({"CHN": 1.1, "MYS": 5.7, "PRT": 15.0, "GRC": 14.0})
+    usage = pd.Series({"MYS": 0.7, "CHN": 0.05, "GRC": 0.05, "PRT": 0.2})
+    value = impact.source_receipts_share(shares, usage)
+    assert value == pytest.approx(0.055 + 3.99 + 0.7 + 3.0)
+    shuffled = usage.loc[["PRT", "GRC", "CHN", "MYS"]]
+    assert impact.source_receipts_share(shares, shuffled) == pytest.approx(value, rel=1e-14)
+    positional = impact.source_receipts_share(shares.to_numpy(), usage.to_numpy())
+    assert positional != pytest.approx(value)
+    with pytest.raises(ValueError, match="same sources"):
+        impact.source_receipts_share(shares, usage.drop("CHN"))
+    with pytest.raises(ValueError, match="same sources"):
+        impact.source_receipts_share(shares, usage.rename({"CHN": "CAN"}))
+    duplicated = pd.Series([1.0, 2.0], index=["a", "a"])
+    with pytest.raises(ValueError, match="one entry per source"):
+        impact.source_receipts_share(duplicated, duplicated)
+
+
+def test_source_receipts_share_ignores_sources_without_usage():
+    shares = [4.0, np.nan, 10.0]
+    assert impact.source_receipts_share(shares, [1.0, 0.0, 1.0]) == pytest.approx(7.0)
+    with pytest.raises(ValueError, match="in use"):
+        impact.source_receipts_share(shares, [1.0, 1.0, 1.0])
+    with pytest.raises(ValueError, match="in use"):
+        impact.source_receipts_share([4.0, 0.0], [1.0, 1.0])
+    with pytest.raises(ValueError, match="in use"):
+        impact.source_receipts_share([4.0, -2.0], [1.0, 1.0])
+    with pytest.raises(ValueError, match="in use"):
+        impact.source_receipts_share([4.0, np.inf], [1.0, 1.0])
+
+
+def test_source_receipts_share_rejects_invalid_usage_and_shapes():
+    shares = [4.0, 6.0]
+    for usage in ([0.0, 0.0], [-1.0, 2.0], [np.nan, 1.0], [np.inf, 1.0]):
+        with pytest.raises(ValueError, match="usage"):
+            impact.source_receipts_share(shares, usage)
+    for bad in ([1.0], [1.0, 1.0, 1.0], [[1.0, 1.0]], 1.0):
+        with pytest.raises(ValueError):
+            impact.source_receipts_share(shares, bad)
+    with pytest.raises(ValueError):
+        impact.source_receipts_share([], [])
+    with pytest.raises(ValueError):
+        impact.source_receipts_share([[4.0, 6.0]], [[1.0, 1.0]])
+
+
+def test_the_rescaled_null_gives_the_minimum_detectable_effect_of_the_target_scale():
+    rng = np.random.default_rng(14)
+    shares = np.array([5.0, 6.0, 8.0])
+    usage = np.array([0.5, 0.3, 0.2])
+    source = impact.source_receipts_share(shares, usage)
+    assert source == pytest.approx(5.9)
+    placebo = rng.normal(0.0, 0.2, 5000)
+    draws, factor = impact.rescale_null_pp(placebo, source, 7.81)
+    assert factor == pytest.approx(7.81 / 5.9, rel=1e-14)
+    mde_target = impact.minimum_detectable_effect(draws)["mde"]
+    mde_source = impact.minimum_detectable_effect(placebo)["mde"]
+    assert mde_target / mde_source == pytest.approx(7.81 / 5.9, rel=1e-12)
+
+
+# ----------------------------------------------------------------------------
 # decide_route
 # ----------------------------------------------------------------------------
+SUPPORTED = {"supported": True, "ess": 4.2, "reasons": []}
+UNSUPPORTED = {
+    "supported": False,
+    "ess": 1.97,
+    "reasons": ["cost share is far outside the sources"],
+}
+CRITERIA = ("importance_usable", "loco_rmse", "enough_cases", "target_supported")
+MANY = 25
+
+
 def loco_table(rmse_weighted, rmse_equal, rmse_uniform, extra=None):
     values = {"ot_weighted": rmse_weighted, "equal": rmse_equal, "ot_uniform": rmse_uniform}
     values.update(extra or {})
     return pd.DataFrame({"rmse": list(values.values())}, index=list(values))
 
 
+def decide(summary=None, n_cases=MANY, usable=True, support=SUPPORTED, **kwargs):
+    """Call decide_route with a passing default for every input."""
+    if summary is None:
+        summary = loco_table(0.5, 1.0, 1.0)
+    return impact.decide_route({"usable": usable}, summary, n_cases, support=support, **kwargs)
+
+
 @pytest.mark.parametrize(
-    "usable, beats_equal, beats_uniform, enough",
-    list(itertools.product([True, False], repeat=4)),
+    "usable, rmse_ok, enough, supported", list(itertools.product([True, False], repeat=4))
 )
-def test_decide_route_truth_table(usable, beats_equal, beats_uniform, enough):
-    rmse_equal = 1.0 if beats_equal else 0.8
-    rmse_uniform = 1.0 if beats_uniform else 0.8
-    summary = loco_table(0.9, rmse_equal, rmse_uniform)
-    n_cases = 12 if enough else 9
-    decision = impact.decide_route({"usable": usable}, summary, n_cases)
-    rmse_ok = beats_equal and beats_uniform
+def test_decide_route_truth_table(usable, rmse_ok, enough, supported):
+    summary = loco_table(0.9, 1.0 if rmse_ok else 0.8, 1.0)
+    n_cases = 20 if enough else 19
+    support = SUPPORTED if supported else UNSUPPORTED
+    decision = impact.decide_route({"usable": usable}, summary, n_cases, support=support)
     assert decision.passed == {
         "importance_usable": usable,
         "loco_rmse": rmse_ok,
         "enough_cases": enough,
+        "target_supported": supported,
     }
+    assert list(decision.passed) == list(CRITERIA)
     assert all(type(v) is bool for v in decision.passed.values())
-    expected = "ot_importance" if (usable and rmse_ok and enough) else "ambient"
+    expected = "ot_importance" if (usable and rmse_ok and enough and supported) else "ambient"
     assert decision.primary == expected
-    assert expected in decision.details
+    assert f"the primary route is {expected}." in decision.details
+    if expected == "ot_importance":
+        assert "All four criteria are met" in decision.details
+    else:
+        assert "At least one criterion is not met" in decision.details
+
+
+@pytest.mark.parametrize(
+    "beats_equal, beats_uniform", list(itertools.product([True, False], repeat=2))
+)
+def test_decide_route_rmse_criterion_needs_both_comparisons(beats_equal, beats_uniform):
+    summary = loco_table(0.9, 1.0 if beats_equal else 0.8, 1.0 if beats_uniform else 0.8)
+    decision = decide(summary)
+    assert decision.passed["loco_rmse"] is (beats_equal and beats_uniform)
+    assert decision.primary == ("ot_importance" if beats_equal and beats_uniform else "ambient")
 
 
 def test_decide_route_boundaries_follow_at_most_and_at_least():
     summary = loco_table(0.95, 1.0, 1.0)
-    on_the_line = impact.decide_route({"usable": True}, summary, 10)
+    on_the_line = decide(summary, 20)
     assert on_the_line.primary == "ot_importance"
-    assert on_the_line.passed == {
-        "importance_usable": True,
-        "loco_rmse": True,
-        "enough_cases": True,
-    }
-    above = impact.decide_route({"usable": True}, loco_table(0.9501, 1.0, 1.0), 10)
+    assert on_the_line.passed == dict.fromkeys(CRITERIA, True)
+    above = decide(loco_table(0.9501, 1.0, 1.0), 20)
     assert above.primary == "ambient" and above.passed["loco_rmse"] is False
-    above_uniform = impact.decide_route({"usable": True}, loco_table(0.95, 1.0, 0.99), 10)
+    above_uniform = decide(loco_table(0.95, 1.0, 0.99), 20)
     assert above_uniform.primary == "ambient"
-    few = impact.decide_route({"usable": True}, summary, 9)
+    few = decide(summary, 19)
     assert few.primary == "ambient" and few.passed["enough_cases"] is False
-    worse = impact.decide_route({"usable": True}, loco_table(1.2, 1.0, 1.0), 40)
+    worse = decide(loco_table(1.2, 1.0, 1.0), 40)
     assert worse.primary == "ambient"
+
+
+def test_decide_route_compares_rmse_values_with_a_tolerance_for_rounding_noise():
+    noise = 0.95 * (1.0 + 1e-14)
+    assert decide(loco_table(noise, 1.0, 1.0)).passed["loco_rmse"] is True
+    assert decide(loco_table(0.95 * (1.0 + 1e-9), 1.0, 1.0)).passed["loco_rmse"] is False
 
 
 def test_decide_route_ignores_other_methods_and_uses_the_named_ones():
     summary = loco_table(0.5, 1.0, 1.0, extra={"ot_other": 0.1, "ambient": 0.2})
-    assert impact.decide_route({"usable": True}, summary, 20).primary == "ot_importance"
+    assert decide(summary).primary == "ot_importance"
     shuffled = summary.iloc[::-1]
-    assert impact.decide_route({"usable": True}, shuffled, 20).primary == "ot_importance"
+    assert decide(shuffled).primary == "ot_importance"
     swapped = loco_table(1.0, 0.5, 0.5, extra={"ot_other": 0.1})
-    assert impact.decide_route({"usable": True}, swapped, 20).primary == "ambient"
+    assert decide(swapped).primary == "ambient"
 
 
 def test_decide_route_default_thresholds_and_overrides():
     assert dict(impact.DEFAULT_ROUTE_RULES) == {
         "rmse_ratio_equal": 0.95,
         "rmse_ratio_uniform": 0.95,
-        "min_cases": 10,
+        "min_cases": 20,
     }
     with pytest.raises(TypeError):
         impact.DEFAULT_ROUTE_RULES["min_cases"] = 3
     summary = loco_table(0.97, 1.0, 1.0)
-    assert impact.decide_route({"usable": True}, summary, 12).primary == "ambient"
-    relaxed = impact.decide_route(
-        {"usable": True}, summary, 12, rules={"rmse_ratio_equal": 1.0, "rmse_ratio_uniform": 1.0}
-    )
+    assert decide(summary, 25).primary == "ambient"
+    relaxed = decide(summary, 25, rules={"rmse_ratio_equal": 1.0, "rmse_ratio_uniform": 1.0})
     assert relaxed.primary == "ot_importance"
-    only_equal = impact.decide_route({"usable": True}, summary, 12, rules={"rmse_ratio_equal": 1.0})
+    only_equal = decide(summary, 25, rules={"rmse_ratio_equal": 1.0})
     assert only_equal.primary == "ambient"
     good = loco_table(0.5, 1.0, 1.0)
-    small = impact.decide_route({"usable": True}, good, 6, rules={"min_cases": 5})
+    assert decide(good, 12).primary == "ambient"
+    small = decide(good, 6, rules={"min_cases": 5})
     assert small.primary == "ot_importance"
-    strict = impact.decide_route({"usable": True}, good, 12, rules={"min_cases": 15})
+    strict = decide(good, 25, rules={"min_cases": 30})
     assert strict.primary == "ambient"
-    tight = impact.decide_route(
-        {"usable": True}, loco_table(0.9, 1.0, 1.0), 12, rules={"rmse_ratio_uniform": 0.8}
-    )
+    ten = decide(good, 10, rules={"min_cases": 10})
+    assert ten.primary == "ot_importance"
+    tight = decide(loco_table(0.9, 1.0, 1.0), 25, rules={"rmse_ratio_uniform": 0.8})
     assert tight.primary == "ambient"
     # an empty override leaves the defaults unchanged
-    unchanged = impact.decide_route({"usable": True}, loco_table(0.9, 1.0, 1.0), 10, rules={})
+    unchanged = decide(loco_table(0.9, 1.0, 1.0), 20, rules={})
     assert unchanged.primary == "ot_importance"
+    assert decide(loco_table(0.9, 1.0, 1.0), 19, rules={}).primary == "ambient"
     with pytest.raises(ValueError, match="min_case"):
-        impact.decide_route({"usable": True}, summary, 12, rules={"min_case": 5})
+        decide(summary, 25, rules={"min_case": 5})
     with pytest.raises(ValueError):
-        impact.decide_route({"usable": True}, summary, 12, rules={"min_cases": float("nan")})
+        decide(summary, 25, rules={"min_cases": float("nan")})
     with pytest.raises(ValueError):
-        impact.decide_route({"usable": True}, summary, 12, rules={"rmse_ratio_equal": -0.1})
+        decide(summary, 25, rules={"rmse_ratio_equal": -0.1})
 
 
 @pytest.mark.parametrize("name", ["rmse_ratio_equal", "rmse_ratio_uniform"])
 def test_decide_route_accepts_rmse_ratio_thresholds_in_the_interval_zero_to_one_and_a_half(name):
     summary = loco_table(0.5, 1.0, 1.0)
     for value in (1e-9, 0.3, 0.95, 1.0, 1.5, np.float64(1.2), np.float32(0.5)):
-        decision = impact.decide_route({"usable": True}, summary, 12, rules={name: value})
+        decision = decide(summary, rules={name: value})
         assert decision.passed["loco_rmse"] is (0.5 <= float(value))
     for value in (0.0, -0.5, 1.5000001, 2.0, np.inf, -np.inf, np.nan):
         with pytest.raises(ValueError, match=name):
-            impact.decide_route({"usable": True}, summary, 12, rules={name: value})
+            decide(summary, rules={name: value})
     for value in (True, "0.9", None, [0.9], 1 + 0j):
         with pytest.raises(ValueError, match=name):
-            impact.decide_route({"usable": True}, summary, 12, rules={name: value})
+            decide(summary, rules={name: value})
 
 
 def test_decide_route_accepts_a_non_negative_finite_minimum_number_of_cases():
     summary = loco_table(0.5, 1.0, 1.0)
-    zero = impact.decide_route({"usable": True}, summary, 0, rules={"min_cases": 0})
+    zero = decide(summary, 0, rules={"min_cases": 0})
     assert zero.primary == "ot_importance" and zero.passed["enough_cases"] is True
-    fractional = impact.decide_route({"usable": True}, summary, 2, rules={"min_cases": 2.5})
+    fractional = decide(summary, 2, rules={"min_cases": 2.5})
     assert fractional.passed["enough_cases"] is False
     assert "at least 2.5 are required" in fractional.details
     for value in (-1, -0.001, np.inf, np.nan, True, "10", None):
         with pytest.raises(ValueError, match="min_cases"):
-            impact.decide_route({"usable": True}, summary, 12, rules={"min_cases": value})
+            decide(summary, rules={"min_cases": value})
     for bad_rules in ([("min_cases", 5)], 5, "min_cases", (10,)):
         with pytest.raises(ValueError, match="mapping"):
-            impact.decide_route({"usable": True}, summary, 12, rules=bad_rules)
+            decide(summary, rules=bad_rules)
 
 
 def test_decide_route_reads_the_usable_flag_strictly():
     summary = loco_table(0.5, 1.0, 1.0)
     for flag in (True, np.True_):
-        decision = impact.decide_route({"usable": flag}, summary, 12)
+        decision = decide(summary, usable=flag)
         assert decision.primary == "ot_importance"
         assert decision.passed["importance_usable"] is True
     for flag in (False, np.False_):
-        decision = impact.decide_route({"usable": flag}, summary, 12)
+        decision = decide(summary, usable=flag)
         assert decision.primary == "ambient"
         assert decision.passed["importance_usable"] is False
     for not_boolean in (1, 0, 1.0, "yes", "True", None, [True], np.int64(1), np.float64(1.0)):
         with pytest.raises(ValueError, match="usable"):
-            impact.decide_route({"usable": not_boolean}, summary, 12)
+            decide(summary, usable=not_boolean)
     extra_keys = {"usable": True, "reason": "ok", "n_folds": 5}
-    assert impact.decide_route(extra_keys, summary, 12).primary == "ot_importance"
+    decision = impact.decide_route(extra_keys, summary, MANY, support=SUPPORTED)
+    assert decision.primary == "ot_importance"
     series = pd.Series({"usable": True, "reason": "ok"})
-    assert impact.decide_route(series, summary, 12).primary == "ot_importance"
+    decision = impact.decide_route(series, summary, MANY, support=SUPPORTED)
+    assert decision.primary == "ot_importance"
 
 
 def test_decide_route_rejects_diagnostics_without_a_usable_entry():
     summary = loco_table(0.5, 1.0, 1.0)
     for diagnostics in (None, {}, {"other": True}, {"Usable": True}, [True], True, "usable", 1):
         with pytest.raises(ValueError, match="usable"):
-            impact.decide_route(diagnostics, summary, 12)
+            impact.decide_route(diagnostics, summary, MANY, support=SUPPORTED)
     with pytest.raises(ValueError, match="usable"):
-        impact.decide_route(pd.DataFrame({"usable": [True]}), summary, 12)
+        impact.decide_route(pd.DataFrame({"usable": [True]}), summary, MANY, support=SUPPORTED)
 
 
 def test_decide_route_rejects_a_summary_without_valid_rmse_values():
-    diagnostics = {"usable": True}
     complete = loco_table(0.5, 1.0, 1.0)
     for method in ("ot_weighted", "equal", "ot_uniform"):
         with pytest.raises(ValueError, match=method):
-            impact.decide_route(diagnostics, complete.drop(index=method), 20)
+            decide(complete.drop(index=method))
     broken = {
         "nan": np.nan,
         "inf": np.inf,
@@ -877,78 +1282,76 @@ def test_decide_route_rejects_a_summary_without_valid_rmse_values():
             values = [0.5, 1.0, 1.0]
             values[position] = value
             with pytest.raises(ValueError, match=method):
-                impact.decide_route(diagnostics, loco_table(*values), 20)
+                decide(loco_table(*values))
     with pytest.raises(ValueError):
-        impact.decide_route(diagnostics, loco_table(0.0, 0.0, 0.0), 20)
+        decide(loco_table(0.0, 0.0, 0.0))
     with pytest.raises(ValueError):
-        impact.decide_route(diagnostics, loco_table(np.inf, np.inf, np.inf), 20)
+        decide(loco_table(np.inf, np.inf, np.inf))
     for text in ("0.5", None, True):
         textual = loco_table(0.5, 1.0, 1.0).astype({"rmse": object})
         textual.loc["ot_weighted", "rmse"] = text
         with pytest.raises(ValueError, match="ot_weighted"):
-            impact.decide_route(diagnostics, textual, 20)
+            decide(textual)
     float32 = complete.astype({"rmse": np.float32})
-    assert impact.decide_route(diagnostics, float32, 20).primary == "ot_importance"
+    assert decide(float32).primary == "ot_importance"
 
 
 def test_decide_route_rejects_a_summary_that_is_not_indexed_by_method_name():
-    diagnostics = {"usable": True}
     complete = loco_table(0.5, 1.0, 1.0)
     in_a_column = complete.reset_index(names="method")
     with pytest.raises(ValueError, match="ot_weighted"):
-        impact.decide_route(diagnostics, in_a_column, 20)
+        decide(in_a_column)
     for index in (["OT_weighted", "equal", "ot_uniform"], ["ot_weighted ", "equal", "ot_uniform"]):
         mislabelled = complete.copy()
         mislabelled.index = index
         with pytest.raises(ValueError, match="ot_weighted"):
-            impact.decide_route(diagnostics, mislabelled, 20)
+            decide(mislabelled)
     with pytest.raises(ValueError, match="rmse"):
-        impact.decide_route(diagnostics, complete.rename(columns={"rmse": "mse"}), 20)
+        decide(complete.rename(columns={"rmse": "mse"}))
     duplicated = pd.DataFrame(
         {"rmse": [0.5, 0.6, 1.0, 1.0]}, index=["ot_weighted", "ot_weighted", "equal", "ot_uniform"]
     )
     with pytest.raises(ValueError, match="one row per method"):
-        impact.decide_route(diagnostics, duplicated, 12)
+        decide(duplicated)
     for not_a_frame in (None, complete["rmse"], complete.to_dict(), complete.to_numpy(), "rmse"):
         with pytest.raises(ValueError, match="DataFrame"):
-            impact.decide_route(diagnostics, not_a_frame, 20)
+            impact.decide_route({"usable": True}, not_a_frame, MANY, support=SUPPORTED)
 
 
 def test_decide_route_requires_a_non_negative_integer_number_of_cases():
     summary = loco_table(0.5, 1.0, 1.0)
-    diagnostics = {"usable": True}
-    not_counts = (12.0, 12.5, np.float64(12.0), True, np.True_, None, "12", [12], -1, -10, np.nan)
+    not_counts = (25.0, 25.5, np.float64(25.0), True, np.True_, None, "25", [25], -1, -10, np.nan)
     for n_cases in not_counts:
         with pytest.raises(ValueError, match="n_cases"):
-            impact.decide_route(diagnostics, summary, n_cases)
-    for n_cases in (12, np.int64(12), np.int32(12), np.uint8(12), 10**6):
-        decision = impact.decide_route(diagnostics, summary, n_cases)
-        assert decision.primary == "ot_importance"
-    nothing = impact.decide_route(diagnostics, summary, 0)
+            decide(summary, n_cases)
+    for n_cases in (25, np.int64(25), np.int32(25), np.uint8(25), 10**6):
+        assert decide(summary, n_cases).primary == "ot_importance"
+    nothing = decide(summary, 0)
     assert nothing.primary == "ambient" and nothing.passed["enough_cases"] is False
     assert "There are 0 cases" in nothing.details
-    assert "There are 12 cases" in impact.decide_route(diagnostics, summary, np.int64(12)).details
+    assert "There are 25 cases" in decide(summary, np.int64(25)).details
 
 
 def test_decide_route_details_report_each_criterion_in_plain_text():
     summary = loco_table(0.4, 0.5, 0.8)
-    decision = impact.decide_route({"usable": True}, summary, 12)
+    decision = decide(summary, 25)
     text = decision.details
     assert isinstance(text, str) and text.endswith(".")
     assert "0.4" in text and "0.5" in text and "0.8" in text
     assert "0.800 times the RMSE of equal" in text
     assert "0.500 times the RMSE of ot_uniform" in text
-    assert "12 cases" in text and "at least 10" in text
+    assert "25 cases" in text and "at least 20" in text
+    assert "support criterion is met" in text
     assert "primary route is ot_importance" in text
-    failing = impact.decide_route({"usable": False}, loco_table(1.0, 1.0, 1.0), 4)
+    failing = decide(loco_table(1.0, 1.0, 1.0), 4, usable=False, support=UNSUPPORTED)
     assert "primary route is ambient" in failing.details
     assert "not met" in failing.details
-    for decision in (decision, failing):
-        assert EM_DASH not in decision.details
+    for item in (decision, failing):
+        assert EM_DASH not in item.details
 
 
 def test_decide_route_names_the_economy_that_is_left_out():
-    decision = impact.decide_route({"usable": True}, loco_table(0.4, 0.5, 0.8), 12)
+    decision = decide(loco_table(0.4, 0.5, 0.8))
     assert "The leave-one-economy-out RMSE of ot_weighted is 0.4" in decision.details
     assert "leave-one-economy-out" in impact.decide_route.__doc__
     for module in (impact, meta):
@@ -960,10 +1363,224 @@ def test_decide_route_names_the_economy_that_is_left_out():
     assert "leave-one-group-out" not in decision.details
 
 
+def test_decide_route_documents_that_economies_are_the_independent_units():
+    doc = " ".join(impact.decide_route.__doc__.split())
+    assert "counts episodes" in doc
+    assert "independent units are the economies" in doc
+    assert "at least 20" in doc
+    assert "about 20 episodes" in doc
+
+
+# ---- the support criterion ---------------------------------------------------
+def test_decide_route_requires_the_support_result():
+    summary = loco_table(0.5, 1.0, 1.0)
+    with pytest.raises(ValueError, match="support is required: pass the result of"):
+        impact.decide_route({"usable": True}, summary, MANY)
+    with pytest.raises(ValueError, match="transport.target_support"):
+        impact.decide_route({"usable": True}, summary, MANY, support=None)
+    with pytest.raises(ValueError, match="support is required"):
+        impact.decide_route({"usable": True}, summary, MANY, rules={"min_cases": 5})
+    signature = inspect.signature(impact.decide_route)
+    assert list(signature.parameters) == [
+        "importance_diagnostics",
+        "loco_summary",
+        "n_cases",
+        "rules",
+        "support",
+        "ambient_rmse",
+    ]
+    assert signature.parameters["support"].default is None
+    assert signature.parameters["ambient_rmse"].default is None
+
+
+def test_decide_route_support_decides_the_route_when_the_other_criteria_hold():
+    summary = loco_table(0.4, 1.0, 1.0)
+    supported = decide(summary, 40)
+    unsupported = decide(summary, 40, support=UNSUPPORTED)
+    assert supported.primary == "ot_importance" and unsupported.primary == "ambient"
+    assert unsupported.passed == {
+        "importance_usable": True,
+        "loco_rmse": True,
+        "enough_cases": True,
+        "target_supported": False,
+    }
+    only_flag = decide(summary, 40, support={"supported": True})
+    assert only_flag.primary == "ot_importance"
+    assert "effective number" not in only_flag.details
+    assert "support criterion is met" in only_flag.details
+
+
+def test_decide_route_states_the_support_result_with_ess_and_reasons():
+    reasons = ["the cost share is 14.8 robust standard deviations out.", "ess is low"]
+    decision = decide(support={"supported": False, "ess": 1.97, "reasons": reasons})
+    text = decision.details
+    assert "(effective number of sources 1.97)" in text
+    assert "the cost share is 14.8 robust standard deviations out; ess is low" in text
+    assert ".;" not in text and ".," not in text and ".." not in text
+    assert "support criterion is not met" in text
+    supported = decide(support={"supported": True, "ess": 3.456}).details
+    assert "(effective number of sources 3.46)" in supported
+    assert "support criterion is met" in supported
+    bare = decide(support={"supported": False}).details
+    assert "is supported, so the support criterion is not met." in bare
+    assert "effective number" not in bare
+    single = decide(support={"supported": False, "reasons": "outside the reach"}).details
+    assert "supported: outside the reach, so the support" in single
+    blank = decide(support={"supported": False, "reasons": ["", "  "]}).details
+    assert "supported, so the support criterion is not met" in blank
+    assert EM_DASH not in text
+
+
+def test_decide_route_reads_the_support_result_strictly():
+    for flag in (np.True_, np.False_):
+        assert decide(support={"supported": flag}).passed["target_supported"] is bool(flag)
+    for bad in (1, 0, 1.0, "yes", "True", None, [True], np.int64(1)):
+        with pytest.raises(ValueError, match="supported"):
+            decide(support={"supported": bad})
+    for not_a_mapping in ([True], True, "supported", 1, (True,), np.array([True])):
+        with pytest.raises(ValueError, match="supported"):
+            decide(support=not_a_mapping)
+    for incomplete in ({}, {"ess": 3.0}, {"Supported": True}, {"reasons": []}):
+        with pytest.raises(ValueError, match="supported"):
+            decide(support=incomplete)
+    for bad in ("3.0", True, [3.0], 1 + 0j):
+        with pytest.raises(ValueError, match="ess"):
+            decide(support={"supported": True, "ess": bad})
+    for bad in (5, [1], [None], {"a": "b"}, b"abc", [["x"]]):
+        with pytest.raises(ValueError, match="reasons"):
+            decide(support={"supported": False, "reasons": bad})
+    accepted = (
+        {"supported": True, "ess": None, "reasons": None},
+        {"supported": True, "ess": np.float64(2.5), "reasons": ("a", "b")},
+        {"supported": True, "ess": 3, "other": object()},
+        {"supported": True, "ess": float("nan")},
+        pd.Series({"supported": True, "ess": 2.0, "reasons": ["x"]}),
+    )
+    for support in accepted:
+        assert decide(support=support).passed["target_supported"] is True
+
+
+# ---- the comparisons that are reported and not used --------------------------
+def test_decide_route_reports_the_ambient_and_neighbour_comparisons_without_using_them():
+    summary = loco_table(0.365, 0.5, 0.6, extra={"nn1": 0.35, "nn3": 0.276})
+    ambient = {"A1": 0.40, "A2": 0.35, "A3": 0.323}
+    decision = decide(summary, ambient_rmse=ambient)
+    info = decision.info
+    assert list(info) == [
+        "rmse_ratio_to_best_ambient",
+        "best_ambient",
+        "rmse_ratio_to_best_neighbour",
+        "best_neighbour",
+    ]
+    assert info["best_ambient"] == "A3"
+    assert info["rmse_ratio_to_best_ambient"] == pytest.approx(0.365 / 0.323, rel=1e-14)
+    assert info["best_neighbour"] == "nn3"
+    assert info["rmse_ratio_to_best_neighbour"] == pytest.approx(0.365 / 0.276, rel=1e-14)
+    assert type(info["rmse_ratio_to_best_ambient"]) is float
+    text = decision.details
+    assert "1.130 times the RMSE of the best ambient estimator A3 (0.323)" in text
+    assert "1.322 times the RMSE of the best neighbour predictor nn3 (0.276)" in text
+    assert text.count("this is reported and is not used by the rule") == 2
+    # the rule does not read them: the primary route and the criteria are the same
+    plain = decide(summary)
+    assert plain.primary == decision.primary == "ot_importance"
+    assert plain.passed == decision.passed
+    worse = decide(summary, ambient_rmse={"A3": 0.01})
+    assert worse.primary == "ot_importance" and worse.passed == decision.passed
+    assert set(plain.info) == {"rmse_ratio_to_best_neighbour", "best_neighbour"}
+    assert "best ambient" not in plain.details
+
+
+def test_decide_route_info_depends_on_what_is_available():
+    plain = decide()
+    assert plain.info == {}
+    assert "ambient estimator" not in plain.details and "neighbour" not in plain.details
+    only_ambient = decide(ambient_rmse={"A1": 0.4, "A2": 0.25})
+    assert only_ambient.info == {
+        "rmse_ratio_to_best_ambient": pytest.approx(0.5 / 0.25),
+        "best_ambient": "A2",
+    }
+    assert "neighbour" not in only_ambient.details
+    summary = loco_table(0.5, 1.0, 1.0, extra={"nn1": 0.2})
+    only_neighbour = decide(summary)
+    assert only_neighbour.info == {
+        "rmse_ratio_to_best_neighbour": pytest.approx(0.5 / 0.2),
+        "best_neighbour": "nn1",
+    }
+    assert "ambient estimator" not in only_neighbour.details
+    empty = decide(ambient_rmse={})
+    assert empty.info == {}
+
+
+def test_decide_route_ambient_entries_named_nn1_or_nn3_are_neighbour_predictors():
+    summary = loco_table(0.5, 1.0, 1.0, extra={"nn1": 0.4, "nn3": 0.3})
+    decision = decide(summary, ambient_rmse={"A1": 0.45, "nn3": 0.5, "nn1": 0.25})
+    assert decision.info["best_ambient"] == "A1"
+    assert decision.info["rmse_ratio_to_best_ambient"] == pytest.approx(0.5 / 0.45)
+    assert decision.info["best_neighbour"] == "nn1"
+    assert decision.info["rmse_ratio_to_best_neighbour"] == pytest.approx(0.5 / 0.25)
+    nn_only = decide(ambient_rmse={"nn3": 0.2})
+    assert "best_ambient" not in nn_only.info and nn_only.info["best_neighbour"] == "nn3"
+
+
+def test_decide_route_reports_the_first_of_equal_best_values_and_ratios_below_one():
+    decision = decide(ambient_rmse={"A2": 0.4, "A3": 0.4, "A1": 0.7})
+    assert decision.info["best_ambient"] == "A2"
+    tie = decide(loco_table(0.5, 1.0, 1.0, extra={"nn1": 0.25, "nn3": 0.25}))
+    assert tie.info["best_neighbour"] == "nn1"
+    ahead = decide(ambient_rmse=pd.Series({"A1": 0.8, "A3": 1.0}))
+    assert ahead.info["best_ambient"] == "A1"
+    assert ahead.info["rmse_ratio_to_best_ambient"] == pytest.approx(0.5 / 0.8)
+    assert "0.625 times the RMSE of the best ambient estimator A1" in ahead.details
+
+
+def test_decide_route_rejects_invalid_ambient_or_neighbour_rmse():
+    for not_a_mapping in ([("A1", 0.3)], 0.3, "A1", (0.3,), np.array([0.3])):
+        with pytest.raises(ValueError, match="ambient_rmse"):
+            decide(ambient_rmse=not_a_mapping)
+    for bad in (np.nan, np.inf, 0.0, -0.1, True, "0.3", None, [0.3]):
+        with pytest.raises(ValueError, match="A2"):
+            decide(ambient_rmse={"A1": 0.4, "A2": bad})
+    with pytest.raises(ValueError, match="strings"):
+        decide(ambient_rmse={1: 0.3})
+    for bad in (np.nan, 0.0, -1.0, np.inf):
+        for method in ("nn1", "nn3"):
+            with pytest.raises(ValueError, match=method):
+                decide(loco_table(0.5, 1.0, 1.0, extra={method: bad}))
+        with pytest.raises(ValueError, match="nn3"):
+            decide(ambient_rmse={"nn3": bad})
+
+
+def test_route_decision_info_defaults_to_an_empty_dict_of_its_own():
+    first = impact.RouteDecision("ambient", {"importance_usable": False}, "text")
+    second = impact.RouteDecision("ambient", {"importance_usable": False}, "text")
+    assert first.info == {} and second.info == {}
+    assert first.info is not second.info
+    explicit = impact.RouteDecision("ambient", {}, "text", info={"best_ambient": "A1"})
+    assert explicit.info == {"best_ambient": "A1"}
+    with pytest.raises(AttributeError):
+        explicit.info = {}
+
+
 def test_route_decision_is_immutable():
-    decision = impact.decide_route({"usable": True}, loco_table(0.5, 1.0, 1.0), 12)
+    decision = decide()
     with pytest.raises(AttributeError):
         decision.primary = "ambient"
+
+
+def test_the_route_rule_declines_a_target_the_transport_cannot_reach():
+    """Three criteria hold but the target lies far outside the sources, with a low ESS."""
+    summary = loco_table(0.311, 0.45, 0.50, extra={"nn1": 0.35, "nn3": 0.276})
+    support = {
+        "supported": False,
+        "ess": 1.97,
+        "reasons": ["the cost share is 14.8 robust standard deviations from the sources"],
+    }
+    decision = decide(summary, 32, support=support, ambient_rmse={"A1": 0.4, "A3": 0.323})
+    assert decision.primary == "ambient"
+    assert decision.passed["importance_usable"] and decision.passed["loco_rmse"]
+    assert decision.passed["enough_cases"] and not decision.passed["target_supported"]
+    assert "14.8 robust standard deviations" in decision.details
 
 
 # ----------------------------------------------------------------------------
@@ -976,7 +1593,7 @@ def test_route_comparison_stacks_the_tables_and_flags_the_primary_route(baseline
         "ambient": impact.impact_table(0.5 * pp, None, baseline, route="also ignored"),
     }
     before = {name: table.copy() for name, table in tables.items()}
-    decision = impact.decide_route({"usable": True}, loco_table(0.5, 1.0, 1.0), 12)
+    decision = decide()
     out = impact.route_comparison(tables, decision)
     assert decision.primary == "ot_importance"
     assert len(out) == len(tables["ot_importance"]) + len(tables["ambient"]) == 6
@@ -989,16 +1606,16 @@ def test_route_comparison_stacks_the_tables_and_flags_the_primary_route(baseline
     assert ambient_rows["q50"].tolist() == pytest.approx([1.25, 1.5])
     for name, table in tables.items():
         pd.testing.assert_frame_equal(table, before[name])
-    swapped = impact.route_comparison(
-        tables, impact.decide_route({"usable": False}, loco_table(0.5, 1.0, 1.0), 12)
-    )
+    swapped = impact.route_comparison(tables, decide(usable=False))
     assert swapped["primary"].tolist() == [False] * 4 + [True] * 2
+    unsupported = impact.route_comparison(tables, decide(support=UNSUPPORTED))
+    assert unsupported["primary"].tolist() == [False] * 4 + [True] * 2
 
 
 def test_route_comparison_supports_additional_routes_and_checks_the_primary_exists(baseline):
     pp = np.linspace(0.0, 1.0, 101)
     table = impact.impact_table(pp, None, baseline)
-    ambient_decision = impact.decide_route({"usable": False}, loco_table(0.5, 1.0, 1.0), 12)
+    ambient_decision = decide(usable=False)
     every_route = {"meta": table, "ambient": table, "ot_importance": table}
     out = impact.route_comparison(every_route, ambient_decision)
     assert out.groupby("route")["primary"].all().to_dict() == {
@@ -1006,10 +1623,202 @@ def test_route_comparison_supports_additional_routes_and_checks_the_primary_exis
         "meta": False,
         "ot_importance": False,
     }
-    primary_decision = impact.decide_route({"usable": True}, loco_table(0.5, 1.0, 1.0), 12)
+    primary_decision = decide()
     with pytest.raises(ValueError, match="ot_importance"):
         impact.route_comparison({"ambient": table}, primary_decision)
     with pytest.raises(ValueError):
         impact.route_comparison({}, ambient_decision)
     only_primary = impact.route_comparison({"ambient": table}, ambient_decision)
     assert only_primary["primary"].all()
+
+
+# ----------------------------------------------------------------------------
+# select_ambient
+# ----------------------------------------------------------------------------
+SELECTION_KEYS = {"selected", "qualifying", "ratios", "margin", "runner_up", "close"}
+
+
+def selection_of_the_notebook(values, ratio=0.95):
+    """The selection rule as written in the leave-one-economy-out table."""
+    loeo = pd.DataFrame({"rmse": list(values.values())}, index=list(values))
+    loeo["ratio_to_A1"] = loeo["rmse"] / loeo.loc["A1", "rmse"]
+    loeo["qualifies"] = (loeo.index != "A1") & (loeo["ratio_to_A1"] <= ratio)
+    qualifying = loeo[loeo["qualifies"]]
+    selected = "A1" if qualifying.empty else str(qualifying["rmse"].idxmin())
+    return selected, qualifying.index.tolist(), loeo["ratio_to_A1"].to_dict()
+
+
+def test_select_ambient_reproduces_the_rule_of_the_notebook_on_random_values():
+    rng = np.random.default_rng(15)
+    counts = {"A1": 0, "A2": 0, "A3": 0}
+    for _ in range(1500):
+        a1 = rng.uniform(0.2, 0.6)
+        values = {
+            "A1": a1,
+            "A2": a1 * rng.uniform(0.7, 1.2),
+            "A3": a1 * rng.uniform(0.7, 1.2),
+        }
+        selected, qualifying, ratios = selection_of_the_notebook(values)
+        out = impact.select_ambient(values)
+        assert out["selected"] == selected
+        assert out["qualifying"] == qualifying
+        assert out["ratios"] == pytest.approx(ratios, rel=1e-14)
+        counts[selected] += 1
+    assert min(counts.values()) > 100
+
+
+def test_select_ambient_edge_cases_of_the_current_rule():
+    # the ratio on the line qualifies
+    on_the_line = impact.select_ambient({"A1": 2.0, "A2": 1.9, "A3": 2.5})
+    assert on_the_line["selected"] == "A2" and on_the_line["qualifying"] == ["A2"]
+    assert selection_of_the_notebook({"A1": 2.0, "A2": 1.9, "A3": 2.5})[0] == "A2"
+    just_above = impact.select_ambient({"A1": 2.0, "A2": 1.91, "A3": 2.5})
+    assert just_above["selected"] == "A1" and just_above["qualifying"] == []
+    # ties between qualifiers go to the one listed first
+    tie = impact.select_ambient({"A1": 1.0, "A2": 0.5, "A3": 0.5})
+    assert tie["selected"] == "A2" and tie["qualifying"] == ["A2", "A3"]
+    assert selection_of_the_notebook({"A1": 1.0, "A2": 0.5, "A3": 0.5})[0] == "A2"
+    flipped = impact.select_ambient({"A1": 1.0, "A3": 0.5, "A2": 0.5})
+    assert flipped["selected"] == "A3" and flipped["qualifying"] == ["A3", "A2"]
+    # the smaller RMSE wins when both qualify
+    both = impact.select_ambient({"A1": 1.0, "A2": 0.9, "A3": 0.8})
+    assert both["selected"] == "A3" and both["qualifying"] == ["A2", "A3"]
+    only_third = impact.select_ambient({"A1": 1.0, "A2": 0.96, "A3": 0.94})
+    assert only_third["selected"] == "A3" and only_third["qualifying"] == ["A3"]
+    # no qualifier leaves the baseline, even if another estimator has a smaller RMSE
+    none = impact.select_ambient({"A1": 1.0, "A2": 0.97, "A3": 1.4})
+    assert none["selected"] == "A1" and none["qualifying"] == []
+    # the baseline alone
+    alone = impact.select_ambient({"A1": 0.7})
+    assert alone["selected"] == "A1" and alone["qualifying"] == []
+    # a baseline that is missing
+    with pytest.raises(ValueError, match="A1"):
+        impact.select_ambient({"A2": 0.5, "A3": 0.6})
+    with pytest.raises(ValueError, match="Z"):
+        impact.select_ambient({"A1": 0.5, "A2": 0.6}, baseline="Z")
+
+
+def test_select_ambient_compares_with_a_tolerance_for_rounding_noise():
+    noisy = impact.select_ambient({"A1": 1.0, "A2": 0.95 * (1.0 + 1e-14)})
+    assert noisy["selected"] == "A2"
+    clear = impact.select_ambient({"A1": 1.0, "A2": 0.95 * (1.0 + 1e-9)})
+    assert clear["selected"] == "A1"
+    near_tie = impact.select_ambient({"A1": 1.0, "A2": 0.8, "A3": 0.8 * (1.0 - 1e-14)})
+    assert near_tie["selected"] == "A2"
+    apart = impact.select_ambient({"A1": 1.0, "A2": 0.8, "A3": 0.8 * (1.0 - 1e-9)})
+    assert apart["selected"] == "A3"
+
+
+def test_select_ambient_reports_margin_runner_up_and_ratios():
+    out = impact.select_ambient({"A1": 1.0, "A2": 0.80, "A3": 0.90})
+    assert set(out) == SELECTION_KEYS
+    assert out["selected"] == "A2" and out["qualifying"] == ["A2", "A3"]
+    assert out["runner_up"] == "A3"
+    assert out["margin"] == pytest.approx(0.9 / 0.8 - 1.0, rel=1e-12)
+    assert out["ratios"] == pytest.approx({"A1": 1.0, "A2": 0.8, "A3": 0.9})
+    assert list(out["ratios"]) == ["A1", "A2", "A3"]
+    assert out["close"] is False
+    assert isinstance(out["selected"], str) and isinstance(out["margin"], float)
+    assert isinstance(out["qualifying"], list)
+    other = impact.select_ambient({"A1": 1.0, "A2": 0.85, "A3": 0.70})
+    assert other["selected"] == "A3" and other["runner_up"] == "A2"
+    assert other["margin"] == pytest.approx(0.85 / 0.70 - 1.0, rel=1e-12)
+    # the baseline is the runner up when it has the second smallest RMSE
+    third = impact.select_ambient({"A1": 1.0, "A2": 0.60, "A3": 1.3})
+    assert third["selected"] == "A2" and third["runner_up"] == "A1"
+    assert third["margin"] == pytest.approx(1.0 / 0.6 - 1.0, rel=1e-12)
+
+
+def test_select_ambient_margin_is_zero_without_competitors_and_negative_when_the_baseline_stays():
+    alone = impact.select_ambient({"A1": 0.7})
+    assert alone["margin"] == 0.0 and alone["runner_up"] is None
+    assert alone["close"] is False and alone["ratios"] == {"A1": 1.0}
+    stays = impact.select_ambient({"A1": 1.0, "A2": 0.97, "A3": 1.4})
+    assert stays["selected"] == "A1" and stays["runner_up"] == "A2"
+    assert stays["margin"] == pytest.approx(-0.03, rel=1e-9)
+    worse = impact.select_ambient({"A1": 0.5, "A2": 0.9, "A3": 0.8})
+    assert worse["selected"] == "A1" and worse["runner_up"] == "A3"
+    assert worse["margin"] == pytest.approx(0.6, rel=1e-12)
+    tied = impact.select_ambient({"A1": 1.0, "A2": 0.5, "A3": 0.5})
+    assert tied["runner_up"] == "A3" and tied["margin"] == 0.0 and tied["close"] is True
+
+
+def test_select_ambient_flags_a_close_selection():
+    # the runner up is within 5 percent of the selected RMSE
+    near_runner = impact.select_ambient({"A1": 1.0, "A2": 0.80, "A3": 0.82})
+    assert near_runner["close"] is True
+    far_runner = impact.select_ambient({"A1": 1.0, "A2": 0.80, "A3": 0.86})
+    assert far_runner["close"] is False
+    # an estimator within 5 percent of the qualification threshold
+    near_limit = impact.select_ambient({"A1": 1.0, "A2": 0.70, "A3": 0.99})
+    assert near_limit["selected"] == "A2" and near_limit["close"] is True
+    just_inside = impact.select_ambient({"A1": 1.0, "A2": 0.60, "A3": 0.9026})
+    assert just_inside["close"] is True
+    just_outside = impact.select_ambient({"A1": 1.0, "A2": 0.60, "A3": 0.9024})
+    assert just_outside["close"] is False
+    below = impact.select_ambient({"A1": 1.0, "A2": 0.60, "A3": 1.0 * 0.95 * 1.049})
+    assert below["close"] is True
+    # the baseline is not an estimator that is compared with the threshold
+    assert impact.select_ambient({"A1": 0.95, "A2": 2.0, "A3": 3.0})["close"] is False
+    # the baseline kept with a rival just above the limit
+    kept = impact.select_ambient({"A1": 1.0, "A2": 0.96, "A3": 1.5})
+    assert kept["selected"] == "A1" and kept["close"] is True
+    wide = impact.select_ambient({"A1": 1.0, "A2": 0.80, "A3": 0.82}, close_within=0.01)
+    assert wide["close"] is False
+    assert impact.select_ambient({"A1": 1.0, "A2": 0.7, "A3": 0.9}, close_within=0.2)["close"]
+
+
+def test_select_ambient_takes_a_baseline_a_ratio_and_a_series():
+    values = {"base": 1.0, "x": 0.6, "y": 0.5}
+    out = impact.select_ambient(values, baseline="base")
+    assert out["selected"] == "y" and out["qualifying"] == ["x", "y"]
+    strict = impact.select_ambient(values, baseline="base", ratio=0.55)
+    assert strict["selected"] == "y" and strict["qualifying"] == ["y"]
+    nothing = impact.select_ambient(values, baseline="base", ratio=0.4)
+    assert nothing["selected"] == "base"
+    relaxed = impact.select_ambient({"A1": 1.0, "A2": 1.02}, ratio=1.05)
+    assert relaxed["selected"] == "A2"
+    from_series = impact.select_ambient(pd.Series({"A1": 0.4, "A2": 0.3, "A3": 0.35}))
+    assert from_series["selected"] == "A2"
+    from_numpy = impact.select_ambient({"A1": np.float64(0.4), "A2": np.float32(0.3), "A3": 5})
+    assert from_numpy["selected"] == "A2"
+    assert list(inspect.signature(impact.select_ambient).parameters)[:3] == [
+        "rmse",
+        "baseline",
+        "ratio",
+    ]
+
+
+def test_select_ambient_rejects_invalid_inputs():
+    good = {"A1": 0.4, "A2": 0.3}
+    for not_a_mapping in (None, [("A1", 0.4)], 0.4, "A1", np.array([0.4, 0.3])):
+        with pytest.raises(ValueError, match="rmse"):
+            impact.select_ambient(not_a_mapping)
+    with pytest.raises(ValueError, match="rmse"):
+        impact.select_ambient({})
+    for bad in (np.nan, np.inf, 0.0, -0.3, True, "0.3", None):
+        with pytest.raises(ValueError, match="A2"):
+            impact.select_ambient({"A1": 0.4, "A2": bad})
+        with pytest.raises(ValueError, match="A1"):
+            impact.select_ambient({"A1": bad, "A2": 0.3})
+    with pytest.raises(ValueError, match="strings"):
+        impact.select_ambient({1: 0.4, "A1": 0.3})
+    for bad_baseline in (None, 1, "a1", ["A1"]):
+        with pytest.raises(ValueError, match="baseline"):
+            impact.select_ambient(good, baseline=bad_baseline)
+    for bad_ratio in (0.0, -0.5, 1.6, np.nan, np.inf, True, "0.95", None):
+        with pytest.raises(ValueError, match="ratio"):
+            impact.select_ambient(good, ratio=bad_ratio)
+    for bad_close in (-0.1, np.nan, np.inf, True, "0.05", None):
+        with pytest.raises(ValueError, match="close_within"):
+            impact.select_ambient(good, close_within=bad_close)
+
+
+# ----------------------------------------------------------------------------
+# Source text
+# ----------------------------------------------------------------------------
+@pytest.mark.parametrize("module", [impact, meta])
+def test_the_modules_have_no_em_dash_and_no_placeholder_text(module):
+    text = Path(module.__file__).read_text(encoding="utf-8")
+    assert EM_DASH not in text
+    assert "TO" + "DO" not in text and "\r" not in text

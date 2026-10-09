@@ -7,10 +7,12 @@ first-order optimality conditions of the objective stated in its documentation a
 """
 import inspect
 import itertools
+import math
 import subprocess
 import sys
 import time
 import warnings
+from fractions import Fraction
 from pathlib import Path
 
 import numpy as np
@@ -104,6 +106,45 @@ def economy_problem(seed, n_groups=12, per=2, d=4):
     Z = pd.DataFrame(np.repeat(base, per, axis=0), columns=[f"f{k}" for k in range(d)], index=index)
     groups = np.repeat([f"E{g:02d}" for g in range(n_groups)], per)
     return Z, np.repeat(effect, per), np.full(n_groups * per, 0.1), groups
+
+
+def dummy_problem(seed=3, n=18, d=6):
+    """Cases whose last feature is a 0/1 indicator equal to one for a third of them, effects, standard errors and
+    weights that sit entirely on the indicator (SIMULATED)."""
+    rng = np.random.default_rng(seed)
+    Z = rng.normal(size=(n, d))
+    indicator = np.zeros(n)
+    indicator[: n // 3] = 1.0
+    rng.shuffle(indicator)
+    Z[:, -1] = indicator
+    w = np.zeros(d)
+    w[-1] = 1.0
+    return pd.DataFrame(Z, columns=[f"f{k}" for k in range(d)]), rng.normal(size=n), np.full(n, 0.2), w
+
+
+def jitter(rng, x, scale=1e-13):
+    """``x`` times ``1 + u * scale`` with ``u`` uniform on [-1, 1]: relative noise far below any meaningful difference."""
+    arr = np.asarray(x, dtype=float)
+    return arr * (1.0 + scale * rng.uniform(-1.0, 1.0, size=arr.shape))
+
+
+def make_plan(pi):
+    """A :class:`Plan` with the given matrix, for tests that need a prescribed usage of the sources."""
+    return tr.Plan(pi=np.asarray(pi, dtype=float), converged=True, n_iter=1, marginal_error=0.0, eps=1.0, rho_source=None, rho_target=None)
+
+
+def raw_draws_reference(errors, codes, estimate, n_draws, seed):
+    """The documented resampling written out: groups with replacement, then one case among the resampled groups."""
+    rng = np.random.default_rng(seed)
+    n_groups = int(codes.max()) + 1
+    members = [np.flatnonzero(codes == g) for g in range(n_groups)]
+    sampled = rng.integers(0, n_groups, size=(n_draws, n_groups))
+    position = rng.random(n_draws)
+    out = np.empty(n_draws)
+    for k in range(n_draws):
+        pool = np.concatenate([members[g] for g in sampled[k]])
+        out[k] = estimate - errors[pool[int(position[k] * pool.size)]]
+    return out
 
 
 def learned_weights(Z, tau, k=2):
@@ -1040,6 +1081,92 @@ def test_select_eps_is_a_tenth_of_the_quantile_of_pairwise_weighted_distances():
             tr.select_eps(*args, **kwargs)
 
 
+def test_select_eps_uses_the_positive_distances_when_the_requested_quantile_of_all_distances_is_zero():
+    values = np.repeat([0.0, 1.0, 2.0], [9, 2, 1])
+    Z = np.column_stack([np.linspace(-1.0, 1.0, 12), np.linspace(1.0, 2.0, 12), np.ones(12), values])
+    w = np.array([0.0, 0.0, 0.0, 1.0])
+    distances = pdist(values[:, None] * 2.0, "sqeuclidean")
+    assert np.count_nonzero(distances == 0) == 37 and np.count_nonzero(distances == 0) > distances.size / 2
+    positive = distances[distances > 0]
+    assert tr.select_eps(Z, w) == pytest.approx(0.1 * np.median(positive), rel=1e-12)
+    assert tr.select_eps(Z, w, quantile=0.0) == pytest.approx(0.1 * positive.min(), rel=1e-12)
+    assert tr.select_eps(Z, w, quantile=0.25) == pytest.approx(0.1 * np.quantile(positive, 0.25), rel=1e-12)
+    assert tr.select_eps(Z, w) > 0
+    for q in (0.9, 1.0):
+        assert tr.select_eps(Z, w, quantile=q) == pytest.approx(0.1 * np.quantile(distances, q), rel=1e-12)
+    assert tr.select_eps(Z, 3.0 * w) == pytest.approx(tr.select_eps(Z, w), rel=1e-12)
+    jittered = Z.copy()
+    jittered[:, 3] = values + 1e-14 * np.random.default_rng(0).uniform(size=12)
+    assert tr.select_eps(jittered, w) == pytest.approx(tr.select_eps(Z, w), rel=1e-9)
+
+
+def test_select_eps_fallback_uses_the_requested_quantile_of_the_positive_distances():
+    rng = np.random.default_rng(31)
+    values = np.r_[np.zeros(200), rng.uniform(1.0, 5.0, 8)]
+    Z = np.column_stack([rng.normal(size=values.size), values])
+    w = np.array([0.0, 1.0])
+    distances = pdist(values[:, None] * np.sqrt(2.0), "sqeuclidean")
+    positive = distances[distances > 0]
+    assert np.quantile(distances, 0.9) == 0.0 and np.quantile(distances, 0.95) > 0.0
+    quantiles = (0.0, 0.25, 0.5, 0.9)
+    got = [tr.select_eps(Z, w, quantile=q) for q in quantiles]
+    for q, value in zip(quantiles, got):
+        assert value == pytest.approx(0.1 * np.quantile(positive, q), rel=1e-12), q
+        assert tr._select_eps(Z, np.array([0.0, 2.0]), q)[1] is True
+    assert np.all(np.diff(got) > 0)
+    assert tr.select_eps(Z, w) != tr.select_eps(Z, w, quantile=0.25)
+    unchanged = tr.select_eps(Z, w, quantile=0.95)
+    assert unchanged == pytest.approx(0.1 * np.quantile(distances, 0.95), rel=1e-12)
+    assert tr._select_eps(Z, np.array([0.0, 2.0]), 0.95)[1] is False
+
+
+def test_select_eps_is_the_same_whatever_the_units_of_the_features():
+    rng = np.random.default_rng(32)
+    Z = rng.normal(size=(12, 3))
+    w = np.array([1.0, 0.5, 0.2])
+    base = tr.select_eps(Z, w)
+    for scale in (1e-10, 1e-6, 1e4, 1e8):
+        assert tr.select_eps(Z * scale, w) == pytest.approx(scale**2 * base, rel=1e-9), scale
+    dummy = np.column_stack([rng.normal(size=12), np.repeat([0.0, 1.0], [8, 4])])
+    fallback = tr.select_eps(dummy, [0.0, 1.0])
+    for scale in (1e-10, 1e6):
+        assert tr.select_eps(dummy * scale, [0.0, 1.0]) == pytest.approx(scale**2 * fallback, rel=1e-9)
+        assert tr._select_eps(dummy * scale, np.array([0.0, 2.0]), 0.5)[1] is True
+    tiny = np.ones((6, 2)) * 1e-10 * (1.0 + 1e-14 * rng.uniform(-1, 1, size=(6, 2)))
+    assert tr.select_eps(tiny, [1.0, 1.0]) == 1.0
+    apart = np.column_stack([np.arange(6.0) * 1e-10, np.ones(6)])
+    assert tr.select_eps(apart, [1.0, 0.0]) == pytest.approx(0.1 * np.median(pdist(apart[:, :1] * np.sqrt(2.0), "sqeuclidean")))
+
+
+def test_weights_that_are_nearly_concentrated_give_a_small_eps_without_a_fallback():
+    Z, _, _, one_hot = dummy_problem()
+    near = np.where(one_hot > 0, 0.999, 0.001 / (one_hot.size - 1))
+    exact = tr.select_eps(Z.to_numpy(), one_hot)
+    small = tr.select_eps(Z.to_numpy(), near)
+    assert 0.0 < small < 0.05 * exact
+    assert tr._select_eps(Z.to_numpy(), near * one_hot.size / near.sum(), 0.5)[1] is False
+    assert tr._select_eps(Z.to_numpy(), one_hot * one_hot.size, 0.5)[1] is True
+    assert "may not reach the tolerance" in flat(tr.select_eps.__doc__) and "n_nonconverged" in flat(tr.select_eps.__doc__)
+
+
+def test_select_eps_is_one_when_no_pairwise_distance_is_positive_and_unchanged_otherwise():
+    assert tr.select_eps(np.zeros((5, 2)), [1.0, 1.0]) == 1.0
+    assert tr.select_eps(np.ones((2, 3)), [1.0, 0.0, 2.0], quantile=0.9) == 1.0
+    rng = np.random.default_rng(3)
+    Z = rng.normal(size=(8, 3))
+    Z[:, 1] = 7.0
+    assert tr.select_eps(Z, [0.0, 1.0, 0.0]) == 1.0
+    assert tr.select_eps(Z, [1.0, 5.0, 0.0]) > 0.0
+    noisy = np.ones((6, 2)) * (1.0 + 1e-14 * rng.uniform(-1, 1, size=(6, 2)))
+    assert tr.select_eps(noisy, [1.0, 1.0]) == 1.0
+    Z = rng.normal(size=(15, 4))
+    w = np.array([3.0, 1.0, 0.5, 2.0])
+    pairs = pdist(Z * np.sqrt(w * 4 / w.sum()), "sqeuclidean")
+    for q in (0.0, 0.3, 0.5, 0.9, 1.0):
+        assert tr.select_eps(Z, w, quantile=q) == pytest.approx(0.1 * np.quantile(pairs, q), rel=1e-12)
+        assert tr._select_eps(Z, w * 4 / w.sum(), q)[1] is False
+
+
 # ----------------------------------------------------------------------------
 # overlap_permutation_test
 # ----------------------------------------------------------------------------
@@ -1123,6 +1250,354 @@ def test_overlap_permutation_test_is_reproducible_and_validates_inputs():
             tr.overlap_permutation_test(**args)
     small = tr.overlap_permutation_test(Zs, Zt, [1.0, 1.0], n_perm=20, seed=0, pool=rng.normal(size=(2, 2)))
     assert np.isfinite(small["p_value"])
+
+
+# ----------------------------------------------------------------------------
+# target_support
+# ----------------------------------------------------------------------------
+SUPPORT_KEYS = {
+    "ess", "max_source_share", "n_sources", "features", "weighted_outside_share", "ess_ok", "range_ok", "supported", "reasons",
+}
+
+
+def support_problem(seed=11, n=20):
+    """Raw features of ``n`` cases (SIMULATED) named cost, size and noise, with weights 0.70, 0.25 and 0.05."""
+    rng = np.random.default_rng(seed)
+    Xs = pd.DataFrame(
+        {"cost": rng.uniform(1.0, 3.0, n), "size": rng.uniform(10.0, 20.0, n), "noise": rng.uniform(0.0, 1.0, n)},
+        index=[f"c{i}" for i in range(n)],
+    )
+    return Xs, pd.Series({"cost": 0.70, "size": 0.25, "noise": 0.05})
+
+
+def target_row(Xs, **changes):
+    """A one-row target at the medians of the cases, with some features replaced."""
+    row = Xs.median().to_frame().T
+    for name, value in changes.items():
+        row[name] = value
+    return row
+
+
+def test_target_support_accepts_a_target_inside_the_range_with_the_mass_on_many_sources():
+    Xs, w = support_problem()
+    n = len(Xs)
+    Xt = target_row(Xs)
+    out = tr.target_support(Xs, Xt, w, make_plan(np.full((n, 1), 1.0 / n)))
+    assert set(out) == SUPPORT_KEYS
+    assert out["ess"] == pytest.approx(n) and out["n_sources"] == n and out["max_source_share"] == pytest.approx(1.0 / n)
+    assert out["ess_ok"] is True and out["range_ok"] is True and out["supported"] is True and out["reasons"] == []
+    features = out["features"]
+    assert list(features.index) == ["cost", "size", "noise"]
+    assert list(features.columns) == ["weight", "target", "source_min", "source_max", "outside", "excess", "z_target", "clipped"]
+    np.testing.assert_allclose(features["weight"], [0.70, 0.25, 0.05], rtol=1e-12)
+    np.testing.assert_allclose(features["source_min"], Xs.min())
+    np.testing.assert_allclose(features["source_max"], Xs.max())
+    np.testing.assert_allclose(features["target"], Xs.median())
+    assert features["outside"].dtype == bool and features["clipped"].dtype == bool
+    assert not features["outside"].any() and (features["excess"] == 0.0).all() and not features["clipped"].any()
+    assert out["weighted_outside_share"] == 0.0
+    _, Zt, _ = tr.robust_standardise(Xs, Xt, clip=None)
+    np.testing.assert_allclose(features["z_target"], Zt.iloc[0], rtol=1e-12)
+    assert out["ess"] == tr.effective_sample_size(np.full(n, 1.0 / n))
+
+
+def test_target_support_flags_a_target_far_out_on_the_heaviest_feature():
+    Xs, w = support_problem()
+    n = len(Xs)
+    span = Xs["cost"].max() - Xs["cost"].min()
+    Xt = target_row(Xs, cost=Xs["cost"].max() + 3.1 * span)
+    out = tr.target_support(Xs, Xt, w, make_plan(np.full((n, 1), 1.0 / n)))
+    features = out["features"]
+    assert out["ess_ok"] and not out["range_ok"] and not out["supported"]
+    assert features["outside"].tolist() == [True, False, False] and features.loc["cost", "excess"] == pytest.approx(3.0, rel=1e-9)
+    assert (features.loc[["size", "noise"], "excess"] == 0.0).all()
+    assert out["weighted_outside_share"] == pytest.approx(0.70)
+    centre = Xs["cost"].median()
+    z = (Xt["cost"].iloc[0] - centre) / (1.4826 * (Xs["cost"] - centre).abs().median())
+    assert features.loc["cost", "z_target"] == pytest.approx(z, rel=1e-12) and abs(z) > 5 and features.loc["cost", "clipped"]
+    assert tr.robust_standardise(Xs, Xt)[1]["cost"].iloc[0] == 5.0
+    assert len(out["reasons"]) == 1 and "cost" in out["reasons"][0] and "0.70" in out["reasons"][0]
+    assert chr(0x2014) not in out["reasons"][0]
+    far = target_row(Xs, cost=Xs["cost"].max() + 300.0 * span)
+    farther = tr.target_support(Xs, far, w, make_plan(np.full((n, 1), 1.0 / n)))
+    assert farther["features"].loc["cost", "excess"] == pytest.approx(299.9, rel=1e-9)
+    assert farther["features"].loc["cost", "z_target"] > 100.0
+
+
+def test_target_support_does_not_fail_a_target_that_is_far_out_only_on_a_feature_with_a_small_weight():
+    Xs, w = support_problem()
+    n = len(Xs)
+    plan = make_plan(np.full((n, 1), 1.0 / n))
+    Xt = target_row(Xs, noise=Xs["noise"].max() + 50.0)
+    out = tr.target_support(Xs, Xt, w, plan)
+    assert out["supported"] and out["range_ok"] and out["reasons"] == []
+    assert out["features"]["outside"].tolist() == [False, False, True]
+    assert out["weighted_outside_share"] == pytest.approx(0.05)
+    for min_weight in (0.04, 0.05):
+        strict = tr.target_support(Xs, Xt, w, plan, min_weight=min_weight)
+        assert not strict["supported"] and "noise" in strict["reasons"][0]
+    assert tr.target_support(Xs, Xt, w, plan, min_weight=0.0501)["supported"]
+
+
+def test_target_support_flags_a_plan_whose_mass_sits_on_one_source():
+    Xs, w = support_problem()
+    n = len(Xs)
+    Xt = target_row(Xs)
+    pi = np.full((n, 1), 0.01 / (n - 1))
+    pi[3, 0] = 0.99
+    out = tr.target_support(Xs, Xt, w, make_plan(pi))
+    assert out["ess"] == pytest.approx(tr.effective_sample_size(pi[:, 0])) and out["ess"] < 1.05
+    assert out["max_source_share"] == pytest.approx(0.99) and out["n_sources"] == n
+    assert not out["ess_ok"] and out["range_ok"] and not out["supported"]
+    assert len(out["reasons"]) == 1 and "effective number of sources" in out["reasons"][0] and "99 percent" in out["reasons"][0]
+    alone = np.zeros((n, 1))
+    alone[3, 0] = 1.0
+    single = tr.target_support(Xs, Xs.iloc[[3]], w, make_plan(alone))
+    assert single["n_sources"] == 1 and single["ess"] == 1.0 and single["max_source_share"] == 1.0
+    assert single["range_ok"] and not single["ess_ok"] and not single["supported"]
+    assert (single["features"]["source_min"] == single["features"]["source_max"]).all()
+    elsewhere = tr.target_support(Xs, Xt, w, make_plan(alone))
+    assert not elsewhere["range_ok"] and elsewhere["features"]["outside"].tolist() == [True, True, True]
+    assert any("effective number" in text for text in elsewhere["reasons"])
+    assert sum("range of the sources" in text for text in elsewhere["reasons"]) == 2
+    assert len(elsewhere["reasons"]) == 3
+    two = np.zeros((n, 1))
+    two[[1, 2], 0] = 0.5
+    assert tr.target_support(Xs, Xt, w, make_plan(two), range_tolerance=100.0)["ess_ok"]
+    assert not tr.target_support(Xs, Xt, w, make_plan(two), range_tolerance=100.0, min_ess=2.5)["ess_ok"]
+    for gap, accepted in ((1e-5, True), (1e-3, False)):
+        nearly = np.zeros((n, 1))
+        nearly[1, 0], nearly[2, 0] = 1.0, 1.0 - gap
+        assert tr.target_support(Xs, Xt, w, make_plan(nearly), range_tolerance=100.0)["ess_ok"] is accepted
+
+
+def test_target_support_uses_the_median_of_a_target_cloud_and_the_sources_with_positive_usage():
+    Xs, w = support_problem()
+    n = len(Xs)
+    rng = np.random.default_rng(12)
+    Xt = pd.DataFrame(
+        {"cost": rng.uniform(1.5, 2.5, 5), "size": rng.uniform(12.0, 18.0, 5), "noise": rng.uniform(0.2, 0.8, 5)}, index=list("vwxyz")
+    )
+    plan = tr.sinkhorn_plan(None, None, rng.uniform(size=(n, 5)), 0.5, rho_source=1.0)
+    out = tr.target_support(Xs, Xt, w, plan)
+    np.testing.assert_allclose(out["features"]["target"], Xt.median())
+    np.testing.assert_allclose(out["features"]["z_target"], tr.robust_standardise(Xs, Xt, clip=None)[1].median(), rtol=1e-12)
+    assert out["supported"]
+    usage = plan.pi.sum(axis=1)
+    assert out["ess"] == pytest.approx(tr.effective_sample_size(usage)) and out["max_source_share"] == pytest.approx(usage.max() / usage.sum())
+    pi = np.full((n, 5), 1.0 / (5 * n))
+    order = Xs["cost"].argsort().to_numpy()
+    pi[order[0]] = 0.0
+    pi[order[-1]] = 0.0
+    trimmed = tr.target_support(Xs, Xt, w, make_plan(pi))
+    srt = Xs["cost"].sort_values()
+    assert trimmed["n_sources"] == n - 2
+    assert trimmed["features"].loc["cost", "source_min"] == srt.iloc[1] and trimmed["features"].loc["cost", "source_max"] == srt.iloc[-2]
+    tiny = pi.copy()
+    tiny[order[0]] = 1e-14 / n
+    noisy = tr.target_support(Xs, Xt, w, make_plan(tiny))
+    assert noisy["features"].loc["cost", "source_min"] == srt.iloc[1]
+    assert noisy["n_sources"] == n - 2 and noisy["ess"] == pytest.approx(trimmed["ess"], rel=1e-12)
+    visible = pi.copy()
+    visible[order[0]] = 1e-9 / n
+    assert tr.target_support(Xs, Xt, w, make_plan(visible))["n_sources"] == n - 1
+    empty = tr.target_support(Xs, Xt, w, make_plan(np.zeros((n, 5))))
+    assert empty["n_sources"] == 0 and empty["ess"] == 0.0 and np.isnan(empty["max_source_share"]) and not empty["supported"]
+    assert np.isnan(empty["features"]["source_min"]).all() and not empty["features"]["outside"].any()
+
+
+def test_target_support_treats_a_feature_without_range_among_the_sources_as_a_point():
+    Xs, w = support_problem()
+    n = len(Xs)
+    Xs = Xs.assign(const=3.0)
+    w = pd.Series({"cost": 0.5, "size": 0.25, "noise": 0.05, "const": 0.2})
+    plan = make_plan(np.full((n, 1), 1.0 / n))
+    inside = tr.target_support(Xs, target_row(Xs), w, plan)
+    assert inside["supported"] and inside["features"].loc["const", "excess"] == 0.0
+    assert tr.target_support(Xs, target_row(Xs, const=3.0 + 1e-12), w, plan)["supported"]
+    assert tr.target_support(Xs, target_row(Xs, const=3.0 - 1e-12), w, plan)["supported"]
+    away = tr.target_support(Xs, target_row(Xs, const=3.5), w, plan)
+    assert not away["supported"] and away["features"]["outside"].tolist() == [False, False, False, True]
+    assert away["features"].loc["const", "excess"] == pytest.approx(0.5) and "single value" in away["reasons"][0]
+    assert away["features"].loc["const", "source_min"] == away["features"].loc["const", "source_max"] == 3.0
+    light = tr.target_support(Xs, target_row(Xs, const=3.5), w.mul([1.0, 1.0, 1.0, 0.1]), plan)
+    assert light["supported"] and light["features"].loc["const", "outside"]
+    near = Xs.assign(const=3.0 + 1e-13 * np.arange(n))
+    assert tr.target_support(near, target_row(near, const=3.0), w, plan)["supported"]
+    assert not tr.target_support(near, target_row(near, const=3.5), w, plan)["supported"]
+    big = Xs.assign(const=1e6)
+    assert tr.target_support(big, target_row(big, const=1e6 * (1.0 + 1e-12)), w, plan)["supported"]
+    assert not tr.target_support(big, target_row(big, const=1e6 * (1.0 + 1e-6)), w, plan)["supported"]
+
+
+def test_target_support_band_edge_is_inside_and_does_not_depend_on_rounding():
+    Xs, w = support_problem()
+    n = len(Xs)
+    plan = make_plan(np.full((n, 1), 1.0 / n))
+    hi, lo = Xs["size"].max(), Xs["size"].min()
+    span = hi - lo
+    for tolerance in (0.05, 0.1, 0.25):
+        edge = hi + tolerance * span
+        for factor in (1.0, 1.0 + 1e-13, 1.0 - 1e-13):
+            out = tr.target_support(Xs, target_row(Xs, size=edge * factor), w, plan, range_tolerance=tolerance)
+            assert not out["features"].loc["size", "outside"], (tolerance, factor)
+        beyond = tr.target_support(Xs, target_row(Xs, size=edge + 1e-6 * span), w, plan, range_tolerance=tolerance)
+        assert beyond["features"].loc["size", "outside"] and beyond["features"].loc["size", "excess"] == pytest.approx(1e-6, rel=1e-3)
+        below = tr.target_support(Xs, target_row(Xs, size=lo - tolerance * span - 1e-6 * span), w, plan, range_tolerance=tolerance)
+        assert below["features"].loc["size", "outside"]
+
+
+def test_target_support_decides_the_weight_threshold_with_a_tolerance():
+    Xs, _ = support_problem()
+    n = len(Xs)
+    plan = make_plan(np.full((n, 1), 1.0 / n))
+    Xt = target_row(Xs, size=Xs["size"].max() + 50.0)
+
+    def verdict(size_weight, **kwargs):
+        w = pd.Series({"cost": 1.0 - size_weight, "size": size_weight, "noise": 0.0})
+        return tr.target_support(Xs, Xt, w, plan, min_weight=0.10, **kwargs)
+
+    for factor in (1.0, 1.0 - 1e-13, 1.0 + 1e-13):
+        out = verdict(0.10 * factor)
+        assert out["features"]["weight"]["size"] == pytest.approx(0.10, rel=1e-12)
+        assert not out["range_ok"] and not out["supported"] and "size" in out["reasons"][0], factor
+    assert verdict(0.10 * (1.0 - 1e-6))["supported"]
+    assert not verdict(0.10 * (1.0 + 1e-6))["supported"]
+
+
+def test_target_support_measures_the_excess_of_a_feature_without_range_in_robust_scale_units():
+    Xs, _ = support_problem()
+    n = len(Xs)
+    Xs = Xs.assign(const=np.r_[np.linspace(0.0, 10.0, n - 2), 4.0, 4.0 + 1e-13])
+    w = pd.Series({"cost": 0.0, "size": 0.0, "noise": 0.0, "const": 1.0})
+    pi = np.zeros((n, 1))
+    pi[[n - 2, n - 1], 0] = 0.5
+    plan = make_plan(pi)
+    Xt = target_row(Xs, const=10.0)
+    scale = float(tr.robust_standardise(Xs, Xt, clip=None)[2]["const"])
+    assert abs(scale - 1.0) > 0.5
+    out = tr.target_support(Xs, Xt, w, plan)
+    row = out["features"].loc["const"]
+    assert out["n_sources"] == 2 and out["ess_ok"] and not out["range_ok"]
+    assert row["outside"] and row["source_min"] == 4.0 and row["source_max"] == 4.0 + 1e-13
+    assert row["excess"] == pytest.approx(6.0 / scale, rel=1e-9)
+    assert "single value" in out["reasons"][0] and "const" in out["reasons"][0]
+    reference = pd.concat([Xs, Xs.assign(const=Xs["const"] * 3.0)], ignore_index=True)
+    wide_scale = float(tr.robust_standardise(Xs, Xt, reference=reference, clip=None)[2]["const"])
+    assert wide_scale != pytest.approx(scale, rel=0.05)
+    assert tr.target_support(Xs, Xt, w, plan, reference=reference)["features"].loc["const", "excess"] == pytest.approx(6.0 / wide_scale, rel=1e-9)
+    inside = tr.target_support(Xs, target_row(Xs, const=4.0 + 2e-9), w, plan)
+    assert inside["supported"] and inside["features"].loc["const", "excess"] == 0.0
+
+
+def test_target_support_accepts_an_array_for_either_table_and_matches_the_columns_by_position():
+    Xs, w = support_problem()
+    n = len(Xs)
+    plan = make_plan(np.full((n, 1), 1.0 / n))
+    span = Xs["cost"].max() - Xs["cost"].min()
+    Xt = target_row(Xs, cost=Xs["cost"].max() + 3.1 * span)
+    expected = tr.target_support(Xs, Xt, w, plan)
+    for xs, xt, names in (
+        (Xs, Xt.to_numpy(), list(Xs.columns)),
+        (Xs, Xt.iloc[0].to_numpy(), list(Xs.columns)),
+        (Xs.to_numpy(), Xt, [0, 1, 2]),
+        (Xs.to_numpy(), Xt.to_numpy(), [0, 1, 2]),
+    ):
+        out = tr.target_support(xs, xt, w.to_numpy(), plan)
+        assert list(out["features"].index) == names
+        pd.testing.assert_frame_equal(out["features"].reset_index(drop=True), expected["features"].reset_index(drop=True), rtol=1e-12)
+        assert len(out["reasons"]) == len(expected["reasons"]) == 1
+        assert (out["reasons"] == expected["reasons"]) == (names == list(Xs.columns))
+        assert out["supported"] is expected["supported"] and out["ess"] == expected["ess"]
+    with pytest.raises(ValueError, match="Xs has 3 features but Xt has 2"):
+        tr.target_support(Xs, Xt.to_numpy()[:, :2], w, plan)
+    with pytest.raises(ValueError, match="Xs has 3 features but Xt has 2"):
+        tr.target_support(Xs.to_numpy(), Xt[["cost", "size"]], w.to_numpy(), plan)
+    with pytest.raises(KeyError, match="Xt lacks the columns"):
+        tr.target_support(Xs, Xt[["cost", "size"]], w, plan)
+
+
+def test_target_support_standardises_with_the_reference_and_matches_weights_by_name():
+    Xs, w = support_problem()
+    n = len(Xs)
+    plan = make_plan(np.full((n, 1), 1.0 / n))
+    Xt = target_row(Xs, cost=Xs["cost"].max() + 1.0)
+    reference = pd.concat([Xs * 3.0, Xs * 0.5], ignore_index=True)
+    default = tr.target_support(Xs, Xt, w, plan)
+    ref = tr.target_support(Xs, Xt, w, plan, reference=reference)
+    expected = tr.robust_standardise(Xs, Xt, reference=reference, clip=None)[1].iloc[0]
+    np.testing.assert_allclose(ref["features"]["z_target"], expected, rtol=1e-12)
+    assert not np.allclose(ref["features"]["z_target"], default["features"]["z_target"])
+    pd.testing.assert_frame_equal(ref["features"].drop(columns=["z_target", "clipped"]), default["features"].drop(columns=["z_target", "clipped"]))
+    by_name = tr.target_support(Xs, Xt, w.iloc[::-1], plan)
+    by_position = tr.target_support(Xs, Xt, w.to_numpy(), plan)
+    pd.testing.assert_frame_equal(by_name["features"], by_position["features"])
+    assert tr.target_support(Xs, Xt, w, plan, clip=None)["features"]["clipped"].sum() == 0
+    assert tr.target_support(Xs, Xt, w, plan, clip=0.1)["features"]["clipped"].any()
+    assert tr.target_support(Xs, Xt, 5.0 * w, plan)["features"]["weight"].sum() == pytest.approx(1.0)
+    arrays = tr.target_support(Xs.to_numpy(), Xt.to_numpy(), w.to_numpy(), plan)
+    assert list(arrays["features"].index) == [0, 1, 2] and arrays["features"]["outside"].tolist() == [True, False, False]
+    nan_zero = Xt.copy()
+    nan_zero["noise"] = np.nan
+    flagged = tr.target_support(Xs, nan_zero, w.mul([1.0, 1.0, 0.0]), plan)
+    assert np.isnan(flagged["features"].loc["noise", "excess"]) and not flagged["features"].loc["noise", "outside"]
+
+
+def test_target_support_checks_its_arguments_and_names_them():
+    Xs, w = support_problem()
+    n = len(Xs)
+    plan = make_plan(np.full((n, 1), 1.0 / n))
+    Xt = target_row(Xs)
+    bad_target = Xt.copy()
+    bad_target["cost"] = np.nan
+    bad_source = Xs.copy()
+    bad_source.iloc[2, 0] = np.nan
+    cases = [
+        (ValueError, {"plan": make_plan(np.full((5, 1), 0.2))}, "plan has 5 sources but Xs has 20 rows"),
+        (ValueError, {"Xt": bad_target}, "Xt must be finite in the features with positive weight"),
+        (ValueError, {"Xs": bad_source}, "Xs must be finite in the features with positive weight"),
+        (ValueError, {"Xt": Xt.iloc[:0]}, "Xs and Xt need at least one row"),
+        (ValueError, {"w": w.to_numpy()[:2]}, "w has 2 entries but there are 3 features"),
+        (ValueError, {"w": np.zeros(3)}, "w sums to zero"),
+        (ValueError, {"w": [1.0, -1.0, 1.0]}, "w must be finite and non-negative"),
+        (ValueError, {"min_ess": -1.0}, "min_ess must be finite, at least 0"),
+        (ValueError, {"min_ess": np.nan}, "min_ess must be finite, at least 0"),
+        (ValueError, {"min_weight": 1.5}, "min_weight must be finite, at least 0 and at most 1"),
+        (ValueError, {"range_tolerance": -0.1}, "range_tolerance must be finite, at least 0"),
+        (ValueError, {"range_tolerance": "wide"}, "range_tolerance must be a number"),
+        (ValueError, {"clip": 0.0}, "clip must be positive and finite, or None"),
+        (ValueError, {"clip": np.inf}, "clip must be positive and finite, or None"),
+        (TypeError, {"plan": np.ones((n, 1))}, "plan must be a Plan"),
+        (KeyError, {"Xt": Xt[["cost", "size"]]}, "Xt lacks the columns"),
+    ]
+    for error, override, message in cases:
+        args = {"Xs": Xs, "Xt": Xt, "w": w, "plan": plan}
+        args.update(override)
+        with pytest.raises(error, match=message):
+            tr.target_support(**args)
+    sig = inspect.signature(tr.target_support).parameters
+    assert [p for p in sig] == ["Xs", "Xt", "w", "plan", "reference", "min_ess", "min_weight", "range_tolerance", "clip"]
+    assert (sig["reference"].default, sig["min_ess"].default, sig["min_weight"].default) == (None, 2.0, 0.10)
+    assert (sig["range_tolerance"].default, sig["clip"].default) == (0.10, 5.0)
+    assert "target_support" in tr.__all__
+
+
+def test_target_support_sees_what_the_clipping_of_the_cost_hides():
+    Xs, w = support_problem()
+    span = Xs["cost"].max() - Xs["cost"].min()
+    verdicts, plans = {}, {}
+    for distance in (0.0, 2.0, 30.0, 300.0):
+        Xt = target_row(Xs, cost=Xs["cost"].max() + distance * span)
+        Zs, Zt, _ = tr.robust_standardise(Xs, Xt)
+        plans[distance] = tr.sinkhorn_plan(None, None, tr.weighted_sq_cost(Zs, Zt, w.to_numpy()), 1.0, rho_source=1.0)
+        out = tr.target_support(Xs, Xt, w, plans[distance])
+        verdicts[distance] = (out["supported"], bool(out["features"].loc["cost", "clipped"]), float(out["features"].loc["cost", "excess"]))
+        assert out["ess"] >= 1.0
+    assert verdicts[0.0] == (True, False, 0.0)
+    assert not verdicts[2.0][0] and not verdicts[30.0][0] and not verdicts[300.0][0]
+    assert verdicts[30.0][1] and verdicts[300.0][1]
+    assert 0.0 < verdicts[2.0][2] < verdicts[30.0][2] < verdicts[300.0][2]
+    np.testing.assert_allclose(plans[30.0].pi, plans[300.0].pi, atol=1e-12)
 
 
 # ----------------------------------------------------------------------------
@@ -1324,15 +1799,141 @@ def test_loco_prediction_for_a_case_does_not_use_its_own_effect():
             assert np.all(np.abs(other.iloc[others]["equal"].to_numpy() - base.iloc[others]["equal"].to_numpy()) > 1e-3)
 
 
-def test_loco_default_eps_needs_distinct_cases():
+def test_loco_default_eps_of_identical_cases_is_one_and_is_counted():
     Z = np.zeros((5, 2))
     tau = np.arange(5.0)
-    with pytest.raises(ValueError, match="eps"):
-        tr.loco_validation(Z, tau, None, [1.0, 1.0], methods=("ot_weighted",), n_boot=5)
+    res = tr.loco_validation(Z, tau, None, [1.0, 1.0], methods=("ot_weighted", "ot_uniform", "equal"), n_boot=5)
+    assert res.eps == {"ot_weighted": 1.0, "ot_uniform": 1.0} and res.n_eps_fallback == 10 and res.n_nonconverged == 0
+    for method in ("ot_weighted", "ot_uniform"):
+        np.testing.assert_allclose(res.predictions()[method], res.predictions()["equal"], atol=1e-9)
     res = tr.loco_validation(Z, tau, None, [1.0, 1.0], eps=0.5, methods=("ot_weighted", "equal"), n_boot=5)
     np.testing.assert_allclose(res.predictions()["ot_weighted"], res.predictions()["equal"], atol=1e-9)
+    assert res.n_eps_fallback == 0
     with pytest.raises(ValueError):
         tr.loco_validation(Z, tau, None, [1.0, 1.0], a=[1.0, 0.0, 0.0, 0.0, 0.0], methods=("equal",), n_boot=5)
+
+
+def test_loco_with_weights_on_a_dummy_feature_completes_in_every_fold_and_counts_the_fallback():
+    Z, tau, se, w = dummy_problem()
+    n, d = Z.shape
+    indicator = Z.to_numpy()[:, -1]
+    pairs = pdist(indicator[:, None])
+    assert np.count_nonzero(pairs == 0) > pairs.size / 2
+    res = tr.loco_validation(Z, tau, se, w, n_boot=20)
+    assert np.isfinite(res.table["prediction"]).all() and np.isfinite(res.table["error"]).all()
+    assert res.n_eps_fallback == n and res.n_nonconverged == 0
+    assert res.eps["ot_weighted"] == pytest.approx(0.1 * d, rel=1e-12)
+    predictions = res.predictions()
+    eps_uniform = []
+    for i in range(n):
+        src = np.delete(np.arange(n), i)
+        pooled = np.vstack([Z.to_numpy()[src], Z.to_numpy()[[i]]])
+        eps_w, eps_u = tr.select_eps(pooled, w), tr.select_eps(pooled, np.ones(d))
+        eps_uniform.append(eps_u)
+        assert eps_w == pytest.approx(0.1 * d, rel=1e-12)
+        if i in (0, 7, 15):
+            with np.errstate(divide="ignore", invalid="ignore"):
+                expected = reference_predictions(Z.to_numpy(), tau, src, i, w, eps_w, eps_u)
+            for method, value in expected.items():
+                if method != "kernel":
+                    assert predictions.iloc[i][method] == pytest.approx(value, abs=1e-9), (i, method)
+            cost = tr.weighted_sq_cost(Z.to_numpy()[src], Z.to_numpy()[[i]], w)
+            pair = np.sqrt(tr.weighted_sq_cost(Z.to_numpy()[src], Z.to_numpy()[src], w)[np.triu_indices(n - 1, k=1)])
+            assert np.median(pair) == 0.0 and np.median(pair[pair > 0]) == pytest.approx(np.sqrt(d), rel=1e-12)
+            assert predictions.iloc[i]["kernel"] == pytest.approx(tr._loco_kernel(cost, tau[src], np.sqrt(d)).mean(), abs=1e-12)
+    assert res.eps["ot_uniform"] == pytest.approx(np.median(eps_uniform), rel=1e-12)
+    fixed = tr.loco_validation(Z, tau, se, w, eps=0.5, n_boot=5)
+    assert fixed.n_eps_fallback == 0
+    ordinary = tr.loco_validation(Z, tau, se, np.array([1.0, 0.5, 0.3, 0.2, 0.1, 0.1]), n_boot=5)
+    assert ordinary.n_eps_fallback == 0
+
+
+def test_loco_dummy_weights_work_with_learned_weights_groups_clouds_and_masses():
+    Z, tau, se, w = dummy_problem(seed=4)
+    n, d = Z.shape
+    groups = np.repeat(np.arange(n // 2), 2)
+    a = np.ones(n)
+    a[[3, 10]] = 0.0
+    rng = np.random.default_rng(8)
+    clouds = [Z.to_numpy()[i] + 0.1 * rng.normal(size=(3, d)) * (np.arange(d) < d - 1) for i in range(n)]
+    calls = []
+
+    def learn(train_idx):
+        calls.append(len(train_idx))
+        return w
+
+    res = tr.loco_validation(Z, tau, se, learn, groups=groups, a=a, clouds=clouds, methods=("ot_weighted", "ot_uniform", "nn1", "kernel"), n_boot=10)
+    assert np.isfinite(res.table["prediction"]).all() and res.n_nonconverged == 0
+    assert len(calls) == n // 2 and res.n_eps_fallback > 0
+    assert res.eps["ot_weighted"] > 0 and np.isfinite(res.eps["ot_uniform"])
+    only = tr.loco_validation(Z, tau, se, w, methods=("ot_weighted",), n_boot=5)
+    assert only.n_eps_fallback == n and set(only.eps) == {"ot_weighted"}
+    none = tr.loco_validation(Z, tau, se, w, methods=("equal", "nn3", "nn1", "kernel"), n_boot=5)
+    assert none.n_eps_fallback == 0 and np.isfinite(none.table["prediction"]).all()
+
+
+def test_kernel_bandwidth_ignores_distances_that_are_rounding_noise_next_to_the_coordinates():
+    assert tr._kernel_bandwidth(np.array([0.5, 1.0, 3.0]), 4.0) == 1.0
+    assert tr._kernel_bandwidth(np.array([0.0, 0.0, 0.0, 0.0, 4.0, 6.0]), 3.0) == 5.0
+    assert tr._kernel_bandwidth(np.array([0.0, 0.0, 2e-13, 0.0, 4.0, 6.0]), 3.0) == 5.0
+    assert tr._kernel_bandwidth(np.full(6, 1e-13), 3.0) == pytest.approx(np.sqrt(3.0), rel=1e-15)
+    assert tr._kernel_bandwidth(np.full(6, 1e-13), 1e-20) == pytest.approx(1e-13, rel=1e-15)
+    assert tr._kernel_bandwidth(np.zeros(6), 0.0) == 1.0
+    rng = np.random.default_rng(83)
+    Z = rng.normal(size=3) + 1e-13 * rng.uniform(-1.0, 1.0, size=(7, 3))
+    tau = rng.normal(size=7)
+    res = tr.loco_validation(Z, tau, None, [1.0, 0.5, 0.2], methods=("kernel", "equal"), n_boot=5)
+    assert np.ptp(tau) > 1.0
+    np.testing.assert_allclose(res.predictions()["kernel"], res.predictions()["equal"], rtol=1e-9)
+
+
+@pytest.mark.parametrize("scale", [1e-10, 1e-6, 1e4])
+def test_loco_validation_does_not_depend_on_the_units_of_the_features(scale):
+    rng = np.random.default_rng(81)
+    Z = rng.normal(size=(14, 4))
+    tau = rng.normal(size=14)
+    w = np.array([1.0, 0.5, 0.2, 0.1])
+    base = tr.loco_validation(Z, tau, None, w, rho_source=None, n_boot=5)
+    moved = tr.loco_validation(Z * scale, tau, None, w, rho_source=None, n_boot=5)
+    np.testing.assert_allclose(moved.predictions().to_numpy(), base.predictions().to_numpy(), rtol=1e-6, atol=1e-8)
+    assert moved.n_eps_fallback == base.n_eps_fallback == 0 and moved.n_nonconverged == base.n_nonconverged == 0
+    for method in ("ot_weighted", "ot_uniform"):
+        assert moved.eps[method] == pytest.approx(scale**2 * base.eps[method], rel=1e-9)
+    Zd, taud, sed, wd = dummy_problem()
+    base = tr.loco_validation(Zd, taud, sed, wd, rho_source=None, n_boot=5)
+    moved = tr.loco_validation(Zd * scale, taud, sed, wd, rho_source=None, n_boot=5)
+    np.testing.assert_allclose(moved.predictions().to_numpy(), base.predictions().to_numpy(), rtol=1e-6, atol=1e-8)
+    assert moved.n_eps_fallback == base.n_eps_fallback == Zd.shape[0] and moved.n_nonconverged == base.n_nonconverged == 0
+
+
+@pytest.mark.parametrize("scale", [1e-8, 1.0, 1e5])
+def test_loco_predictions_on_a_lattice_do_not_depend_on_the_units_or_on_rounding(scale):
+    rng = np.random.default_rng(15)
+    Z = pd.DataFrame(rng.integers(0, 3, size=(14, 3)).astype(float), columns=list("abc"))
+    Z["c"] = (Z["c"] > 0).astype(float)
+    tau, w = rng.normal(size=14), np.array([1.0, 0.5, 2.0])
+    base = tr.loco_validation(Z, tau, None, w, rho_source=None, n_boot=10)
+    for s in range(3):
+        r = np.random.default_rng(700 + s)
+        moved = tr.loco_validation(
+            pd.DataFrame(jitter(r, Z.to_numpy() * scale), columns=Z.columns), jitter(r, tau), None, jitter(r, w), rho_source=None, n_boot=10
+        )
+        np.testing.assert_allclose(moved.predictions().to_numpy(), base.predictions().to_numpy(), rtol=1e-6, atol=1e-8)
+        assert moved.n_eps_fallback == base.n_eps_fallback and list(moved.summary["rank"]) == list(base.summary["rank"])
+
+
+def test_bootstrap_transport_with_weights_on_a_dummy_feature_uses_the_fallback_eps():
+    Z, tau, se, w = dummy_problem(seed=5, n=15, d=4)
+    target = Z.iloc[[0, 1]].to_numpy() * 0.5
+    res = tr.bootstrap_transport(Z, target, w, tau, se, n_boot=30, seed=1)
+    assert res["eps"] == pytest.approx(0.1 * 4, rel=1e-12) and res["eps"] == pytest.approx(tr.select_eps(Z, w), rel=1e-12)
+    for key in ("draws", "predictive_draws"):
+        assert np.isfinite(res[key]).all()
+    assert np.isfinite(res["estimate"]) and res["n_nonconverged"] == 0
+    grouped = tr.bootstrap_transport(Z, target, w, tau, se, n_boot=30, seed=1, groups=np.arange(15) // 3)
+    assert np.isfinite(grouped["draws"]).all() and grouped["eps"] == res["eps"]
+    same = tr.bootstrap_transport(np.zeros((6, 4)), target, w, tau[:6], se[:6], n_boot=10, seed=1, a=None)
+    assert same["eps"] == 1.0 and np.isfinite(same["draws"]).all()
 
 
 # ----------------------------------------------------------------------------
@@ -1758,18 +2359,22 @@ def test_guard_exceptions_end_the_computation_and_guards_must_be_callable():
 def test_loco_predictive_draws_are_the_estimate_minus_resampled_prediction_errors():
     table, _ = logo_table()
     errors = table["error"].to_numpy()
-    out = tr.loco_predictive_draws(table, 1.25, n_draws=500, seed=3)
-    assert set(out) == {"draws", "percentiles", "estimate", "n_draws", "n_groups", "n_cases"}
+    out = tr.loco_predictive_draws(table, 1.25, n_draws=500, seed=3, level=None)
+    assert set(out) == {"draws", "percentiles", "estimate", "n_draws", "n_groups", "n_cases", "interval", "scale", "calibrated"}
+    assert out["interval"] is None and out["scale"] == 1.0 and out["calibrated"] is False
     draws = out["draws"]
     assert draws.shape == (500,) and out["n_draws"] == 500 and out["estimate"] == 1.25
     assert out["n_cases"] == 20 and out["n_groups"] == 10
     assert np.isin(np.round(draws, 12), np.round(1.25 - errors, 12)).all()
     assert list(out["percentiles"].index) == [5, 25, 50, 75, 95]
     np.testing.assert_allclose(out["percentiles"].to_numpy(), np.percentile(draws, [5, 25, 50, 75, 95]))
-    again = tr.loco_predictive_draws(table, 1.25, n_draws=500, seed=3)
+    again = tr.loco_predictive_draws(table, 1.25, n_draws=500, seed=3, level=None)
     np.testing.assert_array_equal(again["draws"], draws)
-    assert not np.array_equal(tr.loco_predictive_draws(table, 1.25, n_draws=500, seed=4)["draws"], draws)
+    assert not np.array_equal(tr.loco_predictive_draws(table, 1.25, n_draws=500, seed=4, level=None)["draws"], draws)
     assert tr.loco_predictive_draws(table, 1.25, n_draws=7)["draws"].shape == (7,)
+    calibrated = tr.loco_predictive_draws(table, 1.25, n_draws=500, seed=3)
+    assert calibrated["calibrated"] is True and calibrated["interval"]["status"] == "ok"
+    np.testing.assert_allclose(calibrated["draws"], 1.25 - calibrated["scale"] * (1.25 - draws), rtol=1e-12, atol=1e-12)
 
 
 def test_loco_predictive_draws_subtract_the_error_because_it_is_prediction_minus_observed():
@@ -1813,7 +2418,7 @@ def test_loco_predictive_draws_treat_every_row_as_a_group_without_labels_and_sum
 
 
 def test_loco_predictive_draws_cover_the_observed_effect_of_an_economy_that_was_not_in_the_sample():
-    covered = []
+    covered, covered_by_interval = [], []
     for rep in range(40):
         rng = np.random.default_rng(300 + rep)
         n, d = 30, 3
@@ -1825,7 +2430,9 @@ def test_loco_predictive_draws_cover_the_observed_effect_of_an_economy_that_was_
         plan = tr.sinkhorn_plan(np.full(n, 1.0 / n), [1.0], tr.weighted_sq_cost(Z[:n], Z[[n]], w), 0.3, rho_source=1.0)
         out = tr.loco_predictive_draws(res.table, tr.target_effect(plan, tau[:n], [1.0]), n_draws=1000, seed=rep)
         covered.append(out["percentiles"][5] <= tau[n] <= out["percentiles"][95])
+        covered_by_interval.append(out["interval"]["lower"] <= tau[n] <= out["interval"]["upper"])
     assert 0.75 <= np.mean(covered) <= 0.99
+    assert 0.8 <= np.mean(covered_by_interval) <= 1.0
 
 
 def test_loco_predictive_draws_check_their_arguments_and_name_them():
@@ -1845,6 +2452,11 @@ def test_loco_predictive_draws_check_their_arguments_and_name_them():
         ({"groups": groups[:-1]}, "groups has 19 entries, expected 20"),
         ({"groups": [None] * 20}, "groups must not contain missing values"),
         ({"groups": np.zeros((20, 2))}, "groups must be a one-dimensional sequence of labels"),
+        ({"level": 0.0}, "level must lie strictly between 0 and 1"),
+        ({"level": 1.0}, "level must lie strictly between 0 and 1"),
+        ({"level": 90.0}, "level must lie strictly between 0 and 1"),
+        ({"level": np.nan}, "level must lie strictly between 0 and 1"),
+        ({"level": "high"}, "level must be a number strictly between 0 and 1"),
     ]
     for override, message in cases:
         args = {"table": table, "estimate": 1.0}
@@ -1857,6 +2469,251 @@ def test_loco_predictive_draws_are_documented_as_the_cost_of_transport_to_a_new_
     assert "loco_predictive_draws" in tr.__all__
     doc = flat(tr.loco_predictive_draws.__doc__)
     assert "economy that was not in the sample" in doc and "cost of transporting an effect" in doc
+
+
+# ----------------------------------------------------------------------------
+# loco_interval and the calibrated predictive draws
+# ----------------------------------------------------------------------------
+def test_loco_interval_is_the_estimate_plus_and_minus_an_order_statistic_of_the_absolute_errors():
+    errors = np.arange(1.0, 20.0) * np.where(np.arange(19) % 2 == 0, 1.0, -1.0)
+    table = pd.DataFrame({"error": errors, "method": "ot_weighted"})
+    out = tr.loco_interval(table, 5.0)
+    assert set(out) == {"lower", "upper", "half_width", "n", "rank", "level", "guaranteed_level", "status"}
+    assert out["n"] == 19 and out["rank"] == 18 and out["level"] == 0.90 and out["status"] == "ok"
+    assert out["half_width"] == 18.0 and out["lower"] == -13.0 and out["upper"] == 23.0
+    assert out["guaranteed_level"] == pytest.approx(18 / 20, rel=1e-15)
+    wide = tr.loco_interval(table, 5.0, level=0.95)
+    assert wide["rank"] == 19 and wide["half_width"] == 19.0 and wide["guaranteed_level"] == pytest.approx(0.95, rel=1e-15)
+    narrow = tr.loco_interval(table, 5.0, level=0.5)
+    assert narrow["rank"] == 10 and narrow["half_width"] == 10.0
+    shuffled = tr.loco_interval(table.sample(frac=1.0, random_state=1), 5.0)
+    assert shuffled == out
+    assert tr.loco_interval(table["error"].to_frame(), -2.0)["lower"] == -20.0
+    assert "loco_interval" in tr.__all__
+
+
+@pytest.mark.parametrize("level,needed", [(0.90, 9), (0.80, 4), (0.95, 19), (0.99, 99), (0.5, 1)])
+def test_loco_interval_does_not_exist_with_too_few_errors_and_the_status_says_how_many_are_needed(level, needed):
+    rng = np.random.default_rng(60)
+    for n in range(1, needed):
+        out = tr.loco_interval(pd.DataFrame({"error": rng.normal(size=n)}), 1.0, level=level)
+        assert np.isnan([out["lower"], out["upper"], out["half_width"], out["guaranteed_level"]]).all()
+        assert out["n"] == n and out["rank"] == n + 1 and out["level"] == level
+        assert out["status"] != "ok" and f"at least {needed} validation errors" in out["status"] and f"the table has {n}" in out["status"]
+    exists = tr.loco_interval(pd.DataFrame({"error": rng.normal(size=needed)}), 1.0, level=level)
+    assert exists["status"] == "ok" and exists["rank"] == needed and np.isfinite(exists["half_width"])
+    assert exists["half_width"] == pytest.approx(np.abs(exists["lower"] - 1.0))
+
+
+def test_the_conformal_rank_is_the_exact_ceiling_whatever_the_rounding_of_level_times_n_plus_one():
+    levels = (0.07, 0.1, 0.14, 0.17, 0.2, 0.28, 0.3, 0.34, 0.5, 0.55, 0.56, 0.6, 0.68, 0.7, 0.75, 0.8, 0.81, 0.85, 0.9, 0.95, 0.99)
+    for level in levels:
+        for n in range(1, 400):
+            exact = max(math.ceil(Fraction(str(level)) * (n + 1)), 1)
+            assert tr._conformal_rank(n, level) == exact, (level, n)
+    traps = [(0.55, 99), (0.56, 24), (0.14, 49), (0.07, 99), (0.28, 24), (0.68, 74), (0.34, 149), (0.17, 299), (0.81, 299)]
+    for level, n in traps:
+        product = level * (n + 1)
+        assert product > round(product) and math.ceil(product) == round(product) + 1, (level, n)
+        assert tr._conformal_rank(n, level) == round(product)
+    errors = pd.DataFrame({"error": np.arange(1.0, 10.0)})
+    assert tr.loco_interval(errors, 0.0, level=0.7)["rank"] == 7
+    assert tr.loco_interval(errors, 0.0, level=0.9)["rank"] == 9
+    assert tr.loco_interval(pd.DataFrame({"error": np.arange(1.0, 20.0)}), 0.0, level=0.95)["rank"] == 19
+    for level, n in traps[:4]:
+        out = tr.loco_interval(pd.DataFrame({"error": np.arange(1.0, n + 1.0)}), 0.0, level=level)
+        want = round(Fraction(str(level)) * (n + 1))
+        assert out["rank"] == want and out["half_width"] == float(want) and out["guaranteed_level"] == pytest.approx(want / (n + 1), rel=1e-15)
+
+
+def test_the_number_of_errors_needed_is_exact_and_cheap_whatever_the_level():
+    for level in (0.05, 0.1, 0.5, 0.55, 0.8, 0.9, 0.95, 0.99, 0.999):
+        brute = next(n for n in range(1, 5000) if tr._conformal_rank(n, level) <= n)
+        assert tr._errors_needed(level) == brute, level
+    for gap in (1e-9, 1e-12, 1e-15, 1.2e-16):
+        level = 1.0 - gap
+        needed = tr._errors_needed(level)
+        assert tr._conformal_rank(needed, level) <= needed and tr._conformal_rank(needed - 1, level) > needed - 1
+        assert needed > 0.9 / gap
+    code = (
+        "import sys\n"
+        f"sys.path.insert(0, {_SRC!r})\n"
+        "import numpy as np, pandas as pd\n"
+        "from dtt import transport as tr\n"
+        "table = pd.DataFrame({'error': np.linspace(-1.0, 1.0, 12)})\n"
+        "for level in (1 - 1e-12, 1 - 1e-15, np.nextafter(1.0, 0.0)):\n"
+        "    out = tr.loco_interval(table, 0.0, level=level)\n"
+        "    assert out['rank'] == 13 and out['n'] == 12 and np.isnan(out['half_width'])\n"
+        "    needed = tr._errors_needed(level)\n"
+        "    assert f'at least {needed} validation errors' in out['status'], out['status']\n"
+        "    assert f'level {float(level)!r}:' in out['status'], out['status']\n"
+        "    draws = tr.loco_predictive_draws(table, 0.0, n_draws=20, level=level)\n"
+        "    assert draws['calibrated'] is False and draws['scale'] == 1.0\n"
+    )
+    result = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True, timeout=120)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("family", ["normal", "student3"])
+@pytest.mark.parametrize("n", [10, 14, 30, 60])
+def test_the_conformal_interval_covers_a_new_error_at_the_guaranteed_level(n, family):
+    reps = 4000
+    rng = np.random.default_rng(900 + n)
+    E = rng.standard_normal((reps, n + 1)) if family == "normal" else rng.standard_t(3, size=(reps, n + 1))
+    info = tr.loco_interval(pd.DataFrame({"error": E[0, :n]}), 0.0, level=0.90)
+    rank, guaranteed = info["rank"], info["guaranteed_level"]
+    assert rank == math.ceil(Fraction("0.9") * (n + 1)) and guaranteed == pytest.approx(rank / (n + 1), rel=1e-15)
+    q = np.partition(np.abs(E[:, :n]), rank - 1, axis=1)[:, rank - 1]
+    coverage = float(np.mean(np.abs(E[:, n]) <= q))
+    assert coverage >= 0.88
+    assert abs(coverage - guaranteed) < 4.5 * np.sqrt(guaranteed * (1.0 - guaranteed) / reps)
+    for r in range(25):
+        got = tr.loco_interval(pd.DataFrame({"error": E[r, :n]}), 0.3, level=0.90)
+        assert got["half_width"] == q[r] and got["lower"] == 0.3 - q[r] and got["upper"] == 0.3 + q[r]
+
+
+def test_the_raw_percentile_interval_is_too_short_with_few_errors_and_the_conformal_one_is_not():
+    reps, n = 4000, 10
+    E = np.random.default_rng(61).standard_normal((reps, n + 1))
+    raw_half = np.percentile(np.abs(E[:, :n]), 90.0, axis=1)
+    rank = tr.loco_interval(pd.DataFrame({"error": E[0, :n]}), 0.0)["rank"]
+    conformal_half = np.partition(np.abs(E[:, :n]), rank - 1, axis=1)[:, rank - 1]
+    assert np.mean(np.abs(E[:, n]) <= raw_half) < 0.86
+    assert np.mean(np.abs(E[:, n]) <= conformal_half) >= 0.88
+
+
+def test_loco_interval_checks_its_arguments_and_names_them():
+    table = pd.DataFrame({"error": np.linspace(-1.0, 1.0, 12), "method": "nn1"})
+    nan_error = table.copy()
+    nan_error.loc[2, "error"] = np.nan
+    two_methods = pd.concat([table, table.assign(method="equal")], ignore_index=True)
+    cases = [
+        ({"table": np.ones(4)}, "table must be a DataFrame with the column 'error'"),
+        ({"table": table.drop(columns="error")}, "table must be a DataFrame with the column 'error'"),
+        ({"table": two_methods}, "table must hold the rows of one method"),
+        ({"table": table.iloc[:0]}, "table has no rows"),
+        ({"table": nan_error}, r"table\['error'\] must be finite"),
+        ({"estimate": np.nan}, "estimate must be finite"),
+        ({"estimate": np.inf}, "estimate must be finite"),
+        ({"level": 0.0}, "level must lie strictly between 0 and 1"),
+        ({"level": 1.0}, "level must lie strictly between 0 and 1"),
+        ({"level": -0.2}, "level must lie strictly between 0 and 1"),
+        ({"level": 1.5}, "level must lie strictly between 0 and 1"),
+        ({"level": np.nan}, "level must lie strictly between 0 and 1"),
+        ({"level": None}, "level must be a number strictly between 0 and 1"),
+        ({"level": "high"}, "level must be a number strictly between 0 and 1"),
+    ]
+    for override, message in cases:
+        args = {"table": table, "estimate": 0.5}
+        args.update(override)
+        with pytest.raises(ValueError, match=message):
+            tr.loco_interval(**args)
+
+
+def test_the_rescaled_draws_reproduce_the_conformal_interval():
+    table, _ = logo_table(n_groups=12, per=2)
+    estimate = 0.7
+    for level in (0.8, 0.9, 0.95):
+        out = tr.loco_predictive_draws(table, estimate, n_draws=3000, seed=2, level=level)
+        raw = tr.loco_predictive_draws(table, estimate, n_draws=3000, seed=2, level=None)
+        interval = out["interval"]
+        assert out["calibrated"] is True and interval["status"] == "ok" and interval["level"] == level
+        assert interval == tr.loco_interval(table, estimate, level)
+        assert interval["n"] == len(table) == 24
+        assert np.quantile(np.abs(out["draws"] - estimate), level) == pytest.approx(interval["half_width"], rel=1e-10)
+        assert out["scale"] == pytest.approx(interval["half_width"] / np.quantile(np.abs(raw["draws"] - estimate), level), rel=1e-10)
+        np.testing.assert_allclose(out["draws"] - estimate, out["scale"] * (raw["draws"] - estimate), rtol=1e-12, atol=1e-14)
+        np.testing.assert_allclose(out["percentiles"].to_numpy(), np.percentile(out["draws"], [5, 25, 50, 75, 95]))
+        assert out["n_groups"] == raw["n_groups"] == 12 and out["n_cases"] == 24
+    default = tr.loco_predictive_draws(table, estimate, n_draws=3000, seed=2)
+    assert default["interval"]["level"] == 0.90 and default["calibrated"]
+    below = np.mean(default["draws"] < estimate - default["interval"]["half_width"])
+    above = np.mean(default["draws"] > estimate + default["interval"]["half_width"])
+    assert below + above < 0.12
+
+
+def test_draws_are_unchanged_and_not_calibrated_when_no_interval_exists():
+    rng = np.random.default_rng(62)
+    table = pd.DataFrame({"error": rng.normal(size=8)})
+    out = tr.loco_predictive_draws(table, 2.0, n_draws=300, seed=4)
+    assert out["calibrated"] is False and out["scale"] == 1.0
+    assert np.isnan(out["interval"]["half_width"]) and "at least 9 validation errors" in out["interval"]["status"]
+    reference = raw_draws_reference(table["error"].to_numpy(), np.arange(8), 2.0, 300, 4)
+    np.testing.assert_array_equal(out["draws"], reference)
+    ok = tr.loco_predictive_draws(pd.DataFrame({"error": rng.normal(size=9)}), 2.0, n_draws=300, seed=4)
+    assert ok["calibrated"] is True and ok["interval"]["rank"] == 9
+    wide = tr.loco_predictive_draws(table, 2.0, n_draws=300, seed=4, level=0.5)
+    assert wide["calibrated"] is True and wide["interval"]["status"] == "ok"
+
+
+def test_level_none_reproduces_the_uncalibrated_draws_bit_for_bit():
+    for per, n_groups in ((2, 10), (1, 25)):
+        table, groups = logo_table(seed=70 + per, n_groups=n_groups, per=per)
+        codes = pd.factorize(groups)[0]
+        out = tr.loco_predictive_draws(table, 1.1, n_draws=400, seed=5, level=None)
+        np.testing.assert_array_equal(out["draws"], raw_draws_reference(table["error"].to_numpy(), codes, 1.1, 400, 5))
+        assert out["interval"] is None and out["scale"] == 1.0 and out["calibrated"] is False
+        np.testing.assert_array_equal(out["percentiles"].to_numpy(), np.percentile(out["draws"], [5, 25, 50, 75, 95]))
+    small = pd.DataFrame({"error": [0.3, -0.2, 0.5, -0.4]})
+    np.testing.assert_array_equal(
+        tr.loco_predictive_draws(small, 1.0, n_draws=50, seed=1)["draws"], tr.loco_predictive_draws(small, 1.0, n_draws=50, seed=1, level=None)["draws"]
+    )
+
+
+def test_calibration_handles_errors_that_are_all_zero_or_almost_all_zero():
+    zero = pd.DataFrame({"error": np.zeros(12)})
+    out = tr.loco_predictive_draws(zero, 3.0, n_draws=50, seed=1)
+    assert out["calibrated"] is True and out["scale"] == 1.0 and out["interval"]["half_width"] == 0.0
+    assert np.all(out["draws"] == 3.0) and out["interval"]["lower"] == out["interval"]["upper"] == 3.0
+    mostly = pd.DataFrame({"error": np.r_[np.zeros(19), 5.0]})
+    other = tr.loco_predictive_draws(mostly, 3.0, n_draws=400, seed=1)
+    assert other["interval"]["half_width"] == 0.0 and other["interval"]["status"] == "ok"
+    assert other["calibrated"] is True and other["scale"] == 1.0
+    np.testing.assert_array_equal(other["draws"], tr.loco_predictive_draws(mostly, 3.0, n_draws=400, seed=1, level=None)["draws"])
+    assert np.isfinite(other["draws"]).all()
+
+
+def test_a_zero_width_interval_collapses_draws_that_have_spread():
+    errors = np.r_[np.zeros(19), 5.0]
+    table = pd.DataFrame({"error": errors, "group": np.r_[np.zeros(19, dtype=int), 1]})
+    out = tr.loco_predictive_draws(table, 3.0, n_draws=400, seed=1)
+    raw = tr.loco_predictive_draws(table, 3.0, n_draws=400, seed=1, level=None)
+    assert out["interval"]["half_width"] == 0.0 and out["interval"]["lower"] == out["interval"]["upper"] == 3.0
+    assert np.quantile(np.abs(raw["draws"] - 3.0), 0.9) == 5.0
+    assert out["calibrated"] is True and out["scale"] == 0.0
+    assert np.all(out["draws"] == 3.0) and np.all(out["percentiles"] == 3.0)
+    singles = tr.loco_predictive_draws(table.drop(columns="group"), 3.0, n_draws=400, seed=1)
+    assert singles["calibrated"] is True and singles["scale"] == 1.0 and set(np.unique(singles["draws"])) <= {3.0, -2.0}
+
+
+def test_only_the_interval_of_the_predictive_draws_has_a_coverage_guarantee():
+    reps, n = 600, 10
+    rng = np.random.default_rng(84)
+    covered = {"interval": 0, "percentiles": 0, "raw percentiles": 0}
+    for r in range(reps):
+        errors = 2.0 + rng.lognormal(0.0, 0.5, size=n + 1)
+        table = pd.DataFrame({"error": errors[:n]})
+        truth = -errors[n]
+        out = tr.loco_predictive_draws(table, 0.0, n_draws=300, seed=r)
+        raw = tr.loco_predictive_draws(table, 0.0, n_draws=300, seed=r, level=None)
+        covered["interval"] += out["interval"]["lower"] <= truth <= out["interval"]["upper"]
+        covered["percentiles"] += out["percentiles"][5] <= truth <= out["percentiles"][95]
+        covered["raw percentiles"] += raw["percentiles"][5] <= truth <= raw["percentiles"][95]
+    share = {name: count / reps for name, count in covered.items()}
+    assert share["interval"] >= 0.86
+    assert share["percentiles"] < 0.80
+    doc = flat(tr.loco_predictive_draws.__doc__)
+    assert "Only ``interval`` has a coverage guarantee" in doc and "descriptive percentiles" in doc and "no coverage guarantee" in doc
+    assert "descriptive and without a coverage guarantee" in doc
+    assert "carry no such guarantee" in flat(tr.__doc__)
+
+
+def test_calibrated_draws_use_one_error_per_case_when_an_economy_has_several_cases():
+    table, groups = logo_table(seed=71, n_groups=8, per=3)
+    out = tr.loco_predictive_draws(table, 0.4, n_draws=500, seed=3)
+    assert out["interval"]["n"] == 24 and out["n_groups"] == 8
+    by_groups = tr.loco_predictive_draws(table.drop(columns="group"), 0.4, groups=np.arange(24), n_draws=500, seed=3)
+    assert by_groups["interval"] == out["interval"] and by_groups["n_groups"] == 24
 
 
 # ----------------------------------------------------------------------------
@@ -2021,8 +2878,10 @@ def test_bootstrap_transport_drops_sources_without_mass_and_checks_eps():
     np.testing.assert_allclose(full["draws"], reduced["draws"], atol=1e-12)
     np.testing.assert_allclose(full["predictive_draws"], reduced["predictive_draws"], atol=1e-12)
     assert full["estimate"] == pytest.approx(reduced["estimate"], abs=1e-12)
+    coincide = tr.bootstrap_transport(np.zeros((4, 2)), Zt, w, tau[:4], se[:4], n_boot=5)
+    assert coincide["eps"] == 1.0 and np.isfinite(coincide["draws"]).all() and coincide["n_nonconverged"] == 0
     with pytest.raises(ValueError, match="eps"):
-        tr.bootstrap_transport(np.zeros((4, 2)), Zt, w, tau[:4], se[:4], n_boot=5)
+        tr.bootstrap_transport(Zs[:1], Zt, w, tau[:1], se[:1], n_boot=5)
     with pytest.raises(ValueError, match="eps"):
         tr.bootstrap_transport(Zs, Zt, w, tau, se, a=np.eye(n)[0], n_boot=5)
 
@@ -2229,6 +3088,210 @@ def test_bootstrap_transport_guard_is_called_before_every_fiftieth_draw(monkeypa
         assert solves_so_far == [1 + 50 * k for k in range(expected)]
         same = tr.bootstrap_transport(Zs, Zt, [1.0, 1.0], tau, se, n_boot=n_boot, seed=1, groups=groups)
         np.testing.assert_array_equal(res["draws"], same["draws"])
+
+
+# ----------------------------------------------------------------------------
+# Decisions that rounding noise must not flip
+# ----------------------------------------------------------------------------
+def lattice_problem(seed=5):
+    """Sources, a target cloud and weights on an integer lattice, where many distances tie exactly (SIMULATED)."""
+    rng = np.random.default_rng(seed)
+    return rng.integers(0, 4, size=(10, 2)).astype(float), rng.integers(0, 4, size=(3, 2)).astype(float) + 1.0, np.array([1.0, 1.0])
+
+
+@pytest.mark.parametrize("use_pool", [False, True])
+def test_overlap_p_value_does_not_change_when_the_inputs_move_by_a_relative_1e_13(use_pool):
+    Zs, Zt, w = lattice_problem()
+    pool = np.random.default_rng(6).integers(0, 6, size=(40, 2)).astype(float) if use_pool else None
+    ref = tr.overlap_permutation_test(Zs, Zt, w, n_perm=199, seed=3, pool=pool)
+    exact_count_differs = 0
+    for s in range(30):
+        r = np.random.default_rng(100 + s)
+        moved = tr.overlap_permutation_test(
+            jitter(r, Zs), jitter(r, Zt), jitter(r, w), n_perm=199, seed=3, pool=None if pool is None else jitter(r, pool)
+        )
+        assert moved["p_value"] == ref["p_value"]
+        assert moved["statistic"] == pytest.approx(ref["statistic"], rel=1e-9)
+        np.testing.assert_allclose(moved["null"], ref["null"], rtol=1e-9, atol=1e-12)
+        exact_count_differs += (1 + np.count_nonzero(moved["null"] >= moved["statistic"])) / 200 != ref["p_value"]
+    assert exact_count_differs > 10
+
+
+def test_overlap_p_value_is_one_when_every_row_is_the_same_point_whatever_the_rounding():
+    for s in range(20):
+        r = np.random.default_rng(s)
+        out = tr.overlap_permutation_test(jitter(r, np.full((8, 2), 3.0)), jitter(r, np.full((3, 2), 3.0)), [1.0, 1.0], n_perm=99, seed=s)
+        assert out["p_value"] == 1.0
+
+
+def test_transported_quantiles_and_bootstrap_percentiles_do_not_change_when_the_inputs_move_by_a_relative_1e_13():
+    rng = np.random.default_rng(5)
+    n, m = 14, 3
+    Zs, Zt, w = rng.normal(size=(n, 3)), rng.normal(scale=0.3, size=(m, 3)), np.array([1.0, 0.2, 0.2])
+    tau, se, a = rng.normal(size=n), rng.uniform(0.1, 0.3, n), rng.uniform(0.5, 1.5, n)
+    noise = [rng.normal(tau[i], se[i], 40) for i in range(n)]
+
+    def run(r=None):
+        f = (lambda x: np.asarray(x, dtype=float)) if r is None else (lambda x: jitter(r, x))
+        zs, zt, ww, aa, tt, ss = f(Zs), f(Zt), f(w), f(a), f(tau), f(se)
+        plan = tr.sinkhorn_plan(aa / aa.sum(), None, tr.weighted_sq_cost(zs, zt, ww), 0.3, rho_source=1.0)
+        values, probs = tr.transported_mixture(plan, [f(d) for d in noise])
+        boot = tr.bootstrap_transport(zs, zt, ww, tt, ss, a=aa, n_boot=100, seed=2)
+        return (
+            tr.weighted_quantile(values, probs, [0.05, 0.25, 0.5, 0.75, 0.95]),
+            boot["percentiles"].to_numpy(),
+            boot["predictive_percentiles"].to_numpy(),
+            np.array([tr.target_effect(plan, tt), boot["estimate"], boot["eps"]]),
+        )
+
+    base = run()
+    for s in range(6):
+        for got, want in zip(run(np.random.default_rng(200 + s)), base):
+            np.testing.assert_allclose(got, want, rtol=1e-8, atol=1e-9)
+
+
+def test_nearest_neighbour_ties_are_broken_by_source_order_whatever_the_rounding():
+    tau = np.array([10.0, 20.0, 30.0, 40.0, 50.0])
+    C = np.array([[2.0, 1.0], [2.0, 4.0], [2.0, 1.0], [5.0, 1.0], [3.0, 0.5]])
+    expected = {k: tr._loco_nn(C, tau, k) for k in (1, 2, 3)}
+    np.testing.assert_allclose(expected[1], [10.0, 50.0])
+    np.testing.assert_allclose(expected[2], [15.0, 30.0])
+    np.testing.assert_allclose(expected[3], [20.0, 30.0])
+    naive_moves = 0
+    for s in range(60):
+        moved = jitter(np.random.default_rng(s), C)
+        for k, want in expected.items():
+            np.testing.assert_array_equal(tr._loco_nn(moved, tau, k), want)
+        naive_moves += not np.array_equal(tau[np.argsort(moved, axis=0, kind="stable")[:1]].mean(axis=0), expected[1])
+    assert naive_moves > 10
+    separated = np.array([[2.0], [2.0 + 1e-6], [1.5], [9.0], [9.0]])
+    np.testing.assert_allclose(tr._loco_nn(separated, tau, 1), [30.0])
+    np.testing.assert_allclose(tr._loco_nn(separated, tau, 2), [20.0])
+    assert tr._loco_nn(C[:2], tau[:2], 5).shape == (2,)
+    tiny = np.array([[1e-30], [0.0], [1.0]])
+    np.testing.assert_allclose(tr._loco_nn(tiny, tau[:3], 1), [20.0])
+    np.testing.assert_allclose(tr._loco_nn(tiny, tau[:3], 1, noise=1e-20), [10.0])
+    np.testing.assert_allclose(tr._loco_nn(tiny, tau[:3], 2, noise=1e-20), [15.0])
+
+
+def test_loco_predictions_on_a_lattice_do_not_change_when_the_inputs_move_by_a_relative_1e_13():
+    rng = np.random.default_rng(15)
+    Z = pd.DataFrame(rng.integers(0, 3, size=(14, 3)).astype(float), columns=list("abc"))
+    Z["c"] = (Z["c"] > 0).astype(float)
+    tau, w = rng.normal(size=14), np.array([1.0, 0.5, 2.0])
+    base = tr.loco_validation(Z, tau, None, w, n_boot=10)
+    for s in range(5):
+        r = np.random.default_rng(500 + s)
+        moved = tr.loco_validation(pd.DataFrame(jitter(r, Z.to_numpy()), columns=Z.columns), jitter(r, tau), None, jitter(r, w), n_boot=10)
+        np.testing.assert_allclose(moved.predictions().to_numpy(), base.predictions().to_numpy(), rtol=1e-8, atol=1e-8)
+        assert moved.n_eps_fallback == base.n_eps_fallback
+        assert list(moved.summary["rank"]) == list(base.summary["rank"])
+
+
+def test_masses_and_weights_that_are_rounding_noise_are_zero():
+    Zs, Zt, w, a, b, C = random_problem(1)
+    noisy = a.copy()
+    noisy[2] = 1e-15 * a.max()
+    exact = np.where(np.arange(a.size) == 2, 0.0, a)
+    plan = tr.sinkhorn_plan(noisy, b, C, 0.3, rho_source=1.0)
+    assert plan.pi[2].sum() == 0.0
+    np.testing.assert_array_equal(plan.pi, tr.sinkhorn_plan(exact, b, C, 0.3, rho_source=1.0).pi)
+    assert tr.overlap_permutation_test(Zs, Zt, w, a=noisy, n_perm=20, seed=1)["statistic"] == tr.overlap_permutation_test(
+        Zs, Zt, w, a=exact, n_perm=20, seed=1
+    )["statistic"]
+    rng = np.random.default_rng(2)
+    tau, se = rng.normal(size=a.size), np.full(a.size, 0.2)
+    kept = tr.bootstrap_transport(Zs, Zt, w, tau, se, a=exact, n_boot=15, seed=1, eps=0.4)
+    dropped = tr.bootstrap_transport(Zs, Zt, w, tau, se, a=noisy, n_boot=15, seed=1, eps=0.4)
+    np.testing.assert_array_equal(kept["draws"], dropped["draws"])
+    frame = pd.DataFrame(Zs)
+    res = tr.loco_validation(frame, tau, se, w, a=noisy, eps=0.4, n_boot=5)
+    assert res.table["n_sources_used"].max() == a.size - 1 and (res.table[res.table["case"] != 2]["n_sources_used"] == a.size - 2).all()
+    np.testing.assert_array_equal(res.predictions().to_numpy(), tr.loco_validation(frame, tau, se, w, a=exact, eps=0.4, n_boot=5).predictions().to_numpy())
+    assert tr._mass_vector(np.array([1e-11, 1.0, 1.0]), 3, "a").tolist() == [1e-11, 1.0, 1.0]
+    assert tr._mass_vector(np.array([1e-12, 1.0, 1.0]), 3, "a").tolist() == [0.0, 1.0, 1.0]
+    assert tr._mass_vector(np.array([5e-13, 1e-13, 3e-13]), 3, "a").tolist() == [5e-13, 1e-13, 3e-13]
+    kept = tr._rescaled_weights([1.0, 1e-10, 2.0], 3)
+    assert kept[1] > 0.0 and kept[1] == pytest.approx(3.0 * 1e-10 / (3.0 + 1e-10), rel=1e-12)
+    assert tr._rescaled_weights([1.0, 1e-13, 2.0], 3).tolist() == [1.0, 0.0, 2.0]
+    assert tr._rescaled_weights([1.0, 1e-12, 2.0], 3)[1] == 0.0
+    cost_kept = tr.weighted_sq_cost(np.array([[0.0, 0.0]]), np.array([[0.0, 1.0]]), [1.0, 1e-10])
+    assert cost_kept[0, 0] > 0.0 and tr.weighted_sq_cost(np.array([[0.0, 0.0]]), np.array([[0.0, 1.0]]), [1.0, 1e-13])[0, 0] == 0.0
+    with pytest.raises(ValueError, match="a has zero total mass"):
+        tr._mass_vector(np.zeros(3), 3, "a")
+    assert tr._mass_vector(np.zeros(3), 3, "a", allow_zero_total=True).tolist() == [0.0, 0.0, 0.0]
+    X = rng.normal(size=(5, 3))
+    X[:, 1] = np.nan
+    Y = rng.normal(size=(4, 3))
+    Y[:, 1] = np.nan
+    np.testing.assert_array_equal(tr.weighted_sq_cost(X, Y, [1.0, 1e-15, 2.0]), tr.weighted_sq_cost(X, Y, [1.0, 0.0, 2.0]))
+    Z = np.column_stack([rng.normal(size=8), np.repeat([0.0, 1.0], [6, 2])])
+    assert tr.select_eps(Z, [1e-15, 1.0]) == tr.select_eps(Z, [0.0, 1.0]) == pytest.approx(0.1 * 2.0, rel=1e-12)
+
+
+def test_ranks_correlations_and_ratio_shares_are_decided_with_a_tolerance():
+    values = np.array([0.3, 0.3 * (1.0 + 1e-13), 0.5, np.nan, 0.1])
+    np.testing.assert_array_equal(tr._rank_with_tolerance(values), [2, 2, 4, 5, 1])
+    np.testing.assert_array_equal(tr._rank_with_tolerance(np.array([2.0, 1.0, 1.0, 3.0])), [3, 1, 1, 4])
+    np.testing.assert_array_equal(tr._rank_with_tolerance(np.array([np.nan, np.nan])), [1, 1])
+    x = np.arange(6.0)
+    assert np.isnan(tr._correlation(np.full(6, 2.0) + 1e-16 * x, x)) and np.isnan(tr._correlation(x, np.full(6, 5.0)))
+    assert tr._correlation(1e-9 * x, x) == pytest.approx(1.0)
+    squared = np.random.default_rng(3).uniform(0.1, 1.0, 12)
+    same = tr._rmse_ratio_table({"ot_weighted": squared, "equal": squared * (1.0 + 1e-14)}, 200, np.random.default_rng(0))
+    assert same.loc["ot_weighted / equal", "share_below_one"] == 0.0 and same.loc["ot_weighted / equal", "ratio"] == pytest.approx(1.0)
+    better = tr._rmse_ratio_table({"ot_weighted": squared, "equal": squared * 1.5}, 200, np.random.default_rng(0))
+    assert better.loc["ot_weighted / equal", "share_below_one"] == 1.0
+
+
+def test_methods_that_are_exact_up_to_rounding_share_rank_one():
+    Z = np.random.default_rng(82).normal(size=(10, 3))
+    for effect in (0.5, 5e-7, 3e6):
+        res = tr.loco_validation(Z, np.full(10, effect), None, [1.0, 1.0, 1.0], n_boot=10)
+        assert (res.summary["rmse"] <= 1e-12 * effect).all()
+        assert res.summary["rank"].tolist() == [1] * 6, effect
+    values = np.array([5e-17, 0.0, 0.0])
+    np.testing.assert_array_equal(tr._rank_with_tolerance(values), [3, 1, 1])
+    np.testing.assert_array_equal(tr._rank_with_tolerance(values, 0.5), [1, 1, 1])
+    np.testing.assert_array_equal(tr._rank_with_tolerance(np.array([0.3, 0.1]), 0.5), [2, 1])
+    np.testing.assert_array_equal(tr._rank_with_tolerance(np.array([1e-4, 0.0]), 0.5), [2, 1])
+    np.testing.assert_array_equal(tr._rank_with_tolerance(np.array([1e-10, 0.0, np.nan]), 0.5), [1, 1, 3])
+    assert "1e-9`` times the larger of the largest RMSE and the largest absolute observed effect" in flat(tr.LocoResult.__doc__)
+
+
+# ----------------------------------------------------------------------------
+# Documentation of the limits of the method
+# ----------------------------------------------------------------------------
+def test_documentation_states_the_limits_of_the_validation_and_of_the_intervals():
+    for text in (tr.__doc__, tr.bootstrap_transport.__doc__, tr.loco_validation.__doc__, tr.loco_predictive_draws.__doc__):
+        doc = flat(text)
+        assert "interpolation among the cases" in doc
+        assert "largest source effect" in doc
+        assert "target_support" in doc
+    for text in (tr.__doc__, tr.loco_interval.__doc__, tr.loco_predictive_draws.__doc__, tr.bootstrap_transport.__doc__):
+        assert "validated by construction" in flat(text)
+    for text in (tr.__doc__, tr.loco_interval.__doc__, tr.loco_predictive_draws.__doc__):
+        doc = flat(text)
+        assert "bootstrap interval of the transported average effect" in doc and "predictive draws" in doc
+    assert "Cases of one economy are dependent" in flat(tr.loco_interval.__doc__) and "approximate" in flat(tr.loco_interval.__doc__)
+    assert "rank / (n + 1)" in flat(tr.loco_interval.__doc__) and "split conformal" in flat(tr.loco_interval.__doc__)
+    select = flat(tr.select_eps.__doc__)
+    assert "positive distances" in select and "returns 1.0" in select
+    assert "multiplying the features by ``c`` multiplies the value by ``c^2``" in select
+    assert "largest squared weighted coordinate" in select and "largest squared weighted coordinate" in flat(tr.__doc__)
+    assert "median of the positive distances" in flat(tr.loco_validation.__doc__)
+    assert "matched by position" in flat(tr.target_support.__doc__)
+    assert "effective_sample_size" in flat(tr.target_support.__doc__)
+    doc = tr.LocoResult.__doc__
+    assert doc.index("n_nonconverged") < doc.index("n_eps_fallback") < doc.index("ratio_note")
+    assert tr.LocoResult(*(None,) * 3, {}, None, 5, 0).n_eps_fallback == 0
+
+
+def test_the_sources_use_no_em_dash_and_only_line_feeds():
+    for path in (Path(tr.__file__), Path(__file__)):
+        raw = path.read_bytes()
+        assert b"\r" not in raw
+        assert chr(0x2014) not in raw.decode("utf-8"), path.name
 
 
 # ----------------------------------------------------------------------------
