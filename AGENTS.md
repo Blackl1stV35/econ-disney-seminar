@@ -25,7 +25,7 @@ Run the fast command before every pull request. Run the full command when you ch
 ## Rules
 
 1. Never commit a secret or personal data: tokens, API keys, passwords, e-mail addresses, the SEC contact file `sec_user_agent.txt`, or user names in file paths. A test scans the Disney project for token-like strings.
-2. Work on a branch named `<owner>/<topic>` and open a pull request. Never push to `main`, never force-push, never rewrite history, never merge your own pull request.
+2. Work on a branch named `<owner>/<topic>` and open a pull request. Only the repository owner can push to `main` directly (a bypass in the branch ruleset); push to `main` only when the owner has told you to. Never force-push, never rewrite history, and never merge your own pull request unless the owner told you to.
 3. Edit one project folder per pull request, and claim the task in a GitHub Issue before you start, so that two people or agents do not work on the same thing.
 4. Do not hand-edit anything in `results/` or `figures/`; they are produced by the notebooks. Change them only in a pull request whose single purpose is a re-run, written by the person who ran it, with the commit used and the run time in the description. Do not mix code changes and result updates.
 5. Do not edit raw data (`data/raw`, `data/reference`) or delete data files.
