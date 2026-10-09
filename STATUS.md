@@ -24,11 +24,11 @@ Folder: [disney-tourism-thailand](disney-tourism-thailand). It builds on the fir
 - Final verification: a full test run on the final version, the same results on different CPU math libraries, a clean install on Python 3.12 and 3.13, and an independent review of the results.
 - Data notice: attribution for the World Bank data (CC BY 4.0), the origin of `data/raw/disney_did_panel.csv`, and the choice of a code licence.
 - Check of the 20 World Bank files against the official API (a script for this is still to be written).
-- Run the single-country replication notebook (01) on the panel file, which also answers where Hong Kong ranks in the original Stata table.
+- Review the 37 reference values of the original Stata analysis that notebook 01 does not reproduce (1179 of 1216 match): synthetic-control weights, balance and placebo ratios that differ by 0.3 to 1.6 percent, and one bootstrap confidence-interval endpoint. Read off the notebook output where Hong Kong ranks in the original table.
 - Only 53 of the 96 economies have a complete outcome series for 1995 to 2019, so the donor pool is smaller than first planned.
 - Dollar costs of the openings are derived estimates, not reported figures.
 
-**How to run.** See `disney-tourism-thailand/README.md`. A full run on the dataset takes roughly 70 minutes on a laptop, almost all of it in notebook 03.
+**How to run.** See `disney-tourism-thailand/README.md`. A full run on the dataset takes one to two hours on a laptop (notebook 03 took 64 and 99 minutes in two runs), almost all of it in notebook 03. Two runs produced identical tables.
 
 ## 2. Investor horizon of Disney's shareholders (SEC Form 13F)
 

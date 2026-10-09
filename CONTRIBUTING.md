@@ -17,7 +17,7 @@ This repository holds the working projects of the seminar group. Anyone invited 
 
 ## Long runs
 
-A run of the notebooks of the Disney project on its dataset takes about an hour (almost all in notebook 03). It does not belong in an automatic check; run it on your own machine and share the outputs through a re-run pull request.
+A run of the notebooks of the Disney project on its dataset takes one to two hours (almost all in notebook 03). It does not belong in an automatic check; run it on your own machine and share the outputs through a re-run pull request.
 
 ## Data and privacy
 
