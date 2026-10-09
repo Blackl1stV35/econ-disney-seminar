@@ -1,0 +1,32 @@
+{
+  "status": "Proposal only. No signed agreement, approved budget, named operator or site allocation for a theme park was found in the sources reviewed up to 2026-10-07 (see docs/thailand_baseline_notes.md).",
+  "location": "EECiti, Chonburi (Eastern Economic Corridor)",
+  "fx_thb_per_usd_reference": null,
+  "scenarios": [
+    {
+      "name": "complex_total",
+      "capex_thb_bn": 300,
+      "scope": "theme park plus sports and entertainment complex, headline figure of the proposal",
+      "primary": true
+    },
+    {
+      "name": "park_high",
+      "capex_thb_bn": 200,
+      "scope": "theme park alone, upper figure",
+      "primary": false
+    },
+    {
+      "name": "park_low",
+      "capex_thb_bn": 100,
+      "scope": "theme park alone, lower figure",
+      "primary": false
+    }
+  ],
+  "ministerial_claims": {
+    "additional_visitors_per_year_million": 10,
+    "revenue_thb_bn": 150,
+    "jobs": 100000,
+    "share_of_gdp_per_year_percent": 1,
+    "note": "Stated by officials in February 2026; no study cited."
+  }
+}

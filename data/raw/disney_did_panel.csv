@@ -1,0 +1,178 @@
+study_case,unit,year,treated,post,treated_post,rel_year,treatment_year,receipts_pct_gdp,unit_id
+Hong Kong,Hong Kong,1998,1,0,0,-7,2005,4.34,2
+Hong Kong,Hong Kong,1999,1,0,0,-6,2005,4.43,2
+Hong Kong,Hong Kong,2000,1,0,0,-5,2005,4.78,2
+Hong Kong,Hong Kong,2001,1,0,0,-4,2005,4.68,2
+Hong Kong,Hong Kong,2002,1,0,0,-3,2005,5.92,2
+Hong Kong,Hong Kong,2003,1,0,0,-2,2005,5.58,2
+Hong Kong,Hong Kong,2004,1,0,0,-1,2005,7.02,2
+Hong Kong,Hong Kong,2005,1,1,1,0,2005,7.48,2
+Hong Kong,Hong Kong,2006,1,1,1,1,2005,8.03,2
+Hong Kong,Hong Kong,2007,1,1,1,2,2005,8.62,2
+Hong Kong,Hong Kong,2008,1,1,1,3,2005,9.23,2
+Hong Kong,Hong Kong,2009,1,1,1,4,2005,9.48,2
+Hong Kong,Hong Kong,2010,1,1,1,5,2005,11.9,2
+Hong Kong,Hong Kong,2011,1,1,1,6,2005,13.35,2
+Hong Kong,Hong Kong,2012,1,1,1,7,2005,14.13,2
+Hong Kong,Hong Kong,2013,1,1,1,8,2005,15.39,2
+Hong Kong,Hong Kong,2014,1,1,1,9,2005,15.9,2
+Hong Kong,Hong Kong,2015,1,1,1,10,2005,13.73,2
+Hong Kong,Hong Kong,2016,1,1,1,11,2005,11.79,2
+Hong Kong,Hong Kong,2017,1,1,1,12,2005,11.18,2
+Hong Kong,Hong Kong,2018,1,1,1,13,2005,11.7,2
+Hong Kong,Hong Kong,2019,1,1,1,14,2005,9.01,2
+Hong Kong,Ireland,1999,0,0,0,-6,2005,3.441,3
+Hong Kong,Ireland,2000,0,0,0,-5,2005,3.51,3
+Hong Kong,Ireland,2001,0,0,0,-4,2005,3.465,3
+Hong Kong,Ireland,2002,0,0,0,-3,2005,3.288,3
+Hong Kong,Ireland,2003,0,0,0,-2,2005,3.162,3
+Hong Kong,Ireland,2004,0,0,0,-1,2005,3.126,3
+Hong Kong,Ireland,2005,0,1,0,0,2005,3.2,3
+Hong Kong,Ireland,2006,0,1,0,1,2005,3.303,3
+Hong Kong,Ireland,2007,0,1,0,2,2005,3.429,3
+Hong Kong,Ireland,2008,0,1,0,3,2005,3.62,3
+Hong Kong,Ireland,2009,0,1,0,4,2005,3.58,3
+Hong Kong,Ireland,2010,0,1,0,5,2005,3.691,3
+Hong Kong,Ireland,2011,0,1,0,6,2005,3.956,3
+Hong Kong,Ireland,2012,0,1,0,7,2005,4.078,3
+Hong Kong,Ireland,2013,0,1,0,8,2005,4.185,3
+Hong Kong,Ireland,2014,0,1,0,9,2005,4.166,3
+Hong Kong,Ireland,2015,0,1,0,10,2005,3.798,3
+Hong Kong,Ireland,2016,0,1,0,11,2005,4.142,3
+Hong Kong,Ireland,2017,0,1,0,12,2005,4.103,3
+Hong Kong,Ireland,2018,0,1,0,13,2005,3.861,3
+Hong Kong,Ireland,2019,0,1,0,14,2005,3.637,3
+Hong Kong,New Zealand,1998,0,0,0,-7,2005,3.303,4
+Hong Kong,New Zealand,1999,0,0,0,-6,2005,3.802,4
+Hong Kong,New Zealand,2000,0,0,0,-5,2005,4.317,4
+Hong Kong,New Zealand,2001,0,0,0,-4,2005,4.344,4
+Hong Kong,New Zealand,2002,0,0,0,-3,2005,4.741,4
+Hong Kong,New Zealand,2003,0,0,0,-2,2005,4.795,4
+Hong Kong,New Zealand,2004,0,0,0,-1,2005,4.907,4
+Hong Kong,New Zealand,2005,0,1,0,0,2005,5.654,4
+Hong Kong,New Zealand,2006,0,1,0,1,2005,5.512,4
+Hong Kong,New Zealand,2007,0,1,0,2,2005,5.241,4
+Hong Kong,New Zealand,2008,0,1,0,3,2005,5.217,4
+Hong Kong,New Zealand,2009,0,1,0,4,2005,4.914,4
+Hong Kong,New Zealand,2010,0,1,0,5,2005,4.441,4
+Hong Kong,New Zealand,2011,0,1,0,6,2005,4.331,4
+Hong Kong,New Zealand,2012,0,1,0,7,2005,4.046,4
+Hong Kong,New Zealand,2013,0,1,0,8,2005,3.894,4
+Hong Kong,New Zealand,2014,0,1,0,9,2005,4.261,4
+Hong Kong,New Zealand,2015,0,1,0,10,2005,5.313,4
+Hong Kong,New Zealand,2016,0,1,0,11,2005,5.172,4
+Hong Kong,New Zealand,2017,0,1,0,12,2005,5.129,4
+Hong Kong,New Zealand,2018,0,1,0,13,2005,5.178,4
+Hong Kong,Singapore,1998,0,0,0,-7,2005,5.369,7
+Hong Kong,Singapore,1999,0,0,0,-6,2005,5.898,7
+Hong Kong,Singapore,2000,0,0,0,-5,2005,5.352,7
+Hong Kong,Singapore,2001,0,0,0,-4,2005,5.169,7
+Hong Kong,Singapore,2002,0,0,0,-3,2005,4.818,7
+Hong Kong,Singapore,2003,0,0,0,-2,2005,3.934,7
+Hong Kong,Singapore,2004,0,0,0,-1,2005,4.631,7
+Hong Kong,Singapore,2005,0,1,0,0,2005,4.858,7
+Hong Kong,Singapore,2006,0,1,0,1,2005,5.071,7
+Hong Kong,Singapore,2007,0,1,0,2,2005,5.011,7
+Hong Kong,Singapore,2008,0,1,0,3,2005,5.482,7
+Hong Kong,Singapore,2009,0,1,0,4,2005,4.752,7
+Hong Kong,Singapore,2010,0,1,0,5,2005,5.913,7
+Hong Kong,Singapore,2011,0,1,0,6,2005,6.417,7
+Hong Kong,Singapore,2012,0,1,0,7,2005,6.37,7
+Hong Kong,Singapore,2013,0,1,0,8,2005,6.253,7
+Hong Kong,Singapore,2014,0,1,0,9,2005,6.086,7
+Hong Kong,Singapore,2015,0,1,0,10,2005,5.396,7
+Hong Kong,Singapore,2016,0,1,0,11,2005,5.907,7
+Hong Kong,Singapore,2017,0,1,0,12,2005,5.769,7
+Hong Kong,Singapore,2018,0,1,0,13,2005,5.401,7
+Hong Kong,South Korea,1998,0,0,0,-7,2005,2.08,8
+Hong Kong,South Korea,1999,0,0,0,-6,2005,1.617,8
+Hong Kong,South Korea,2000,0,0,0,-5,2005,1.427,8
+Hong Kong,South Korea,2001,0,0,0,-4,2005,1.395,8
+Hong Kong,South Korea,2002,0,0,0,-3,2005,1.172,8
+Hong Kong,South Korea,2003,0,0,0,-2,2005,0.961,8
+Hong Kong,South Korea,2004,0,0,0,-1,2005,0.999,8
+Hong Kong,South Korea,2005,0,1,0,0,2005,0.852,8
+Hong Kong,South Korea,2006,0,1,0,1,2005,0.77,8
+Hong Kong,South Korea,2007,0,1,0,2,2005,0.758,8
+Hong Kong,South Korea,2008,0,1,0,3,2005,1.231,8
+Hong Kong,South Korea,2009,0,1,0,4,2005,1.349,8
+Hong Kong,South Korea,2010,0,1,0,5,2005,1.2,8
+Hong Kong,South Korea,2011,0,1,0,6,2005,1.326,8
+Hong Kong,South Korea,2012,0,1,0,7,2005,1.403,8
+Hong Kong,South Korea,2013,0,1,0,8,2005,1.356,8
+Hong Kong,South Korea,2014,0,1,0,9,2005,1.439,8
+Hong Kong,South Korea,2015,0,1,0,10,2005,1.216,8
+Hong Kong,South Korea,2016,0,1,0,11,2005,1.325,8
+Hong Kong,South Korea,2017,0,1,0,12,2005,1.004,8
+Hong Kong,South Korea,2018,0,1,0,13,2005,1.266,8
+Hong Kong,South Korea,2019,0,1,0,14,2005,1.454,8
+Hong Kong,Switzerland,1998,0,0,0,-7,2005,3.32,9
+Hong Kong,Switzerland,1999,0,0,0,-6,2005,3.026,9
+Hong Kong,Switzerland,2000,0,0,0,-5,2005,3.209,9
+Hong Kong,Switzerland,2001,0,0,0,-4,2005,3.237,9
+Hong Kong,Switzerland,2002,0,0,0,-3,2005,2.93,9
+Hong Kong,Switzerland,2003,0,0,0,-2,2005,2.844,9
+Hong Kong,Switzerland,2004,0,0,0,-1,2005,2.742,9
+Hong Kong,Switzerland,2005,0,1,0,0,2005,2.807,9
+Hong Kong,Switzerland,2006,0,1,0,1,2005,2.891,9
+Hong Kong,Switzerland,2007,0,1,0,2,2005,2.993,9
+Hong Kong,Switzerland,2008,0,1,0,3,2005,3.135,9
+Hong Kong,Switzerland,2009,0,1,0,4,2005,3.021,9
+Hong Kong,Switzerland,2010,0,1,0,5,2005,2.932,9
+Hong Kong,Switzerland,2011,0,1,0,6,2005,2.861,9
+Hong Kong,Switzerland,2012,0,1,0,7,2005,2.803,9
+Hong Kong,Switzerland,2013,0,1,0,8,2005,2.816,9
+Hong Kong,Switzerland,2014,0,1,0,9,2005,2.882,9
+Hong Kong,Switzerland,2015,0,1,0,10,2005,2.852,9
+Hong Kong,Switzerland,2016,0,1,0,11,2005,2.833,9
+Hong Kong,Switzerland,2017,0,1,0,12,2005,2.887,9
+Hong Kong,Switzerland,2018,0,1,0,13,2005,2.875,9
+Hong Kong,Switzerland,2019,0,1,0,14,2005,2.887,9
+Shanghai,Beijing,2001,0,0,0,-15,2016,8.667,1
+Shanghai,Beijing,2003,0,0,0,-13,2016,4.353,1
+Shanghai,Beijing,2008,0,0,0,-8,2016,2.954,1
+Shanghai,Beijing,2009,0,0,0,-7,2016,2.51,1
+Shanghai,Beijing,2010,0,0,0,-6,2016,2.476,1
+Shanghai,Beijing,2011,0,0,0,-5,2016,2.189,1
+Shanghai,Beijing,2012,0,0,0,-4,2016,1.826,1
+Shanghai,Beijing,2013,0,0,0,-3,2016,1.521,1
+Shanghai,Beijing,2014,0,0,0,-2,2016,1.327,1
+Shanghai,Beijing,2015,0,0,0,-1,2016,1.248,1
+Shanghai,Beijing,2016,0,1,0,0,2016,1.353,1
+Shanghai,Beijing,2017,0,1,0,1,2016,1.235,1
+Shanghai,Beijing,2018,0,1,0,2,2016,1.205,1
+Shanghai,Beijing,2019,0,1,0,3,2016,1.012,1
+Shanghai,Shanghai,2001,1,0,0,-15,2016,3.023,5
+Shanghai,Shanghai,2002,1,0,0,-14,2016,3.481,5
+Shanghai,Shanghai,2003,1,0,0,-13,2016,2.718,5
+Shanghai,Shanghai,2004,1,0,0,-12,2016,3.432,5
+Shanghai,Shanghai,2005,1,0,0,-11,2016,3.232,5
+Shanghai,Shanghai,2006,1,0,0,-10,2016,3.067,5
+Shanghai,Shanghai,2007,1,0,0,-9,2016,3.001,5
+Shanghai,Shanghai,2008,1,0,0,-8,2016,2.549,5
+Shanghai,Shanghai,2009,1,0,0,-7,2016,2.199,5
+Shanghai,Shanghai,2010,1,0,0,-6,2016,2.57,5
+Shanghai,Shanghai,2011,1,0,0,-5,2016,1.963,5
+Shanghai,Shanghai,2012,1,0,0,-4,2016,1.753,5
+Shanghai,Shanghai,2013,1,0,0,-3,2016,1.53,5
+Shanghai,Shanghai,2014,1,0,0,-2,2016,1.487,5
+Shanghai,Shanghai,2015,1,0,0,-1,2016,1.487,5
+Shanghai,Shanghai,2016,1,1,1,0,2016,1.579,5
+Shanghai,Shanghai,2017,1,1,1,1,2016,1.526,5
+Shanghai,Shanghai,2018,1,1,1,2,2016,1.493,5
+Shanghai,Shanghai,2019,1,1,1,3,2016,1.514,5
+Shanghai,Shenzhen,2002,0,0,0,-14,2016,6.369,6
+Shanghai,Shenzhen,2006,0,0,0,-10,2016,3.177,6
+Shanghai,Shenzhen,2007,0,0,0,-9,2016,2.948,6
+Shanghai,Shenzhen,2008,0,0,0,-8,2016,2.409,6
+Shanghai,Shenzhen,2009,0,0,0,-7,2016,2.299,6
+Shanghai,Shenzhen,2010,0,0,0,-6,2016,2.264,6
+Shanghai,Shenzhen,2011,0,0,0,-5,2016,2.104,6
+Shanghai,Shenzhen,2012,0,0,0,-4,2016,2.11,6
+Shanghai,Shenzhen,2013,0,0,0,-3,2016,1.935,6
+Shanghai,Shenzhen,2014,0,0,0,-2,2016,1.753,6
+Shanghai,Shenzhen,2015,0,0,0,-1,2016,1.767,6
+Shanghai,Shenzhen,2016,0,1,0,0,2016,1.626,6
+Shanghai,Shenzhen,2017,0,1,0,1,2016,1.5,6
+Shanghai,Shenzhen,2018,0,1,0,2,2016,1.398,6
+Shanghai,Shenzhen,2019,0,1,0,3,2016,1.282,6

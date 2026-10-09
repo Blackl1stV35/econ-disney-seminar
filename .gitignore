@@ -1,0 +1,21 @@
+# Python caches
+__pycache__/
+*.py[cod]
+
+# Notebook checkpoints and test caches
+.ipynb_checkpoints/
+.pytest_cache/
+
+# Run log and assembled panel
+results/thermal_log.csv
+data/processed/global_panel.csv
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Operating system files
+.DS_Store
+Thumbs.db
+desktop.ini

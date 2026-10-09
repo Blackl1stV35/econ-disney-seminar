@@ -1,0 +1,24 @@
+# Packages needed to run the notebooks and the test suite.
+# Each minimum version is the version with which the analysis was developed.
+numpy>=2.5.3
+pandas>=3.0.5
+scipy>=1.18.1
+scikit-learn>=1.9.1
+statsmodels>=0.15.0
+matplotlib>=3.11.2
+cycler>=0.12.1
+psutil>=7.2.2
+nbconvert>=7.17.1
+nbclient>=0.11.0
+nbformat>=5.11.1
+ipykernel>=7.4.0
+pytest>=9.1.1
+
+# Opening the notebooks interactively needs a notebook front end, for example JupyterLab (pip install jupyterlab).
+# Running them from the command line needs only the packages above.
+
+# Optional packages, used by the tests only.
+# tests/test_scm.py and tests/test_transport.py compare the solvers with cvxpy solutions and skip those tests when it is absent.
+cvxpy>=1.9.3
+# tests/test_transport.py compares transport plans and the Wasserstein distance with POT and skips those tests when it is absent.
+POT>=0.9.7.post1

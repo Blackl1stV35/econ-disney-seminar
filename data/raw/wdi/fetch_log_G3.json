@@ -1,0 +1,1603 @@
+{
+  "group": "G3",
+  "generated_utc": "2026-10-08T04:31:48Z",
+  "economies": [
+    "POL",
+    "CZE",
+    "HUN",
+    "SVK",
+    "LVA",
+    "LTU",
+    "BGR",
+    "ROU",
+    "RUS",
+    "UKR",
+    "USA",
+    "CAN",
+    "MEX",
+    "BRA",
+    "ARG",
+    "CHL",
+    "COL",
+    "PER",
+    "CRI",
+    "PAN",
+    "DOM",
+    "JAM",
+    "BHS",
+    "URY"
+  ],
+  "chunks": [
+    [
+      "POL",
+      "CZE",
+      "HUN",
+      "SVK",
+      "LVA",
+      "LTU",
+      "BGR",
+      "ROU"
+    ],
+    [
+      "RUS",
+      "UKR",
+      "USA",
+      "CAN",
+      "MEX",
+      "BRA",
+      "ARG",
+      "CHL"
+    ],
+    [
+      "COL",
+      "PER",
+      "CRI",
+      "PAN",
+      "DOM",
+      "JAM",
+      "BHS",
+      "URY"
+    ]
+  ],
+  "indicators": [
+    "ST.INT.RCPT.CD",
+    "ST.INT.ARVL",
+    "NY.GDP.MKTP.CD",
+    "SP.POP.TOTL",
+    "IS.AIR.PSGR"
+  ],
+  "years": "1995-2024",
+  "route": "WebFetch tool only (api.worldbank.org); no curl/wget/requests/mirrors",
+  "chunk_prompt": "From the JSON data array, output one CSV line per record in the form iso3,year,value. iso3 is countryiso3code (if empty, use country.id). value is copied EXACTLY with all digits, no rounding, no thousands separators, no scientific notation; leave it empty if null. Output ALL records, sorted by iso3 then year ascending. After the records print one final line: TOTAL=<the total field>, PAGES=<the pages field>, LASTUPDATED=<the lastupdated field>. No other text.",
+  "format_notes": "Some WebFetch outputs were wrapped in ``` fences or began with an 'iso3,year,value' header line; those non-record lines and the TOTAL line were not written to the CSV files. Data lines were written unchanged.",
+  "calls": [
+    {
+      "call_no": 1,
+      "indicator": "ST.INT.RCPT.CD",
+      "economies": [
+        "POL",
+        "CZE",
+        "HUN",
+        "SVK",
+        "LVA",
+        "LTU",
+        "BGR",
+        "ROU"
+      ],
+      "url": "https://api.worldbank.org/v2/country/POL;CZE;HUN;SVK;LVA;LTU;BGR;ROU/indicator/ST.INT.RCPT.CD?format=json&date=1995:2024&per_page=1000",
+      "TOTAL": 240,
+      "PAGES": 1,
+      "LASTUPDATED": "2026-07-13",
+      "rows_written": 240,
+      "non_empty_written": 172,
+      "attempts": 3,
+      "read_timeouts_before_success": 2
+    },
+    {
+      "call_no": 2,
+      "indicator": "ST.INT.RCPT.CD",
+      "economies": [
+        "RUS",
+        "UKR",
+        "USA",
+        "CAN",
+        "MEX",
+        "BRA",
+        "ARG",
+        "CHL"
+      ],
+      "url": "https://api.worldbank.org/v2/country/RUS;UKR;USA;CAN;MEX;BRA;ARG;CHL/indicator/ST.INT.RCPT.CD?format=json&date=1995:2024&per_page=1000",
+      "TOTAL": 240,
+      "PAGES": 1,
+      "LASTUPDATED": "2026-07-13",
+      "rows_written": 240,
+      "non_empty_written": 192,
+      "attempts": 1,
+      "read_timeouts_before_success": 0
+    },
+    {
+      "call_no": 3,
+      "indicator": "ST.INT.RCPT.CD",
+      "economies": [
+        "COL",
+        "PER",
+        "CRI",
+        "PAN",
+        "DOM",
+        "JAM",
+        "BHS",
+        "URY"
+      ],
+      "url": "https://api.worldbank.org/v2/country/COL;PER;CRI;PAN;DOM;JAM;BHS;URY/indicator/ST.INT.RCPT.CD?format=json&date=1995:2024&per_page=1000",
+      "TOTAL": 240,
+      "PAGES": 1,
+      "LASTUPDATED": "2026-07-13",
+      "rows_written": 240,
+      "non_empty_written": 195,
+      "attempts": 1,
+      "read_timeouts_before_success": 0
+    },
+    {
+      "call_no": 4,
+      "indicator": "ST.INT.ARVL",
+      "economies": [
+        "POL",
+        "CZE",
+        "HUN",
+        "SVK",
+        "LVA",
+        "LTU",
+        "BGR",
+        "ROU"
+      ],
+      "url": "https://api.worldbank.org/v2/country/POL;CZE;HUN;SVK;LVA;LTU;BGR;ROU/indicator/ST.INT.ARVL?format=json&date=1995:2024&per_page=1000",
+      "TOTAL": 240,
+      "PAGES": 1,
+      "LASTUPDATED": "2026-07-13",
+      "rows_written": 240,
+      "non_empty_written": 175,
+      "attempts": 1,
+      "read_timeouts_before_success": 0
+    },
+    {
+      "call_no": 5,
+      "indicator": "ST.INT.ARVL",
+      "economies": [
+        "RUS",
+        "UKR",
+        "USA",
+        "CAN",
+        "MEX",
+        "BRA",
+        "ARG",
+        "CHL"
+      ],
+      "url": "https://api.worldbank.org/v2/country/RUS;UKR;USA;CAN;MEX;BRA;ARG;CHL/indicator/ST.INT.ARVL?format=json&date=1995:2024&per_page=1000",
+      "TOTAL": 240,
+      "PAGES": 1,
+      "LASTUPDATED": "2026-07-13",
+      "rows_written": 240,
+      "non_empty_written": 191,
+      "attempts": 1,
+      "read_timeouts_before_success": 0
+    },
+    {
+      "call_no": 6,
+      "indicator": "ST.INT.ARVL",
+      "economies": [
+        "COL",
+        "PER",
+        "CRI",
+        "PAN",
+        "DOM",
+        "JAM",
+        "BHS",
+        "URY"
+      ],
+      "url": "https://api.worldbank.org/v2/country/COL;PER;CRI;PAN;DOM;JAM;BHS;URY/indicator/ST.INT.ARVL?format=json&date=1995:2024&per_page=1000",
+      "TOTAL": 240,
+      "PAGES": 1,
+      "LASTUPDATED": "2026-07-13",
+      "rows_written": 240,
+      "non_empty_written": 198,
+      "attempts": 1,
+      "read_timeouts_before_success": 0
+    },
+    {
+      "call_no": 7,
+      "indicator": "NY.GDP.MKTP.CD",
+      "economies": [
+        "POL",
+        "CZE",
+        "HUN",
+        "SVK",
+        "LVA",
+        "LTU",
+        "BGR",
+        "ROU"
+      ],
+      "url": "https://api.worldbank.org/v2/country/POL;CZE;HUN;SVK;LVA;LTU;BGR;ROU/indicator/NY.GDP.MKTP.CD?format=json&date=1995:2024&per_page=1000",
+      "TOTAL": 240,
+      "PAGES": 1,
+      "LASTUPDATED": "2026-07-13",
+      "rows_written": 240,
+      "non_empty_written": 240,
+      "attempts": 1,
+      "read_timeouts_before_success": 0
+    },
+    {
+      "call_no": 8,
+      "indicator": "NY.GDP.MKTP.CD",
+      "economies": [
+        "RUS",
+        "UKR",
+        "USA",
+        "CAN",
+        "MEX",
+        "BRA",
+        "ARG",
+        "CHL"
+      ],
+      "url": "https://api.worldbank.org/v2/country/RUS;UKR;USA;CAN;MEX;BRA;ARG;CHL/indicator/NY.GDP.MKTP.CD?format=json&date=1995:2024&per_page=1000",
+      "TOTAL": 240,
+      "PAGES": 1,
+      "LASTUPDATED": "2026-07-13",
+      "rows_written": 240,
+      "non_empty_written": 240,
+      "attempts": 1,
+      "read_timeouts_before_success": 0
+    },
+    {
+      "call_no": 9,
+      "indicator": "NY.GDP.MKTP.CD",
+      "economies": [
+        "COL",
+        "PER",
+        "CRI",
+        "PAN",
+        "DOM",
+        "JAM",
+        "BHS",
+        "URY"
+      ],
+      "url": "https://api.worldbank.org/v2/country/COL;PER;CRI;PAN;DOM;JAM;BHS;URY/indicator/NY.GDP.MKTP.CD?format=json&date=1995:2024&per_page=1000",
+      "TOTAL": 240,
+      "PAGES": 1,
+      "LASTUPDATED": "2026-07-13",
+      "rows_written": 240,
+      "non_empty_written": 240,
+      "attempts": 1,
+      "read_timeouts_before_success": 0
+    },
+    {
+      "call_no": 10,
+      "indicator": "SP.POP.TOTL",
+      "economies": [
+        "POL",
+        "CZE",
+        "HUN",
+        "SVK",
+        "LVA",
+        "LTU",
+        "BGR",
+        "ROU"
+      ],
+      "url": "https://api.worldbank.org/v2/country/POL;CZE;HUN;SVK;LVA;LTU;BGR;ROU/indicator/SP.POP.TOTL?format=json&date=1995:2024&per_page=1000",
+      "TOTAL": 240,
+      "PAGES": 1,
+      "LASTUPDATED": "2026-07-13",
+      "rows_written": 240,
+      "non_empty_written": 240,
+      "attempts": 1,
+      "read_timeouts_before_success": 0
+    },
+    {
+      "call_no": 11,
+      "indicator": "SP.POP.TOTL",
+      "economies": [
+        "RUS",
+        "UKR",
+        "USA",
+        "CAN",
+        "MEX",
+        "BRA",
+        "ARG",
+        "CHL"
+      ],
+      "url": "https://api.worldbank.org/v2/country/RUS;UKR;USA;CAN;MEX;BRA;ARG;CHL/indicator/SP.POP.TOTL?format=json&date=1995:2024&per_page=1000",
+      "TOTAL": 240,
+      "PAGES": 1,
+      "LASTUPDATED": "2026-07-13",
+      "rows_written": 240,
+      "non_empty_written": 240,
+      "attempts": 1,
+      "read_timeouts_before_success": 0
+    },
+    {
+      "call_no": 12,
+      "indicator": "SP.POP.TOTL",
+      "economies": [
+        "COL",
+        "PER",
+        "CRI",
+        "PAN",
+        "DOM",
+        "JAM",
+        "BHS",
+        "URY"
+      ],
+      "url": "https://api.worldbank.org/v2/country/COL;PER;CRI;PAN;DOM;JAM;BHS;URY/indicator/SP.POP.TOTL?format=json&date=1995:2024&per_page=1000",
+      "TOTAL": 240,
+      "PAGES": 1,
+      "LASTUPDATED": "2026-07-13",
+      "rows_written": 240,
+      "non_empty_written": 240,
+      "attempts": 1,
+      "read_timeouts_before_success": 0
+    },
+    {
+      "call_no": 13,
+      "indicator": "IS.AIR.PSGR",
+      "economies": [
+        "POL",
+        "CZE",
+        "HUN",
+        "SVK",
+        "LVA",
+        "LTU",
+        "BGR",
+        "ROU"
+      ],
+      "url": "https://api.worldbank.org/v2/country/POL;CZE;HUN;SVK;LVA;LTU;BGR;ROU/indicator/IS.AIR.PSGR?format=json&date=1995:2024&per_page=1000",
+      "TOTAL": 240,
+      "PAGES": 1,
+      "LASTUPDATED": "2026-07-13",
+      "rows_written": 240,
+      "non_empty_written": 228,
+      "attempts": 2,
+      "read_timeouts_before_success": 1
+    },
+    {
+      "call_no": 14,
+      "indicator": "IS.AIR.PSGR",
+      "economies": [
+        "RUS",
+        "UKR",
+        "USA",
+        "CAN",
+        "MEX",
+        "BRA",
+        "ARG",
+        "CHL"
+      ],
+      "url": "https://api.worldbank.org/v2/country/RUS;UKR;USA;CAN;MEX;BRA;ARG;CHL/indicator/IS.AIR.PSGR?format=json&date=1995:2024&per_page=1000",
+      "TOTAL": 240,
+      "PAGES": 1,
+      "LASTUPDATED": "2026-07-13",
+      "rows_written": 240,
+      "non_empty_written": 231,
+      "attempts": 2,
+      "read_timeouts_before_success": 1
+    },
+    {
+      "call_no": 15,
+      "indicator": "IS.AIR.PSGR",
+      "economies": [
+        "COL",
+        "PER",
+        "CRI",
+        "PAN",
+        "DOM",
+        "JAM",
+        "BHS",
+        "URY"
+      ],
+      "url": "https://api.worldbank.org/v2/country/COL;PER;CRI;PAN;DOM;JAM;BHS;URY/indicator/IS.AIR.PSGR?format=json&date=1995:2024&per_page=1000",
+      "TOTAL": 240,
+      "PAGES": 1,
+      "LASTUPDATED": "2026-07-13",
+      "rows_written": 240,
+      "non_empty_written": 201,
+      "attempts": 2,
+      "read_timeouts_before_success": 1
+    }
+  ],
+  "per_indicator": {
+    "ST.INT.RCPT.CD": {
+      "file": "wdi_G3_ST.INT.RCPT.CD.csv",
+      "rows": 720,
+      "non_empty": 559,
+      "empty": 161,
+      "economies_with_no_data_at_all": [],
+      "years_with_no_data_for_any_economy": [
+        2021,
+        2022,
+        2023,
+        2024
+      ],
+      "coverage_by_economy": {
+        "POL": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "CZE": {
+          "non_empty": 19,
+          "first_year": 2002,
+          "last_year": 2020
+        },
+        "HUN": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "SVK": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "LVA": {
+          "non_empty": 13,
+          "first_year": 1995,
+          "last_year": 2007
+        },
+        "LTU": {
+          "non_empty": 10,
+          "first_year": 1995,
+          "last_year": 2004
+        },
+        "BGR": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "ROU": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "RUS": {
+          "non_empty": 20,
+          "first_year": 2001,
+          "last_year": 2020
+        },
+        "UKR": {
+          "non_empty": 25,
+          "first_year": 1996,
+          "last_year": 2020
+        },
+        "USA": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "CAN": {
+          "non_empty": 17,
+          "first_year": 1995,
+          "last_year": 2011
+        },
+        "MEX": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "BRA": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "ARG": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "CHL": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "COL": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "PER": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "CRI": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "PAN": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "DOM": {
+          "non_empty": 24,
+          "first_year": 1995,
+          "last_year": 2018
+        },
+        "JAM": {
+          "non_empty": 17,
+          "first_year": 1995,
+          "last_year": 2011
+        },
+        "BHS": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "URY": {
+          "non_empty": 24,
+          "first_year": 1995,
+          "last_year": 2020
+        }
+      },
+      "notes": [
+        "0 non-empty values contain a decimal part (copied as returned)"
+      ],
+      "sha256": "486221b593ce4e6ba47fa5c6f315b7e6ff7311709e5cd9589ed806834c791df6"
+    },
+    "ST.INT.ARVL": {
+      "file": "wdi_G3_ST.INT.ARVL.csv",
+      "rows": 720,
+      "non_empty": 564,
+      "empty": 156,
+      "economies_with_no_data_at_all": [],
+      "years_with_no_data_for_any_economy": [
+        2021,
+        2022,
+        2023,
+        2024
+      ],
+      "coverage_by_economy": {
+        "POL": {
+          "non_empty": 25,
+          "first_year": 1995,
+          "last_year": 2019
+        },
+        "CZE": {
+          "non_empty": 17,
+          "first_year": 2003,
+          "last_year": 2019
+        },
+        "HUN": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "SVK": {
+          "non_empty": 6,
+          "first_year": 2013,
+          "last_year": 2018
+        },
+        "LVA": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "LTU": {
+          "non_empty": 23,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "BGR": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "ROU": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "RUS": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "UKR": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "USA": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "CAN": {
+          "non_empty": 25,
+          "first_year": 1995,
+          "last_year": 2019
+        },
+        "MEX": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "BRA": {
+          "non_empty": 25,
+          "first_year": 1995,
+          "last_year": 2019
+        },
+        "ARG": {
+          "non_empty": 25,
+          "first_year": 1995,
+          "last_year": 2019
+        },
+        "CHL": {
+          "non_empty": 12,
+          "first_year": 2008,
+          "last_year": 2019
+        },
+        "COL": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "PER": {
+          "non_empty": 17,
+          "first_year": 2004,
+          "last_year": 2020
+        },
+        "CRI": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "PAN": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "DOM": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "JAM": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "BHS": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2020
+        },
+        "URY": {
+          "non_empty": 25,
+          "first_year": 1995,
+          "last_year": 2019
+        }
+      },
+      "notes": [
+        "8 non-empty values contain a decimal part (copied as returned)"
+      ],
+      "sha256": "74793ff52e334f21e55efec1fd71c1a14a964a423486bd324a26ed8f856e0b5a"
+    },
+    "NY.GDP.MKTP.CD": {
+      "file": "wdi_G3_NY.GDP.MKTP.CD.csv",
+      "rows": 720,
+      "non_empty": 720,
+      "empty": 0,
+      "economies_with_no_data_at_all": [],
+      "years_with_no_data_for_any_economy": [],
+      "coverage_by_economy": {
+        "POL": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "CZE": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "HUN": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "SVK": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "LVA": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "LTU": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "BGR": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "ROU": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "RUS": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "UKR": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "USA": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "CAN": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "MEX": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "BRA": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "ARG": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "CHL": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "COL": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "PER": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "CRI": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "PAN": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "DOM": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "JAM": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "BHS": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "URY": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        }
+      },
+      "notes": [
+        "622 non-empty values contain a decimal part (copied as returned)"
+      ],
+      "sha256": "5e2ea5e9ed1c624601195252c4a86d5e934cc93a13b8efd72766dcd70c5dfe9e"
+    },
+    "SP.POP.TOTL": {
+      "file": "wdi_G3_SP.POP.TOTL.csv",
+      "rows": 720,
+      "non_empty": 720,
+      "empty": 0,
+      "economies_with_no_data_at_all": [],
+      "years_with_no_data_for_any_economy": [],
+      "coverage_by_economy": {
+        "POL": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "CZE": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "HUN": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "SVK": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "LVA": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "LTU": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "BGR": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "ROU": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "RUS": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "UKR": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "USA": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "CAN": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "MEX": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "BRA": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "ARG": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "CHL": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "COL": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "PER": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "CRI": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "PAN": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "DOM": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "JAM": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "BHS": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        },
+        "URY": {
+          "non_empty": 30,
+          "first_year": 1995,
+          "last_year": 2024
+        }
+      },
+      "notes": [
+        "0 non-empty values contain a decimal part (copied as returned)"
+      ],
+      "sha256": "c4e13a5c9c30cd76549666cec51787fa3369b8ff81d953304d5ac6ad69316d9b"
+    },
+    "IS.AIR.PSGR": {
+      "file": "wdi_G3_IS.AIR.PSGR.csv",
+      "rows": 720,
+      "non_empty": 660,
+      "empty": 60,
+      "economies_with_no_data_at_all": [],
+      "years_with_no_data_for_any_economy": [
+        2024
+      ],
+      "coverage_by_economy": {
+        "POL": {
+          "non_empty": 29,
+          "first_year": 1995,
+          "last_year": 2023
+        },
+        "CZE": {
+          "non_empty": 29,
+          "first_year": 1995,
+          "last_year": 2023
+        },
+        "HUN": {
+          "non_empty": 29,
+          "first_year": 1995,
+          "last_year": 2023
+        },
+        "SVK": {
+          "non_empty": 26,
+          "first_year": 1995,
+          "last_year": 2022
+        },
+        "LVA": {
+          "non_empty": 29,
+          "first_year": 1995,
+          "last_year": 2023
+        },
+        "LTU": {
+          "non_empty": 28,
+          "first_year": 1995,
+          "last_year": 2022
+        },
+        "BGR": {
+          "non_empty": 29,
+          "first_year": 1995,
+          "last_year": 2023
+        },
+        "ROU": {
+          "non_empty": 29,
+          "first_year": 1995,
+          "last_year": 2023
+        },
+        "RUS": {
+          "non_empty": 29,
+          "first_year": 1995,
+          "last_year": 2023
+        },
+        "UKR": {
+          "non_empty": 28,
+          "first_year": 1995,
+          "last_year": 2022
+        },
+        "USA": {
+          "non_empty": 29,
+          "first_year": 1995,
+          "last_year": 2023
+        },
+        "CAN": {
+          "non_empty": 29,
+          "first_year": 1995,
+          "last_year": 2023
+        },
+        "MEX": {
+          "non_empty": 29,
+          "first_year": 1995,
+          "last_year": 2023
+        },
+        "BRA": {
+          "non_empty": 29,
+          "first_year": 1995,
+          "last_year": 2023
+        },
+        "ARG": {
+          "non_empty": 29,
+          "first_year": 1995,
+          "last_year": 2023
+        },
+        "CHL": {
+          "non_empty": 29,
+          "first_year": 1995,
+          "last_year": 2023
+        },
+        "COL": {
+          "non_empty": 29,
+          "first_year": 1995,
+          "last_year": 2023
+        },
+        "PER": {
+          "non_empty": 29,
+          "first_year": 1995,
+          "last_year": 2023
+        },
+        "CRI": {
+          "non_empty": 29,
+          "first_year": 1995,
+          "last_year": 2023
+        },
+        "PAN": {
+          "non_empty": 29,
+          "first_year": 1995,
+          "last_year": 2023
+        },
+        "DOM": {
+          "non_empty": 17,
+          "first_year": 1995,
+          "last_year": 2023
+        },
+        "JAM": {
+          "non_empty": 24,
+          "first_year": 1995,
+          "last_year": 2018
+        },
+        "BHS": {
+          "non_empty": 29,
+          "first_year": 1995,
+          "last_year": 2023
+        },
+        "URY": {
+          "non_empty": 15,
+          "first_year": 1995,
+          "last_year": 2009
+        }
+      },
+      "notes": [
+        "API returned numeric 0 (not null) for: JAM-2010, JAM-2011, JAM-2012",
+        "61 non-empty values contain a decimal part (copied as returned)"
+      ],
+      "sha256": "54dca09a19b896dd6c35d9558cfadcf796c5c2a30c239b83a5bffdf3db04e16b"
+    }
+  },
+  "validation": {
+    "all_passed": true,
+    "by_indicator": {
+      "ST.INT.RCPT.CD": {
+        "every_economy_year_exactly_once": true,
+        "missing_rows": 0,
+        "unexpected_rows": 0,
+        "duplicate_keys": 0,
+        "non_numeric_values": 0,
+        "rows_per_call": [
+          240,
+          240,
+          240
+        ],
+        "rows_per_call_equal_TOTAL": true,
+        "passed": true
+      },
+      "ST.INT.ARVL": {
+        "every_economy_year_exactly_once": true,
+        "missing_rows": 0,
+        "unexpected_rows": 0,
+        "duplicate_keys": 0,
+        "non_numeric_values": 0,
+        "rows_per_call": [
+          240,
+          240,
+          240
+        ],
+        "rows_per_call_equal_TOTAL": true,
+        "passed": true
+      },
+      "NY.GDP.MKTP.CD": {
+        "every_economy_year_exactly_once": true,
+        "missing_rows": 0,
+        "unexpected_rows": 0,
+        "duplicate_keys": 0,
+        "non_numeric_values": 0,
+        "rows_per_call": [
+          240,
+          240,
+          240
+        ],
+        "rows_per_call_equal_TOTAL": true,
+        "passed": true
+      },
+      "SP.POP.TOTL": {
+        "every_economy_year_exactly_once": true,
+        "missing_rows": 0,
+        "unexpected_rows": 0,
+        "duplicate_keys": 0,
+        "non_numeric_values": 0,
+        "rows_per_call": [
+          240,
+          240,
+          240
+        ],
+        "rows_per_call_equal_TOTAL": true,
+        "passed": true
+      },
+      "IS.AIR.PSGR": {
+        "every_economy_year_exactly_once": true,
+        "missing_rows": 0,
+        "unexpected_rows": 0,
+        "duplicate_keys": 0,
+        "non_numeric_values": 0,
+        "rows_per_call": [
+          240,
+          240,
+          240
+        ],
+        "rows_per_call_equal_TOTAL": true,
+        "passed": true
+      }
+    }
+  },
+  "audit": {
+    "sample_size": 30,
+    "selection": "random.Random(20261008); 24 economies each drawn once plus 6 extra random economies; 6 records per indicator; year random among non-empty years of the chosen (economy, indicator)",
+    "prompt": "Print only the value field exactly as given, all digits.",
+    "matched": 30,
+    "match_rate": 1.0,
+    "mismatches": [],
+    "reaudit": "not required (no mismatch)",
+    "records": [
+      {
+        "n": 1,
+        "indicator": "ST.INT.RCPT.CD",
+        "iso3": "BHS",
+        "year": 1995,
+        "url": "https://api.worldbank.org/v2/country/BHS/indicator/ST.INT.RCPT.CD?format=json&date=1995",
+        "stored_value": "1356000000",
+        "fetched_value": "1356000000",
+        "exact_string_match": true,
+        "fetch_attempts": 2
+      },
+      {
+        "n": 2,
+        "indicator": "ST.INT.RCPT.CD",
+        "iso3": "BRA",
+        "year": 2004,
+        "url": "https://api.worldbank.org/v2/country/BRA/indicator/ST.INT.RCPT.CD?format=json&date=2004",
+        "stored_value": "3389000000",
+        "fetched_value": "3389000000",
+        "exact_string_match": true,
+        "fetch_attempts": 1
+      },
+      {
+        "n": 3,
+        "indicator": "ST.INT.RCPT.CD",
+        "iso3": "CAN",
+        "year": 2011,
+        "url": "https://api.worldbank.org/v2/country/CAN/indicator/ST.INT.RCPT.CD?format=json&date=2011",
+        "stored_value": "19994000000",
+        "fetched_value": "19994000000",
+        "exact_string_match": true,
+        "fetch_attempts": 1
+      },
+      {
+        "n": 4,
+        "indicator": "ST.INT.RCPT.CD",
+        "iso3": "LTU",
+        "year": 1996,
+        "url": "https://api.worldbank.org/v2/country/LTU/indicator/ST.INT.RCPT.CD?format=json&date=1996",
+        "stored_value": "345000000",
+        "fetched_value": "345000000",
+        "exact_string_match": true,
+        "fetch_attempts": 1
+      },
+      {
+        "n": 5,
+        "indicator": "ST.INT.RCPT.CD",
+        "iso3": "LVA",
+        "year": 1998,
+        "url": "https://api.worldbank.org/v2/country/LVA/indicator/ST.INT.RCPT.CD?format=json&date=1998",
+        "stored_value": "222000000",
+        "fetched_value": "222000000",
+        "exact_string_match": true,
+        "fetch_attempts": 1
+      },
+      {
+        "n": 6,
+        "indicator": "ST.INT.RCPT.CD",
+        "iso3": "RUS",
+        "year": 2012,
+        "url": "https://api.worldbank.org/v2/country/RUS/indicator/ST.INT.RCPT.CD?format=json&date=2012",
+        "stored_value": "17876000000",
+        "fetched_value": "17876000000",
+        "exact_string_match": true,
+        "fetch_attempts": 1
+      },
+      {
+        "n": 7,
+        "indicator": "ST.INT.ARVL",
+        "iso3": "ARG",
+        "year": 2006,
+        "url": "https://api.worldbank.org/v2/country/ARG/indicator/ST.INT.ARVL?format=json&date=2006",
+        "stored_value": "4173000",
+        "fetched_value": "4173000",
+        "exact_string_match": true,
+        "fetch_attempts": 1
+      },
+      {
+        "n": 8,
+        "indicator": "ST.INT.ARVL",
+        "iso3": "CZE",
+        "year": 2009,
+        "url": "https://api.worldbank.org/v2/country/CZE/indicator/ST.INT.ARVL?format=json&date=2009",
+        "stored_value": "23285000",
+        "fetched_value": "23285000",
+        "exact_string_match": true,
+        "fetch_attempts": 1
+      },
+      {
+        "n": 9,
+        "indicator": "ST.INT.ARVL",
+        "iso3": "JAM",
+        "year": 1996,
+        "url": "https://api.worldbank.org/v2/country/JAM/indicator/ST.INT.ARVL?format=json&date=1996",
+        "stored_value": "1821000",
+        "fetched_value": "1821000",
+        "exact_string_match": true,
+        "fetch_attempts": 1
+      },
+      {
+        "n": 10,
+        "indicator": "ST.INT.ARVL",
+        "iso3": "MEX",
+        "year": 2008,
+        "url": "https://api.worldbank.org/v2/country/MEX/indicator/ST.INT.ARVL?format=json&date=2008",
+        "stored_value": "92948000",
+        "fetched_value": "92948000",
+        "exact_string_match": true,
+        "fetch_attempts": 1
+      },
+      {
+        "n": 11,
+        "indicator": "ST.INT.ARVL",
+        "iso3": "PER",
+        "year": 2006,
+        "url": "https://api.worldbank.org/v2/country/PER/indicator/ST.INT.ARVL?format=json&date=2006",
+        "stored_value": "2227000",
+        "fetched_value": "2227000",
+        "exact_string_match": true,
+        "fetch_attempts": 3
+      },
+      {
+        "n": 12,
+        "indicator": "ST.INT.ARVL",
+        "iso3": "USA",
+        "year": 2019,
+        "url": "https://api.worldbank.org/v2/country/USA/indicator/ST.INT.ARVL?format=json&date=2019",
+        "stored_value": "165478000",
+        "fetched_value": "165478000",
+        "exact_string_match": true,
+        "fetch_attempts": 1
+      },
+      {
+        "n": 13,
+        "indicator": "NY.GDP.MKTP.CD",
+        "iso3": "BGR",
+        "year": 2018,
+        "url": "https://api.worldbank.org/v2/country/BGR/indicator/NY.GDP.MKTP.CD?format=json&date=2018",
+        "stored_value": "66100606676.6544",
+        "fetched_value": "66100606676.6544",
+        "exact_string_match": true,
+        "fetch_attempts": 1
+      },
+      {
+        "n": 14,
+        "indicator": "NY.GDP.MKTP.CD",
+        "iso3": "PAN",
+        "year": 1995,
+        "url": "https://api.worldbank.org/v2/country/PAN/indicator/NY.GDP.MKTP.CD?format=json&date=1995",
+        "stored_value": "9573813700",
+        "fetched_value": "9573813700",
+        "exact_string_match": true,
+        "fetch_attempts": 1
+      },
+      {
+        "n": 15,
+        "indicator": "NY.GDP.MKTP.CD",
+        "iso3": "POL",
+        "year": 1996,
+        "url": "https://api.worldbank.org/v2/country/POL/indicator/NY.GDP.MKTP.CD?format=json&date=1996",
+        "stored_value": "160813026223.063",
+        "fetched_value": "160813026223.063",
+        "exact_string_match": true,
+        "fetch_attempts": 1
+      },
+      {
+        "n": 16,
+        "indicator": "NY.GDP.MKTP.CD",
+        "iso3": "SVK",
+        "year": 2008,
+        "url": "https://api.worldbank.org/v2/country/SVK/indicator/NY.GDP.MKTP.CD?format=json&date=2008",
+        "stored_value": "96685492864.2317",
+        "fetched_value": "96685492864.2317",
+        "exact_string_match": true,
+        "fetch_attempts": 1
+      },
+      {
+        "n": 17,
+        "indicator": "NY.GDP.MKTP.CD",
+        "iso3": "UKR",
+        "year": 2020,
+        "url": "https://api.worldbank.org/v2/country/UKR/indicator/NY.GDP.MKTP.CD?format=json&date=2020",
+        "stored_value": "156617722013.342",
+        "fetched_value": "156617722013.342",
+        "exact_string_match": true,
+        "fetch_attempts": 1
+      },
+      {
+        "n": 18,
+        "indicator": "NY.GDP.MKTP.CD",
+        "iso3": "URY",
+        "year": 2005,
+        "url": "https://api.worldbank.org/v2/country/URY/indicator/NY.GDP.MKTP.CD?format=json&date=2005",
+        "stored_value": "17362857683.8545",
+        "fetched_value": "17362857683.8545",
+        "exact_string_match": true,
+        "fetch_attempts": 1
+      },
+      {
+        "n": 19,
+        "indicator": "SP.POP.TOTL",
+        "iso3": "CRI",
+        "year": 2017,
+        "url": "https://api.worldbank.org/v2/country/CRI/indicator/SP.POP.TOTL?format=json&date=2017",
+        "stored_value": "4913177",
+        "fetched_value": "4913177",
+        "exact_string_match": true,
+        "fetch_attempts": 1
+      },
+      {
+        "n": 20,
+        "indicator": "SP.POP.TOTL",
+        "iso3": "CZE",
+        "year": 2001,
+        "url": "https://api.worldbank.org/v2/country/CZE/indicator/SP.POP.TOTL?format=json&date=2001",
+        "stored_value": "10216605",
+        "fetched_value": "10216605",
+        "exact_string_match": true,
+        "fetch_attempts": 1
+      },
+      {
+        "n": 21,
+        "indicator": "SP.POP.TOTL",
+        "iso3": "HUN",
+        "year": 2016,
+        "url": "https://api.worldbank.org/v2/country/HUN/indicator/SP.POP.TOTL?format=json&date=2016",
+        "stored_value": "9759755",
+        "fetched_value": "9759755",
+        "exact_string_match": true,
+        "fetch_attempts": 1
+      },
+      {
+        "n": 22,
+        "indicator": "SP.POP.TOTL",
+        "iso3": "ROU",
+        "year": 2020,
+        "url": "https://api.worldbank.org/v2/country/ROU/indicator/SP.POP.TOTL?format=json&date=2020",
+        "stored_value": "19265250",
+        "fetched_value": "19265250",
+        "exact_string_match": true,
+        "fetch_attempts": 1
+      },
+      {
+        "n": 23,
+        "indicator": "SP.POP.TOTL",
+        "iso3": "ROU",
+        "year": 2023,
+        "url": "https://api.worldbank.org/v2/country/ROU/indicator/SP.POP.TOTL?format=json&date=2023",
+        "stored_value": "19061062",
+        "fetched_value": "19061062",
+        "exact_string_match": true,
+        "fetch_attempts": 1
+      },
+      {
+        "n": 24,
+        "indicator": "SP.POP.TOTL",
+        "iso3": "RUS",
+        "year": 1997,
+        "url": "https://api.worldbank.org/v2/country/RUS/indicator/SP.POP.TOTL?format=json&date=1997",
+        "stored_value": "147915361",
+        "fetched_value": "147915361",
+        "exact_string_match": true,
+        "fetch_attempts": 1
+      },
+      {
+        "n": 25,
+        "indicator": "IS.AIR.PSGR",
+        "iso3": "ARG",
+        "year": 1999,
+        "url": "https://api.worldbank.org/v2/country/ARG/indicator/IS.AIR.PSGR?format=json&date=1999",
+        "stored_value": "9191900",
+        "fetched_value": "9191900",
+        "exact_string_match": true,
+        "fetch_attempts": 1
+      },
+      {
+        "n": 26,
+        "indicator": "IS.AIR.PSGR",
+        "iso3": "CHL",
+        "year": 2020,
+        "url": "https://api.worldbank.org/v2/country/CHL/indicator/IS.AIR.PSGR?format=json&date=2020",
+        "stored_value": "8019753",
+        "fetched_value": "8019753",
+        "exact_string_match": true,
+        "fetch_attempts": 1
+      },
+      {
+        "n": 27,
+        "indicator": "IS.AIR.PSGR",
+        "iso3": "COL",
+        "year": 1998,
+        "url": "https://api.worldbank.org/v2/country/COL/indicator/IS.AIR.PSGR?format=json&date=1998",
+        "stored_value": "9289700",
+        "fetched_value": "9289700",
+        "exact_string_match": true,
+        "fetch_attempts": 1
+      },
+      {
+        "n": 28,
+        "indicator": "IS.AIR.PSGR",
+        "iso3": "DOM",
+        "year": 1995,
+        "url": "https://api.worldbank.org/v2/country/DOM/indicator/IS.AIR.PSGR?format=json&date=1995",
+        "stored_value": "67400",
+        "fetched_value": "67400",
+        "exact_string_match": true,
+        "fetch_attempts": 1
+      },
+      {
+        "n": 29,
+        "indicator": "IS.AIR.PSGR",
+        "iso3": "LVA",
+        "year": 1998,
+        "url": "https://api.worldbank.org/v2/country/LVA/indicator/IS.AIR.PSGR?format=json&date=1998",
+        "stored_value": "229100",
+        "fetched_value": "229100",
+        "exact_string_match": true,
+        "fetch_attempts": 2
+      },
+      {
+        "n": 30,
+        "indicator": "IS.AIR.PSGR",
+        "iso3": "UKR",
+        "year": 2004,
+        "url": "https://api.worldbank.org/v2/country/UKR/indicator/IS.AIR.PSGR?format=json&date=2004",
+        "stored_value": "2200094",
+        "fetched_value": "2200094",
+        "exact_string_match": true,
+        "fetch_attempts": 2
+      }
+    ]
+  },
+  "supplementary_checks": {
+    "second_pass_crosscheck": {
+      "description": "Optional independent re-fetch of the same chunk with '&page=1' appended to the URL (fresh fetch and fresh transcription), compared programmatically to the stored CSV rows",
+      "ST.INT.RCPT.CD chunk 1": {
+        "url": "https://api.worldbank.org/v2/country/POL;CZE;HUN;SVK;LVA;LTU;BGR;ROU/indicator/ST.INT.RCPT.CD?format=json&date=1995:2024&per_page=1000&page=1",
+        "records_compared": 240,
+        "mismatches": 0,
+        "TOTAL": 240,
+        "LASTUPDATED": "2026-07-13"
+      },
+      "ST.INT.RCPT.CD chunk 2": {
+        "url": "https://api.worldbank.org/v2/country/RUS;UKR;USA;CAN;MEX;BRA;ARG;CHL/indicator/ST.INT.RCPT.CD?format=json&date=1995:2024&per_page=1000&page=1",
+        "records_compared": 240,
+        "mismatches": 0,
+        "TOTAL": 240,
+        "LASTUPDATED": "2026-07-13"
+      },
+      "ST.INT.RCPT.CD chunk 3": {
+        "url": "https://api.worldbank.org/v2/country/COL;PER;CRI;PAN;DOM;JAM;BHS;URY/indicator/ST.INT.RCPT.CD?format=json&date=1995:2024&per_page=1000&page=1",
+        "result": "not read: WebFetch proxy returned HTTP 429 (rate limited) and instructed not to fetch this page again; not retried. No further second-pass fetches were attempted for other indicators."
+      }
+    },
+    "targeted_single_record_checks": [
+      {
+        "indicator": "IS.AIR.PSGR",
+        "iso3": "JAM",
+        "year": 2010,
+        "fetched": "0",
+        "stored": "0",
+        "note": "API gives numeric 0, not null",
+        "exact_match": true
+      },
+      {
+        "indicator": "ST.INT.ARVL",
+        "iso3": "USA",
+        "year": 2011,
+        "fetched": "147271421.875",
+        "stored": "147271421.875",
+        "exact_match": true
+      },
+      {
+        "indicator": "ST.INT.ARVL",
+        "iso3": "JAM",
+        "year": 2020,
+        "fetched": "1329699.95117188",
+        "stored": "1329699.95117188",
+        "exact_match": true
+      },
+      {
+        "indicator": "ST.INT.ARVL",
+        "iso3": "LTU",
+        "year": 2005,
+        "fetched": "null",
+        "stored": "",
+        "note": "stored empty; source null",
+        "exact_match": true
+      },
+      {
+        "indicator": "IS.AIR.PSGR",
+        "iso3": "DOM",
+        "year": 2017,
+        "fetched": "null",
+        "stored": "",
+        "note": "stored empty; source null",
+        "exact_match": true
+      },
+      {
+        "indicator": "ST.INT.ARVL",
+        "iso3": "POL",
+        "year": 2020,
+        "fetched": "null",
+        "stored": "",
+        "note": "stored empty; source null",
+        "exact_match": true
+      }
+    ],
+    "offline_sanity_scans": {
+      "ST.INT.RCPT.CD_all_values_multiple_of_1e6": true,
+      "SP.POP.TOTL_yoy_change_over_3pct": [
+        "UKR 2022",
+        "UKR 2023",
+        "CAN 2024"
+      ],
+      "NY.GDP.MKTP.CD_yoy_change_over_45pct": [
+        "ARG 2002",
+        "DOM 2005",
+        "BHS 1997"
+      ]
+    }
+  },
+  "events": [
+    {
+      "event": "HTTP 429 from WebFetch proxy on an optional cross-check fetch",
+      "url": "https://api.worldbank.org/v2/country/COL;PER;CRI;PAN;DOM;JAM;BHS;URY/indicator/ST.INT.RCPT.CD?format=json&date=1995:2024&per_page=1000&page=1",
+      "action": "page not re-fetched; no further second-pass chunk fetches were made; after a pause of about 75 seconds only six light single-record spot-checks were made (see supplementary_checks.targeted_single_record_checks)"
+    }
+  ]
+}
