@@ -689,7 +689,8 @@ def source_receipts_share(shares: ArrayLike | pd.Series, usage: ArrayLike | pd.S
     usage of a source is the weight that the transport puts on it (for example
     the mass of its episodes in the transported effect).  The result is
     ``sum(usage * shares) / sum(usage)``.  Sources with zero usage do not enter,
-    so their shares may be missing.
+    so their shares may be missing.  The usages are used as given: their sum and
+    their products with the shares must stay below the largest float.
 
     Parameters
     ----------
@@ -710,8 +711,9 @@ def source_receipts_share(shares: ArrayLike | pd.Series, usage: ArrayLike | pd.S
     ------
     ValueError
         If the inputs are not one-dimensional and of equal length, a usage is
-        negative or not finite, the usages sum to zero, a share with positive
-        usage is not finite and positive, or two Series name different sources.
+        negative or not finite, the usages sum to zero or to a value that is not
+        finite, a share with positive usage is not finite and positive, two
+        Series name different sources, or the weighted mean is not finite.
     """
     if isinstance(shares, pd.Series) and isinstance(usage, pd.Series):
         if not (shares.index.is_unique and usage.index.is_unique):
@@ -727,13 +729,22 @@ def source_receipts_share(shares: ArrayLike | pd.Series, usage: ArrayLike | pd.S
         raise ValueError("shares and usage must have the same length.")
     if not bool(np.all(np.isfinite(u) & (u >= 0.0))):
         raise ValueError("usage must be finite and non-negative.")
-    total = float(np.sum(u))
+    with np.errstate(over="ignore", invalid="ignore"):
+        total = float(np.sum(u))
     if not total > 0.0:
         raise ValueError("usage must have a positive sum.")
+    if not np.isfinite(total):
+        raise ValueError("usage must have a finite sum.")
     used = u > 0.0
     if not bool(np.all(np.isfinite(s[used]) & (s[used] > 0.0))):
         raise ValueError("shares of the sources in use must be finite and positive.")
-    return float(np.sum(u[used] * s[used]) / total)
+    with np.errstate(over="ignore", invalid="ignore"):
+        mean = float(np.sum(u[used] * s[used]) / total)
+    if not np.isfinite(mean):
+        raise ValueError(
+            "The usage-weighted mean of the shares is not finite: usage times share overflows."
+        )
+    return mean
 
 
 def rescale_null_pp(
@@ -741,12 +752,13 @@ def rescale_null_pp(
 ) -> tuple[np.ndarray, float]:
     """Put a placebo null in percentage points of GDP on the scale of the target.
 
-    The result is the tuple ``(draws, factor)``.  A placebo effect in percentage points of GDP is a fraction of the receipts
+    A placebo effect in percentage points of GDP is a fraction of the receipts
     of the economy that produced it, so its noise is proportional to the receipts
     share of GDP of that economy.  The null of the transported effect is a
     mixture over the source economies; multiplying its draws by the receipts
     share of the target over the receipts share of the sources gives the null
-    that a placebo run on the target would have.
+    that a placebo run on the target would have.  The result is the tuple
+    ``(draws, factor)``.
 
     Parameters
     ----------
@@ -768,14 +780,27 @@ def rescale_null_pp(
     Raises
     ------
     ValueError
-        If the draws are empty or not finite, or a share is not a finite
-        positive number.
+        If the draws are empty or not finite, a share is not a finite positive
+        number, the factor overflows or underflows to a value that is not finite
+        and positive, or a rescaled draw is not finite.
     """
     draws = _as_draws(null_pp, "null_pp")
     source = _positive_finite(source_receipts_share, "source_receipts_share")
     target = _positive_finite(target_receipts_share, "target_receipts_share")
     factor = target / source
-    return draws * factor, float(factor)
+    if not (np.isfinite(factor) and factor > 0.0):
+        raise ValueError(
+            "The factor target_receipts_share / source_receipts_share must be finite and "
+            f"positive; found {factor}."
+        )
+    with np.errstate(over="ignore"):
+        rescaled = draws * factor
+    if not bool(np.all(np.isfinite(rescaled))):
+        raise ValueError(
+            "The rescaled null is not finite: the draws times the factor "
+            f"{factor:g} overflow."
+        )
+    return rescaled, float(factor)
 
 
 def minimum_detectable_effect(
@@ -901,7 +926,11 @@ class RouteDecision:
         the name of that estimator) are present when ambient RMSE values were
         given.  ``rmse_ratio_to_best_neighbour`` and ``best_neighbour`` (the
         same against the smaller of the ``nn1`` and ``nn3`` RMSE) are present
-        when a neighbour RMSE was given or found in the summary.
+        when a neighbour RMSE was given or found in the summary.  Such a ratio
+        compares like with like only when both RMSE values are computed on the
+        same economies.  ``n_ot`` and ``n_ambient`` (the numbers of cases behind
+        the RMSE of ``ot_weighted`` and behind the ambient RMSE values) are
+        present when they were given.
     """
 
     primary: str
@@ -1008,7 +1037,8 @@ def _rmse_entries(entries: Any, name: str, allow_empty: bool = False) -> dict[st
     Parameters
     ----------
     entries : mapping or Series
-        Estimator name to leave-one-economy-out RMSE.
+        Estimator name to leave-one-economy-out RMSE; a Series must have one
+        entry per label.
     name : str
         Name of the argument, used in error messages.
     allow_empty : bool, default False
@@ -1022,12 +1052,17 @@ def _rmse_entries(entries: Any, name: str, allow_empty: bool = False) -> dict[st
     Raises
     ------
     ValueError
-        If ``entries`` is not a mapping or Series, is empty and ``allow_empty``
-        is false, a name is not a string, or an RMSE is not a finite positive
-        number.
+        If ``entries`` is not a mapping or Series, is a Series whose index
+        repeats a label, is empty and ``allow_empty`` is false, a name is not a
+        string, or an RMSE is not a finite positive number.
     """
     if not isinstance(entries, (Mapping, pd.Series)):
         raise ValueError(f"{name} must be a mapping from estimator names to RMSE values.")
+    if isinstance(entries, pd.Series) and not entries.index.is_unique:
+        repeated = sorted({str(label) for label in entries.index[entries.index.duplicated()]})
+        raise ValueError(
+            f"{name} must have one RMSE per estimator; the labels {repeated} occur more than once."
+        )
     out: dict[str, float] = {}
     for key, value in entries.items():
         if not isinstance(key, str):
@@ -1047,7 +1082,7 @@ def _rmse_entries(entries: Any, name: str, allow_empty: bool = False) -> dict[st
 
 def _reported_rmse(
     loco_summary: pd.DataFrame, ambient_rmse: Any
-) -> tuple[dict[str, float], dict[str, float]]:
+) -> tuple[dict[str, float], dict[str, float], set[str]]:
     """RMSE values that are reported next to the rule and not used by it.
 
     Parameters
@@ -1066,6 +1101,9 @@ def _reported_rmse(
         RMSE of the ambient estimators, in the given order.
     neighbours : dict
         RMSE of the neighbour predictors that are available.
+    replaced : set of str
+        Names of the neighbour predictors whose RMSE comes from ``ambient_rmse``
+        and not from the summary.
 
     Raises
     ------
@@ -1086,13 +1124,15 @@ def _reported_rmse(
                 )
             neighbours[method] = number
     ambient: dict[str, float] = {}
+    replaced: set[str] = set()
     if ambient_rmse is not None:
         for key, number in _rmse_entries(ambient_rmse, "ambient_rmse", allow_empty=True).items():
             if key in _NEIGHBOUR_METHODS:
                 neighbours[key] = number
+                replaced.add(key)
             else:
                 ambient[key] = number
-    return ambient, neighbours
+    return ambient, neighbours, replaced
 
 
 def _smallest(entries: Mapping[str, float]) -> str:
@@ -1233,6 +1273,51 @@ def _check_n_cases(n_cases: Any) -> int:
     return int(n_cases)
 
 
+def _check_sample_size(value: Any, name: str) -> int | None:
+    """Validate an optional sample size.
+
+    Parameters
+    ----------
+    value : int or None
+        Number of cases behind an RMSE, or None when not given.
+    name : str
+        Name of the argument, used in the error message.
+
+    Returns
+    -------
+    int or None
+        The sample size, or None when ``value`` is None.
+
+    Raises
+    ------
+    ValueError
+        If ``value`` is not None and not a positive integer (a boolean is not).
+    """
+    if value is None:
+        return None
+    if not isinstance(value, numbers.Integral) or isinstance(value, (bool, np.bool_)):
+        raise ValueError(f"{name} must be a positive integer.")
+    if value < 1:
+        raise ValueError(f"{name} must be a positive integer.")
+    return int(value)
+
+
+def _cases(count: int) -> str:
+    """Phrase a number of cases.
+
+    Parameters
+    ----------
+    count : int
+        Number of cases.
+
+    Returns
+    -------
+    str
+        The number followed by ``case`` or ``cases``.
+    """
+    return f"{count} case" if count == 1 else f"{count} cases"
+
+
 def decide_route(
     importance_diagnostics: Mapping[str, Any],
     loco_summary: pd.DataFrame,
@@ -1240,6 +1325,9 @@ def decide_route(
     rules: Mapping[str, float] | None = None,
     support: Mapping[str, Any] | None = None,
     ambient_rmse: Mapping[str, float] | None = None,
+    *,
+    n_ot: int | None = None,
+    n_ambient: int | None = None,
 ) -> RouteDecision:
     """Choose the primary route for the Thailand estimate.
 
@@ -1269,6 +1357,16 @@ def decide_route(
     stated in the text of the decision, which says that it is reported and not
     used by the rule.
 
+    A ratio of two RMSE values compares like with like only when both are
+    computed on the same economies.  The transport and the ambient estimators
+    can be validated on different samples, for example when the ambient
+    estimators need complete covariates, and then the ratio mixes the difficulty
+    of the sample with the quality of the estimator.  The text of the decision
+    says so, and ``n_ot`` and ``n_ambient`` record the two sample sizes when they
+    are given.  The rows ``nn1`` and ``nn3`` of ``loco_summary`` come from the
+    validation of ``ot_weighted``; entries of the same names in ``ambient_rmse``
+    replace them and carry the same condition.
+
     Parameters
     ----------
     importance_diagnostics : mapping
@@ -1294,7 +1392,14 @@ def decide_route(
         Estimator name to leave-one-economy-out RMSE of the ambient estimators,
         for example ``{"A1": 0.35, "A2": 0.34, "A3": 0.32}``.  The entries
         ``nn1`` and ``nn3`` are read as neighbour predictors and replace the rows
-        of ``loco_summary`` with these names.  Not a criterion.
+        of ``loco_summary`` with these names.  A Series must have one entry per
+        label.  Not a criterion.
+    n_ot : int, optional
+        Number of cases (episodes) that the RMSE of ``ot_weighted`` is computed
+        on; a positive integer.  Keyword only.
+    n_ambient : int, optional
+        Number of cases (episodes) that the RMSE values in ``ambient_rmse`` are
+        computed on; a positive integer.  Keyword only.
 
     Returns
     -------
@@ -1304,7 +1409,8 @@ def decide_route(
         ``target_supported``), a text that reports each criterion with its
         numbers, and ``info`` with ``rmse_ratio_to_best_ambient``,
         ``best_ambient``, ``rmse_ratio_to_best_neighbour`` and
-        ``best_neighbour`` for the comparisons that could be made.
+        ``best_neighbour`` for the comparisons that could be made, followed by
+        ``n_ot`` and ``n_ambient`` for the sample sizes that were given.
 
     Raises
     ------
@@ -1313,15 +1419,18 @@ def decide_route(
         ``importance_diagnostics`` has no boolean entry ``usable``, the summary
         lacks one of the three methods or holds an RMSE that is not finite and
         positive, ``ambient_rmse`` is not a mapping of finite positive RMSE
-        values, ``n_cases`` is not a non-negative integer, or a rule name or
-        value is invalid.
+        values or is a Series with a repeated label, ``n_cases`` is not a
+        non-negative integer, ``n_ot`` or ``n_ambient`` is not a positive
+        integer, or a rule name or value is invalid.
     """
     thresholds = _resolve_rules(rules)
     usable = _usable_flag(importance_diagnostics)
     rmse = _loco_rmse(loco_summary)
     n_cases = _check_n_cases(n_cases)
     supported, ess, reasons = _check_support(support)
-    ambient, neighbours = _reported_rmse(loco_summary, ambient_rmse)
+    ambient, neighbours, replaced = _reported_rmse(loco_summary, ambient_rmse)
+    n_ot = _check_sample_size(n_ot, "n_ot")
+    n_ambient = _check_sample_size(n_ambient, "n_ambient")
     r_weighted, r_equal, r_uniform = (rmse[method] for method in _ROUTE_METHODS)
     slack = 1.0 + _RATIO_TOL
     ok_equal = r_weighted <= thresholds["rmse_ratio_equal"] * r_equal * slack
@@ -1338,6 +1447,10 @@ def decide_route(
 
     info: dict[str, Any] = {}
     reported = []
+    same_economies = (
+        "The ratio compares like with like only when both RMSE values are computed on the same "
+        "economies."
+    )
     if ambient:
         best = _smallest(ambient)
         info["rmse_ratio_to_best_ambient"] = float(r_weighted / ambient[best])
@@ -1345,7 +1458,7 @@ def decide_route(
         reported.append(
             f"The leave-one-economy-out RMSE of ot_weighted is {r_weighted / ambient[best]:.3f} "
             f"times the RMSE of the best ambient estimator {best} ({ambient[best]:.4g}); this is "
-            "reported and is not used by the rule."
+            f"reported and is not used by the rule. {same_economies}"
         )
     if neighbours:
         best = _smallest(neighbours)
@@ -1355,7 +1468,24 @@ def decide_route(
             f"The leave-one-economy-out RMSE of ot_weighted is {r_weighted / neighbours[best]:.3f} "
             f"times the RMSE of the best neighbour predictor {best} ({neighbours[best]:.4g}); this "
             "is reported and is not used by the rule."
+            + (f" {same_economies}" if best in replaced else "")
         )
+    if n_ot is not None:
+        info["n_ot"] = n_ot
+    if n_ambient is not None:
+        info["n_ambient"] = n_ambient
+    if n_ot is not None and n_ambient is not None:
+        differ = (
+            ", so the two are not computed on the same cases." if n_ot != n_ambient else "."
+        )
+        reported.append(
+            f"The RMSE of ot_weighted is computed on {_cases(n_ot)} and the ambient RMSE values "
+            f"on {_cases(n_ambient)}{differ}"
+        )
+    elif n_ot is not None:
+        reported.append(f"The RMSE of ot_weighted is computed on {_cases(n_ot)}.")
+    elif n_ambient is not None:
+        reported.append(f"The ambient RMSE values are computed on {_cases(n_ambient)}.")
 
     ess_text = "" if ess is None else f" (effective number of sources {ess:.3g})"
     if supported:
@@ -1413,13 +1543,16 @@ def select_ambient(
     close when the margin is within ``close_within`` in either direction, or when
     the RMSE ratio of any estimator other than ``baseline`` lies within
     ``close_within`` of the limit ``ratio`` in relative terms, so that a small
-    change in the RMSE values could change which estimator qualifies.
+    change in the RMSE values could change which estimator qualifies.  A distance
+    that equals ``close_within`` in exact arithmetic counts as within it: the
+    comparison allows the same tolerance of ``1e-12``, added to ``close_within``.
 
     Parameters
     ----------
     rmse : mapping or Series
         Estimator name to leave-one-economy-out RMSE; finite and positive.  The
-        order of the entries decides ties.
+        order of the entries decides ties.  A Series must have one entry per
+        label.
     baseline : str, default "A1"
         Name of the estimator that the others have to beat; it must be in
         ``rmse``.
@@ -1452,8 +1585,9 @@ def select_ambient(
     Raises
     ------
     ValueError
-        If ``rmse`` is not a mapping of finite positive numbers, ``baseline`` is
-        not one of its names, or ``ratio`` or ``close_within`` is out of range.
+        If ``rmse`` is not a mapping of finite positive numbers or is a Series
+        with a repeated label, ``baseline`` is not one of its names, or
+        ``ratio`` or ``close_within`` is out of range.
     """
     values = _rmse_entries(rmse, "rmse")
     if not isinstance(baseline, str) or baseline not in values:

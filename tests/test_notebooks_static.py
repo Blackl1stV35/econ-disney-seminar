@@ -96,3 +96,51 @@ def test_repository_text_files_have_no_em_dash_and_no_secrets():
         if EM_DASH in text and path.suffix != ".csv":
             offenders.append(f"{path.relative_to(ROOT)}: em dash")
     assert not offenders, offenders
+
+
+@pytest.mark.parametrize("path", ANALYSIS_NOTEBOOKS, ids=lambda p: p.stem)
+def test_notebook_text_has_no_todo_and_no_review_references(path):
+    text = "\n".join(cell.source for cell in _read(path).cells)
+    assert not re.search(r"\bTODO\b|\bFIXME\b", text)
+    assert not re.search(r"\b(?:review finding|reviewers?|wave [0-9])\b", text, re.IGNORECASE)
+
+
+def _code(name: str) -> list[str]:
+    return [cell.source for cell in _read(NOTEBOOK_DIR / f"{name}.ipynb").cells if cell.cell_type == "code"]
+
+
+def _markdown(name: str) -> list[str]:
+    return [cell.source for cell in _read(NOTEBOOK_DIR / f"{name}.ipynb").cells if cell.cell_type == "markdown"]
+
+
+def test_the_panel_is_stamped_by_notebook_00_and_required_by_02_and_04():
+    assert any("ctx.stamp_file(panel_path)" in source for source in _code("00_build_global_panel"))
+    assert any(re.search(r"ctx\.require\([^)]*panel_path", source) for source in _code("02_case_effects"))
+    requires = [source for source in _code("04_optimal_transport") if "ctx.require(" in source]
+    assert any("PANEL_PATH" in s and "ctx.baseline_path" in s and "ctx.proposal_path" in s for s in requires)
+
+
+def test_notebook_04_shows_no_transported_effect_before_the_route_decision():
+    usage_calls = [line for source in _code("04_optimal_transport") for line in source.splitlines() if "show(usage_table" in line]
+    assert usage_calls and all('drop(columns=["att_pp", "att_rel_pct"])' in line for line in usage_calls)
+
+
+def test_notebook_04_reports_the_log_domain_solves():
+    source = "\n".join(_code("04_optimal_transport"))
+    for name in ("loco.n_log_domain", "loco_rel.n_log_domain", "PLAN_LOG_DOMAIN", "boot['n_log_domain']", "plan_s.log_domain"):
+        assert name in source
+    text = "\n".join(_markdown("04_optimal_transport"))
+    assert "log domain" in text
+
+
+def test_notebook_05_prints_the_support_beside_the_conformal_interval():
+    cells = [source for source in _code("05_thailand_impact") if "Conformal" in source and "guaranteed coverage" in source]
+    assert len(cells) == 1 and "support['supported']" in cells[0]
+    shown = [line for source in _code("05_thailand_impact") for line in source.splitlines() if line.startswith("show(comparison[comparison[")]
+    assert shown and all("importance_route_supported" in line for line in shown)
+
+
+def test_notebook_05_does_not_promise_more_power_than_the_placebo_distribution_gives():
+    text = "\n".join(_markdown("05_thailand_impact"))
+    assert "of either sign exceeds the threshold in at least" not in text
+    assert "of either sign exceeds the threshold in about" in text

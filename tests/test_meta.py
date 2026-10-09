@@ -1226,6 +1226,89 @@ def test_meta_regression_shrinkage_ratio_is_missing_where_the_unpenalised_slope_
     assert np.isfinite(table.loc["x1", "ratio"])
 
 
+def noise_free_effects(k=30, level=1e6):
+    """Effects exactly linear in the cost share at a large level, without a receipts effect."""
+    rng = np.random.default_rng(81)
+    X = pd.DataFrame({"cost": rng.uniform(0.3, 1.5, k), "receipts": rng.uniform(2.0, 8.0, k)})
+    se = rng.uniform(0.08, 0.25, k)
+    return level + 0.8 * X["cost"].to_numpy(), se, X
+
+
+@pytest.mark.parametrize("ridge", [0.0, 1.0])
+def test_meta_regression_shrinkage_ratio_is_missing_for_a_slope_that_is_rounding_noise(ridge):
+    """A feature without an effect gets a slope of rounding noise, which has no ratio."""
+    y, se, X = noise_free_effects()
+    table = meta.meta_regression(y, se, X, ridge=ridge)["shrinkage"]
+    floor = 1e-12 * np.max(np.abs(y))
+    assert abs(table.loc["receipts", "unpenalised_slope"]) < floor
+    assert np.isnan(table.loc["receipts", "ratio"])
+    assert np.isfinite(table.loc["receipts", "ridge_slope"])
+    assert abs(table.loc["cost", "unpenalised_slope"]) > 1e3 * floor
+    assert np.isfinite(table.loc["cost", "ratio"])
+    if ridge == 0.0:
+        assert table.loc["cost", "ratio"] == pytest.approx(1.0, rel=1e-12)
+        np.testing.assert_array_equal(table["ridge_slope"], table["unpenalised_slope"])
+    else:
+        assert 0.0 < table.loc["cost", "ratio"] < 1.0
+
+
+def test_meta_regression_shrinkage_ratio_is_missing_for_every_slope_of_a_constant_effect():
+    rng = np.random.default_rng(82)
+    X = pd.DataFrame({"a": rng.normal(size=25), "b": rng.uniform(1.0, 4.0, 25)})
+    se = rng.uniform(0.1, 0.3, 25)
+    for level in (1e6, 5.0, 1e-3):
+        for ridge in (0.0, 1.0):
+            table = meta.meta_regression(np.full(25, level), se, X, ridge=ridge)["shrinkage"]
+            assert table["ratio"].isna().all(), (level, ridge)
+            assert table["unpenalised_slope"].abs().max() < 1e-12 * level, (level, ridge)
+
+
+def test_meta_regression_shrinkage_floor_is_a_multiple_of_the_largest_effect(monkeypatch):
+    y, se, X = make_regression_data(seed=75, k=20, slopes=(0.4, 0.2), tau=0.1)
+    floor = 1e-12 * float(np.max(np.abs(y)))
+    real = meta._fit_mixed
+
+    def with_first_slope(value):
+        def patched(y_, v_, X_, ridge_):
+            fit = real(y_, v_, X_, ridge_)
+            if ridge_ == 0.0:
+                theta = fit.theta.copy()
+                theta[1] = value
+                return dataclasses.replace(fit, theta=theta)
+            return fit
+
+        return patched
+
+    cases = ((0.5 * floor, False), (-0.5 * floor, False), (2.0 * floor, True), (-2.0 * floor, True))
+    for value, has_ratio in cases:
+        monkeypatch.setattr(meta, "_fit_mixed", with_first_slope(value))
+        table = meta.meta_regression(y, se, X, ridge=1.0)["shrinkage"]
+        assert table.loc["x0", "unpenalised_slope"] == value
+        assert bool(np.isfinite(table.loc["x0", "ratio"])) is has_ratio, value
+        assert np.isfinite(table.loc["x1", "ratio"])
+
+
+@pytest.mark.parametrize("factor", [1e-15, 1e-9, 1e-3, 1e3, 1e9])
+def test_meta_regression_shrinkage_ratio_does_not_depend_on_the_unit_of_the_effects(factor):
+    y, se, X = costly_target_data(2)
+    reference = meta.meta_regression(y, se, X, ridge=1.0)["shrinkage"]
+    scaled = meta.meta_regression(factor * y, factor * se, X, ridge=1.0)["shrinkage"]
+    assert scaled["ratio"].notna().all() and scaled["unpenalised_slope"].notna().all()
+    np.testing.assert_allclose(scaled["ratio"], reference["ratio"], rtol=1e-5)
+    np.testing.assert_allclose(
+        scaled["unpenalised_slope"], factor * reference["unpenalised_slope"], rtol=1e-5
+    )
+
+
+def test_meta_regression_does_not_claim_a_ratio_of_one_for_slopes_that_are_noise():
+    doc = " ".join(meta.meta_regression.__doc__.split())
+    assert "The ratio is 1 for every feature when ``ridge`` is zero." not in doc
+    assert "is rounding noise" in doc and "1e-12`` times the largest absolute effect" in doc
+    assert "ratio is 1 for every feature whose slope is not rounding noise and NaN" in doc
+    table_doc = " ".join(meta._shrinkage_table.__doc__.split())
+    assert "``1e-12`` times the largest absolute effect" in table_doc
+
+
 def test_meta_regression_shrinkage_covers_the_fitted_features_only():
     y, se, X = make_regression_data(seed=76, k=24, slopes=(0.3,), tau=0.1)
     X3 = pd.DataFrame({"a": X[:, 0], "constant": 3.0, "b": np.sin(np.arange(24.0))})
@@ -1283,6 +1366,56 @@ def test_extrapolation_treats_the_ends_of_the_range_as_inside(case_features):
         "above",
         "above",
     ]
+
+
+@pytest.mark.parametrize("factor", [1e-12, 1e-9, 1e-6, 1e-3, 1.0, 1e3, 1e9])
+def test_extrapolation_position_does_not_depend_on_the_unit_of_a_feature(factor):
+    """A target 1e-12 beyond an end of the range is inside it and one 1e-6 beyond is outside."""
+    base = pd.DataFrame(
+        {
+            "share": [0.4, 0.9, 1.5, 0.7],
+            "balance": [-1.0, 0.5, 2.0, 0.0],
+            "year": [2000.0, 2010.0, 2019.0, 2005.0],
+        }
+    )
+    cases = base * factor
+    scale = np.maximum(cases.min().abs(), cases.max().abs())
+    expectations = ((1e-12, "inside", "inside"), (1e-6, "above", "below"))
+    for offset, expected_up, expected_down in expectations:
+        up = (cases.max() + offset * scale).to_dict()
+        down = (cases.min() - offset * scale).to_dict()
+        assert meta.extrapolation(cases, up)["position"].tolist() == [expected_up] * 3, offset
+        assert meta.extrapolation(cases, down)["position"].tolist() == [expected_down] * 3, offset
+    inside = (0.5 * (cases.min() + cases.max())).to_dict()
+    assert meta.extrapolation(cases, inside)["position"].tolist() == ["inside"] * 3
+
+
+def test_extrapolation_tolerance_is_relative_for_features_of_magnitude_below_one():
+    X = pd.DataFrame({"tiny": [1e-6, 2e-6, 3e-6]})
+    near = meta.extrapolation(X, {"tiny": 3e-6 * (1.0 + 1e-10)})
+    assert near["position"].tolist() == ["inside"]
+    out = meta.extrapolation(X, {"tiny": 3e-6 * (1.0 + 1e-6)})
+    assert out["position"].tolist() == ["above"]
+    below = meta.extrapolation(X, {"tiny": 1e-6 * (1.0 - 1e-6)})
+    assert below["position"].tolist() == ["below"]
+    assert meta.extrapolation(X, {"tiny": 3e-6 * (1.0 + 5e-10)})["position"].tolist() == ["inside"]
+    assert meta.extrapolation(X, {"tiny": 3e-6 * (1.0 + 5e-9)})["position"].tolist() == ["above"]
+
+
+def test_extrapolation_has_no_tolerance_for_a_feature_that_is_zero_in_every_case():
+    X = pd.DataFrame({"zeros": [0.0, 0.0, 0.0], "other": [1.0, 2.0, 3.0]})
+    expectations = ((0.0, "inside"), (1e-300, "above"), (-1e-300, "below"), (1e-12, "above"))
+    for value, expected in expectations:
+        out = meta.extrapolation(X, {"zeros": value, "other": 2.0})
+        assert out.loc["zeros", "position"] == expected, value
+        assert out.loc["other", "position"] == "inside"
+
+
+def test_extrapolation_documents_its_tolerance_as_scale_free():
+    doc = " ".join(meta.extrapolation.__doc__.split())
+    assert "times the larger of the absolute smallest and largest case value" in doc
+    assert "multiplied by a positive constant" in doc
+    assert "max(1," not in doc
 
 
 def test_extrapolation_ratio_is_defined_for_non_negative_features_with_a_positive_maximum():
@@ -1488,3 +1621,16 @@ def test_scaling_law_input_checks():
     with pytest.raises(ValueError):
         meta.scaling_law(y, se, size, 0.2, level=2.0)
     assert isinstance(meta.scaling_law(y, se, size, 0.2)["prediction"]["mean"], float)
+
+
+# ----------------------------------------------------------------------------
+# Source text
+# ----------------------------------------------------------------------------
+@pytest.mark.parametrize("path", [Path(meta.__file__), Path(__file__)])
+def test_no_line_of_the_module_or_of_this_file_is_longer_than_one_hundred_characters(path):
+    text = path.read_text(encoding="utf-8")
+    too_long = [
+        (number, len(line)) for number, line in enumerate(text.splitlines(), 1) if len(line) > 100
+    ]
+    assert too_long == [], path.name
+    assert "\r" not in text and chr(0x2014) not in text

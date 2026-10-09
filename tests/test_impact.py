@@ -4,9 +4,12 @@ All inputs are hand-made or SIMULATED.
 """
 from __future__ import annotations
 
+import contextlib
 import inspect
 import itertools
+import re
 import sys
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -21,6 +24,7 @@ if str(SRC) not in sys.path:
 from dtt import impact, meta  # noqa: E402
 
 EM_DASH = chr(0x2014)
+MAX_LINE_LENGTH = 100
 
 BASELINE_COLUMNS = (
     "gdp_usd_bn",
@@ -36,6 +40,14 @@ MAIN_VARIABLES = (
     "intl_arrivals_million",
     "fx_thb_per_usd",
 )
+
+
+@contextlib.contextmanager
+def warnings_are_errors():
+    """Run a block in which any warning, such as a floating-point overflow, raises."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        yield
 
 
 # ----------------------------------------------------------------------------
@@ -1008,6 +1020,37 @@ def test_rescale_null_pp_rejects_invalid_shares_and_draws():
     np.testing.assert_allclose(draws, 1.5 * null)
 
 
+def test_rescale_null_pp_raises_for_a_factor_that_overflows_or_underflows():
+    null = np.linspace(-1.0, 1.0, 11)
+    tiny, largest = np.finfo(float).tiny, np.finfo(float).max
+    with warnings_are_errors():
+        for source, target in ((1e-300, 1e300), (1e-10, 1e300), (tiny, largest)):
+            with pytest.raises(ValueError, match="factor.*finite and positive"):
+                impact.rescale_null_pp(null, source, target)
+        for source, target in ((1e300, 1e-300), (largest, 5e-324)):
+            with pytest.raises(ValueError, match="factor.*finite and positive"):
+                impact.rescale_null_pp(null, source, target)
+        # the largest finite factor and the smallest positive factor are still valid
+        big, factor = impact.rescale_null_pp(null, 1e-100, 1e200)
+        assert factor == pytest.approx(1e300, rel=1e-12) and np.isfinite(big).all()
+        small, factor = impact.rescale_null_pp(null, 1e200, 1e-100)
+        assert factor == pytest.approx(1e-300, rel=1e-12) and np.isfinite(small).all()
+
+
+def test_rescale_null_pp_raises_for_draws_that_overflow_when_rescaled():
+    draws = np.array([1e200, -1e200, 1.0])
+    with warnings_are_errors():
+        with pytest.raises(ValueError, match="rescaled null is not finite"):
+            impact.rescale_null_pp(draws, 1.0, 1e200)
+        with pytest.raises(ValueError, match="rescaled null is not finite"):
+            impact.rescale_null_pp(-draws, 1.0, 1e200)
+        rescaled, factor = impact.rescale_null_pp(draws, 1.0, 1e100)
+    assert factor == 1e100
+    np.testing.assert_allclose(rescaled, [1e300, -1e300, 1e100], rtol=1e-12)
+    # the input is not modified when the call fails
+    np.testing.assert_array_equal(draws, [1e200, -1e200, 1.0])
+
+
 def test_source_receipts_share_is_the_usage_weighted_mean():
     shares = [4.0, 6.0, 10.0]
     assert impact.source_receipts_share(shares, [1.0, 1.0, 2.0]) == pytest.approx(7.5)
@@ -1063,6 +1106,27 @@ def test_source_receipts_share_rejects_invalid_usage_and_shapes():
         impact.source_receipts_share([], [])
     with pytest.raises(ValueError):
         impact.source_receipts_share([[4.0, 6.0]], [[1.0, 1.0]])
+
+
+def test_source_receipts_share_raises_for_usage_whose_sum_or_products_overflow():
+    overflowing = (
+        ([5.0, 6.0], [1.5e308, 1.5e308], "finite sum"),
+        ([5.0, 6.0], [1e308, 1e308], "finite sum"),
+        ([5.0], [1e308], "not finite"),
+        ([5.0, 7.0], [1e308, 1e-3], "not finite"),
+        ([1e300, 1e300], [1e10, 1e10], "not finite"),
+    )
+    with warnings_are_errors():
+        for shares, usage, match in overflowing:
+            with pytest.raises(ValueError, match=match):
+                impact.source_receipts_share(shares, usage)
+            with pytest.raises(ValueError, match=match):
+                impact.source_receipts_share(np.array(shares), pd.Series(usage).to_numpy())
+        # large values whose sums stay finite give the weighted mean
+        assert impact.source_receipts_share([5.0, 7.0], [1e300, 1e300]) == pytest.approx(6.0)
+        assert impact.source_receipts_share([5.0, 7.0], [1e-300, 3e-300]) == pytest.approx(6.5)
+        assert impact.source_receipts_share([1e300, 3e300], [1.0, 1.0]) == pytest.approx(2e300)
+        assert impact.source_receipts_share([5.0, 7.0], [1e307, 0.0]) == pytest.approx(5.0)
 
 
 def test_the_rescaled_null_gives_the_minimum_detectable_effect_of_the_target_scale():
@@ -1388,9 +1452,14 @@ def test_decide_route_requires_the_support_result():
         "rules",
         "support",
         "ambient_rmse",
+        "n_ot",
+        "n_ambient",
     ]
     assert signature.parameters["support"].default is None
     assert signature.parameters["ambient_rmse"].default is None
+    for name in ("n_ot", "n_ambient"):
+        assert signature.parameters[name].kind is inspect.Parameter.KEYWORD_ONLY
+        assert signature.parameters[name].default is None
 
 
 def test_decide_route_support_decides_the_route_when_the_other_criteria_hold():
@@ -1549,6 +1618,123 @@ def test_decide_route_rejects_invalid_ambient_or_neighbour_rmse():
                 decide(loco_table(0.5, 1.0, 1.0, extra={method: bad}))
         with pytest.raises(ValueError, match="nn3"):
             decide(ambient_rmse={"nn3": bad})
+
+
+def test_decide_route_rejects_an_ambient_series_with_repeated_labels():
+    repeated = pd.Series([0.40, 0.30, 0.20], index=["A1", "A2", "A2"])
+    with pytest.raises(ValueError, match=r"ambient_rmse must have one RMSE per estimator.*'A2'"):
+        decide(ambient_rmse=repeated)
+    # identical repeated values are rejected as well
+    with pytest.raises(ValueError, match="one RMSE per estimator"):
+        decide(ambient_rmse=pd.Series([0.3, 0.3], index=["A2", "A2"]))
+    # a repeated neighbour label is not collapsed to its last value
+    neighbours = pd.Series([0.40, 0.30, 0.20], index=["A1", "nn1", "nn1"])
+    with pytest.raises(ValueError, match="'nn1'"):
+        decide(ambient_rmse=neighbours)
+    # the labels that repeat are all named, in sorted order
+    many = pd.Series([0.4, 0.3, 0.2, 0.1], index=["A3", "A1", "A3", "A1"])
+    with pytest.raises(ValueError, match=r"\['A1', 'A3'\]"):
+        decide(ambient_rmse=many)
+    # a Series with distinct labels and a mapping with the same entries are still accepted
+    distinct = decide(ambient_rmse=pd.Series([0.40, 0.30], index=["A1", "A2"]))
+    assert distinct.info["best_ambient"] == "A2"
+    assert decide(ambient_rmse={"A1": 0.40, "A2": 0.30}).info == distinct.info
+
+
+# ---- the condition under which the comparisons are like for like -------------
+SAME_ECONOMIES = (
+    "The ratio compares like with like only when both RMSE values are computed on the same "
+    "economies."
+)
+
+
+def test_decide_route_says_that_the_ambient_comparison_needs_the_same_economies():
+    decision = decide(ambient_rmse={"A1": 0.4, "A3": 0.323})
+    text = decision.details
+    assert SAME_ECONOMIES in text and text.count("same economies") == 1
+    start = text.index("the best ambient estimator A3 (0.323)")
+    assert start < text.index("not used by the rule", start) < text.index(SAME_ECONOMIES)
+    assert text.index(SAME_ECONOMIES) < text.index("All four criteria")
+    # nothing is said about the sample when there is no comparison to qualify
+    plain = decide()
+    assert "same economies" not in plain.details and "like with like" not in plain.details
+    # the condition is stated for the interface as well
+    for member in (impact.decide_route, impact.RouteDecision):
+        doc = " ".join(member.__doc__.split())
+        assert "computed on the same economies" in doc, member.__name__
+    doc = " ".join(impact.decide_route.__doc__.split())
+    assert "validated on different samples" in doc
+    assert "n_ot" in doc and "n_ambient" in doc
+
+
+def test_the_neighbour_comparison_carries_the_condition_only_for_replaced_entries():
+    summary = loco_table(0.5, 1.0, 1.0, extra={"nn1": 0.4, "nn3": 0.45})
+    from_summary = decide(summary)
+    assert from_summary.info["best_neighbour"] == "nn1"
+    assert "same economies" not in from_summary.details
+    replaced = decide(summary, ambient_rmse={"nn1": 0.3})
+    assert replaced.info["rmse_ratio_to_best_neighbour"] == pytest.approx(0.5 / 0.3)
+    assert replaced.details.count(SAME_ECONOMIES) == 1
+    assert replaced.details.index(SAME_ECONOMIES) < replaced.details.index("All four criteria")
+    # a replaced entry that is not the best neighbour does not decide the comparison
+    other = decide(summary, ambient_rmse={"nn3": 0.9})
+    assert other.info["best_neighbour"] == "nn1"
+    assert "same economies" not in other.details
+    both = decide(summary, ambient_rmse={"nn1": 0.3, "A2": 0.45})
+    assert both.details.count(SAME_ECONOMIES) == 2
+    assert both.primary == from_summary.primary and both.passed == from_summary.passed
+
+
+def test_decide_route_reports_the_sample_sizes_when_they_are_given():
+    ambient = {"A1": 0.4, "A3": 0.323}
+    base = decide(ambient_rmse=ambient)
+    assert "n_ot" not in base.info and "n_ambient" not in base.info
+    assert re.search(r"computed on \d", base.details) is None
+    both = decide(ambient_rmse=ambient, n_ot=14, n_ambient=22)
+    assert both.info["n_ot"] == 14 and both.info["n_ambient"] == 22
+    assert list(both.info)[-2:] == ["n_ot", "n_ambient"]
+    assert list(both.info)[:2] == ["rmse_ratio_to_best_ambient", "best_ambient"]
+    assert type(both.info["n_ot"]) is int and type(both.info["n_ambient"]) is int
+    assert (
+        "The RMSE of ot_weighted is computed on 14 cases and the ambient RMSE values on 22 cases, "
+        "so the two are not computed on the same cases."
+    ) in both.details
+    same = decide(ambient_rmse=ambient, n_ot=22, n_ambient=22)
+    assert (
+        "The RMSE of ot_weighted is computed on 22 cases and the ambient RMSE values on 22 cases."
+        in same.details
+    )
+    assert "not computed on the same cases" not in same.details
+    only_ot = decide(ambient_rmse=ambient, n_ot=14)
+    assert only_ot.info["n_ot"] == 14 and "n_ambient" not in only_ot.info
+    assert "The RMSE of ot_weighted is computed on 14 cases." in only_ot.details
+    only_ambient = decide(ambient_rmse=ambient, n_ambient=1)
+    assert only_ambient.info["n_ambient"] == 1 and "n_ot" not in only_ambient.info
+    assert "The ambient RMSE values are computed on 1 case." in only_ambient.details
+    numpy_sizes = decide(ambient_rmse=ambient, n_ot=np.int64(9), n_ambient=np.int32(11))
+    assert numpy_sizes.info["n_ot"] == 9 and type(numpy_sizes.info["n_ot"]) is int
+    assert type(numpy_sizes.info["n_ambient"]) is int
+    # the sizes are reported and do not enter the rule
+    for item in (both, same, only_ot, only_ambient, numpy_sizes):
+        assert item.primary == base.primary and item.passed == base.passed
+        assert item.details.endswith("the primary route is ot_importance.")
+    stripped = {key: value for key, value in both.info.items() if key not in ("n_ot", "n_ambient")}
+    assert stripped == base.info
+    # without an ambient comparison the sizes are still recorded
+    alone = decide(n_ot=14, n_ambient=22)
+    assert alone.info == {"n_ot": 14, "n_ambient": 22}
+    assert "ambient estimator" not in alone.details
+
+
+def test_decide_route_rejects_invalid_sample_sizes():
+    for name in ("n_ot", "n_ambient"):
+        for bad in (0, -3, 2.5, 3.0, np.float64(4.0), True, np.bool_(True), "12", [12], np.nan):
+            with pytest.raises(ValueError, match=f"{name} must be a positive integer"):
+                decide(ambient_rmse={"A1": 0.4}, **{name: bad})
+    with pytest.raises(TypeError):
+        impact.decide_route(
+            {"usable": True}, loco_table(0.5, 1.0, 1.0), MANY, None, SUPPORTED, None, 14
+        )
 
 
 def test_route_decision_info_defaults_to_an_empty_dict_of_its_own():
@@ -1768,6 +1954,80 @@ def test_select_ambient_flags_a_close_selection():
     assert impact.select_ambient({"A1": 1.0, "A2": 0.7, "A3": 0.9}, close_within=0.2)["close"]
 
 
+WITHIN_TOLERANCE = 5e-13  # half of the relative tolerance of 1e-12
+BEYOND_TOLERANCE = 1e-9  # a thousand times the tolerance
+
+
+@pytest.mark.parametrize("excess, expected", [(WITHIN_TOLERANCE, True), (BEYOND_TOLERANCE, False)])
+def test_select_ambient_runner_up_gap_at_the_boundary_allows_the_rounding_tolerance(
+    excess, expected
+):
+    """A gap of 5 percent plus rounding noise is close; a gap of 5 percent plus 1e-9 is not."""
+    runner = 0.8 * (1.05 + excess)
+    out = impact.select_ambient({"A1": 1.0, "A2": 0.8, "A3": runner})
+    assert out["selected"] == "A2" and out["runner_up"] == "A3"
+    assert out["margin"] == pytest.approx(0.05 + excess, abs=1e-14)
+    assert out["close"] is expected
+
+
+@pytest.mark.parametrize("excess, expected", [(WITHIN_TOLERANCE, True), (BEYOND_TOLERANCE, False)])
+def test_select_ambient_negative_gap_at_the_boundary_allows_the_rounding_tolerance(
+    excess, expected
+):
+    """The baseline stays and the rival is 5 percent below it, plus rounding noise or 1e-9."""
+    out = impact.select_ambient({"A1": 1.0, "A2": 0.95 - excess, "A3": 1.5}, ratio=0.9)
+    assert out["selected"] == "A1" and out["runner_up"] == "A2" and out["qualifying"] == []
+    assert out["margin"] == pytest.approx(-(0.05 + excess), abs=1e-14)
+    assert out["close"] is expected
+
+
+@pytest.mark.parametrize("excess, expected", [(WITHIN_TOLERANCE, True), (BEYOND_TOLERANCE, False)])
+def test_select_ambient_distance_to_the_limit_at_the_boundary_allows_the_rounding_tolerance(
+    excess, expected
+):
+    """An estimator 5 percent (plus excess) from the limit of 0.95, on either side of it."""
+    limit = 0.95
+    inside = limit * (1.0 - (0.05 + excess))
+    outside = limit * (1.0 + (0.05 + excess))
+    below = impact.select_ambient({"A1": 1.0, "A2": 0.5, "A3": inside})
+    assert below["selected"] == "A2" and below["qualifying"] == ["A2", "A3"]
+    assert below["runner_up"] == "A3" and below["margin"] > 0.5
+    assert below["close"] is expected
+    above = impact.select_ambient({"A1": 1.0, "A2": 0.5, "A3": outside})
+    assert above["selected"] == "A2" and above["qualifying"] == ["A2"]
+    assert above["runner_up"] == "A3" and above["margin"] > 0.5
+    assert above["close"] is expected
+
+
+@pytest.mark.parametrize("excess, expected", [(WITHIN_TOLERANCE, True), (BEYOND_TOLERANCE, False)])
+def test_select_ambient_without_a_band_only_the_tolerance_remains(excess, expected):
+    values = {"A1": 1.0, "A2": 0.8, "A3": 0.8 * (1.0 + excess)}
+    out = impact.select_ambient(values, close_within=0.0)
+    assert out["margin"] == pytest.approx(excess, abs=1e-14)
+    assert out["close"] is expected
+    tied = impact.select_ambient({"A1": 1.0, "A2": 0.8, "A3": 0.8}, close_within=0.0)
+    assert tied["margin"] == 0.0 and tied["close"] is True
+
+
+def test_select_ambient_treats_a_gap_of_exactly_the_band_as_close():
+    """Decimal values whose gap is the band in exact arithmetic; floats may round either way."""
+    gap = impact.select_ambient({"A1": 1.0, "A2": 0.8, "A3": 0.84})
+    assert gap["close"] is True
+    limit = impact.select_ambient({"A1": 1.0, "A2": 0.6, "A3": 0.9025})
+    assert limit["close"] is True
+    upper = impact.select_ambient({"A1": 1.0, "A2": 0.6, "A3": 0.9975})
+    assert upper["close"] is True
+    wide_band = impact.select_ambient({"A1": 1.0, "A2": 0.8, "A3": 0.88}, close_within=0.1)
+    assert wide_band["close"] is True
+    beyond = impact.select_ambient({"A1": 1.0, "A2": 0.8, "A3": 0.8401})
+    assert beyond["close"] is False
+
+
+def test_select_ambient_documents_the_tolerance_of_the_closeness_test():
+    doc = " ".join(impact.select_ambient.__doc__.split())
+    assert "added to ``close_within``" in doc and "1e-12" in doc
+
+
 def test_select_ambient_takes_a_baseline_a_ratio_and_a_series():
     values = {"base": 1.0, "x": 0.6, "y": 0.5}
     out = impact.select_ambient(values, baseline="base")
@@ -1814,6 +2074,25 @@ def test_select_ambient_rejects_invalid_inputs():
             impact.select_ambient(good, close_within=bad_close)
 
 
+def test_select_ambient_rejects_a_series_with_repeated_labels():
+    repeated = pd.Series([1.0, 0.9, 0.5], index=["A1", "A2", "A2"])
+    with pytest.raises(ValueError, match=r"rmse must have one RMSE per estimator.*'A2'"):
+        impact.select_ambient(repeated)
+    # the baseline label repeated; collapsing would keep the last of its two values
+    baseline_twice = pd.Series([1.0, 0.8, 0.6], index=["A1", "A1", "A2"])
+    with pytest.raises(ValueError, match=r"one RMSE per estimator.*'A1'"):
+        impact.select_ambient(baseline_twice)
+    # identical repeated values are rejected as well
+    with pytest.raises(ValueError, match="one RMSE per estimator"):
+        impact.select_ambient(pd.Series([0.4, 0.4], index=["A1", "A1"]))
+    many = pd.Series([0.4, 0.3, 0.2, 0.1], index=["A3", "A1", "A3", "A1"])
+    with pytest.raises(ValueError, match=r"\['A1', 'A3'\]"):
+        impact.select_ambient(many)
+    distinct = pd.Series([1.0, 0.9, 0.5], index=["A1", "A2", "A3"])
+    assert impact.select_ambient(distinct)["selected"] == "A3"
+    assert "repeated label" in impact.select_ambient.__doc__
+
+
 # ----------------------------------------------------------------------------
 # Source text
 # ----------------------------------------------------------------------------
@@ -1822,3 +2101,22 @@ def test_the_modules_have_no_em_dash_and_no_placeholder_text(module):
     text = Path(module.__file__).read_text(encoding="utf-8")
     assert EM_DASH not in text
     assert "TO" + "DO" not in text and "\r" not in text
+
+
+@pytest.mark.parametrize("path", [Path(impact.__file__), Path(meta.__file__), Path(__file__)])
+def test_no_line_of_the_modules_or_of_this_file_is_longer_than_one_hundred_characters(path):
+    lines = path.read_text(encoding="utf-8").splitlines()
+    too_long = [
+        (number, len(line)) for number, line in enumerate(lines, 1) if len(line) > MAX_LINE_LENGTH
+    ]
+    assert too_long == [], path.name
+
+
+def test_the_first_line_of_every_docstring_is_a_sentence_within_the_line_length():
+    for module in (impact, meta):
+        for name, member in vars(module).items():
+            if (inspect.isfunction(member) or inspect.isclass(member)) and member.__doc__:
+                if member.__module__ == module.__name__:
+                    first = member.__doc__.strip().splitlines()[0]
+                    assert len(first) <= MAX_LINE_LENGTH, name
+                    assert first.endswith("."), name

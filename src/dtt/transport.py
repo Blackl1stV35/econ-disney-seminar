@@ -27,6 +27,34 @@ Transport problem
     by log-domain scaling iterations whose update for a relaxed marginal has
     exponent ``rho / (rho + eps)`` (Chizat, Peyre, Schmitzer and Vialard).
 
+Small regularisation
+    The scaling iterations contract by the factor ``rho / (rho + eps)`` per
+    iteration when a marginal is relaxed, so they need about ``(rho + eps) /
+    eps`` iterations per factor ``e`` of accuracy.  When ``eps`` is small next
+    to ``rho``, for example when the feature weights are almost concentrated on
+    a feature with few values and :func:`select_eps` gives a small positive
+    value, the iterations can stop at ``max_iter`` before the marginal residual
+    is below ``tol``.  The solvers then solve the same problem (same ``eps``,
+    ``rho`` and masses) from scratch by a log-domain rescue: Newton iterations
+    with Levenberg damping on the dual objective in the log-scalings of the
+    smaller side of the plan, the log-scalings of the other side being
+    eliminated exactly by their log-sum-exp update, with a continuation in
+    ``eps`` that starts at the largest cost and shrinks by a factor of four
+    per stage until the requested value.  The plan is evaluated from the
+    log-scalings, and the costs are shifted by their row and column minima, so
+    the rescue converges for ``eps`` far below the reach of the scaling
+    iterations.  A scaling iteration that reaches the tolerance is returned
+    unchanged, bit for bit, and the rescue is never run for it.
+    :class:`Plan` reports a rescued plan
+    in ``log_domain``, :class:`LocoResult` and :func:`bootstrap_transport`
+    count rescued solves in ``n_log_domain``, and ``n_nonconverged`` counts only
+    the solves that do not reach the tolerance even after the rescue.  The
+    rescue needs ``eps`` large enough for the exponents ``C / eps`` to be
+    resolved in double precision (the marginal residual cannot fall below about
+    ``1e-16 * max(C) / eps``); below that the solve is reported as not
+    converged.  The balanced iterations of :func:`sinkhorn_divergence` have no
+    rescue.
+
 Transported effect
     ``effect_j = sum_i pi_ij tau_i / sum_i pi_ij`` for each target point, and
     the target effect is the ``b``-weighted mean of these values.
@@ -126,6 +154,22 @@ _MAD_TO_SD = 1.4826
 _LOCO_METHODS = ("ot_weighted", "ot_uniform", "equal", "nn1", "nn3", "kernel")
 _WEIGHTED_METHODS = ("ot_weighted", "nn1", "nn3", "kernel")
 _PERCENTILES = (5, 25, 50, 75, 95)
+# Log-domain rescue: the largest ratios between the regularisation strengths of successive stages of the continuation,
+# tried in turn until the final stage reaches the tolerance, the largest number of stages, the marginal residual at
+# which an intermediate stage is accepted, the largest numbers of Newton steps of an intermediate and of the final
+# stage, and the largest change of one log-scaling in one step.
+_RESCUE_RATIOS = (0.25, 0.5, 0.75)
+_RESCUE_MAX_STAGES = 60
+_RESCUE_STAGE_TOL = 1e-5
+_RESCUE_STAGE_STEPS = 40
+_RESCUE_FINAL_STEPS = 60
+_RESCUE_STEP_CAP = 30.0
+# Near the solution (marginal residual below _RESCUE_WIDE_ERR) the coordinates that carry mass, as opposed to those
+# with at most _RESCUE_PASSIVE times the total mass, may first try a step of up to _RESCUE_WIDE_CAP, because flat
+# directions of the dual objective need steps far beyond _RESCUE_STEP_CAP.
+_RESCUE_WIDE_ERR = 1e-3
+_RESCUE_WIDE_CAP = 1e6
+_RESCUE_PASSIVE = 1e-10
 _RATIO_NOTE = (
     "The intervals of the RMSE ratios are descriptive: they describe the cases at hand "
     "and are not a test of the route rule."
@@ -525,7 +569,11 @@ def select_eps(Z: pd.DataFrame | ArrayLike, w: ArrayLike, quantile: float = 0.5)
     Weights that are close to, but not exactly, concentrated on a feature with
     few values give a small positive quantile of the distances and so a small
     ``eps``, with no fallback.  The Sinkhorn iterations of such a small ``eps``
-    may not reach the tolerance; the callers report this as ``n_nonconverged``.
+    may not reach the tolerance within their iteration limit.  The solvers then
+    solve the same problem by the log-domain rescue of :func:`sinkhorn_plan`,
+    which converges for small ``eps``, and the callers report those solves as
+    ``n_log_domain``; ``n_nonconverged`` counts the solves that do not reach the
+    tolerance even after the rescue.
 
     Parameters
     ----------
@@ -596,7 +644,9 @@ class Plan:
     converged : bool
         Whether ``marginal_error`` fell below the tolerance.
     n_iter : int
-        Number of scaling iterations performed.
+        Number of scaling iterations performed.  When ``log_domain`` is true
+        these are the iterations that did not reach the tolerance and preceded
+        the rescue.
     marginal_error : float
         Largest L1 residual of the two marginal optimality conditions, divided
         by the total mass of the plan, so that it does not depend on the scale of
@@ -614,6 +664,11 @@ class Plan:
         Labels of the sources, used by the functions that return pandas objects.
     target_index : Index, optional
         Labels of the target points.
+    log_domain : bool
+        True when the scaling iterations did not reach the tolerance within
+        ``max_iter`` and the plan comes from the log-domain rescue (see the
+        module header and :func:`sinkhorn_plan`), which reached it.  False for
+        a plan of the scaling iterations, also for one that did not converge.
     mass : float
         Total transported mass (read-only property).
     """
@@ -627,6 +682,7 @@ class Plan:
     rho_target: float | None
     source_index: pd.Index | None = field(default=None, repr=False)
     target_index: pd.Index | None = field(default=None, repr=False)
+    log_domain: bool = False
 
     @property
     def mass(self) -> float:
@@ -709,6 +765,203 @@ def _sinkhorn_core(
     return phi, psi, pi, n_iter, float(err)
 
 
+def _lower(err: float, best: float) -> bool:
+    """Whether the residual ``err`` is smaller than ``best``; any finite residual beats a missing one."""
+    return bool(err < best) or (bool(np.isnan(best)) and not bool(np.isnan(err)))
+
+
+def _log_domain_rescue(
+    a: np.ndarray,
+    b: np.ndarray,
+    C: np.ndarray,
+    eps: float,
+    rho_s: float | None,
+    rho_t: float | None,
+    tol: float,
+) -> tuple[np.ndarray, float, int]:
+    """Plan of the transport problem of :func:`sinkhorn_plan` by Newton iterations on the dual, for small ``eps``.
+
+    With the log-scalings ``phi`` of the sources and ``psi`` of the targets the
+    plan is ``pi = exp(log a + log b - C / eps + phi + psi)`` and the dual
+    objective divided by ``eps`` is ``T_s(phi) + T_t(psi) - sum_ij pi_ij``.
+    ``T_s(phi)`` is ``sum_i a_i phi_i`` when the source marginal is enforced
+    and ``-(rho_s / eps) sum_i a_i exp(-eps phi_i / rho_s)`` when it is
+    relaxed, and likewise ``T_t(psi)``.  The objective is concave, and its
+    gradient is the marginal residual of the optimality conditions that
+    :func:`_sinkhorn_core` iterates on.
+
+    The log-scalings of the larger side of the plan are eliminated: for given
+    log-scalings of the smaller side they are the exact maximiser, which is the
+    log-sum-exp scaling update.  The reduced objective of the smaller side has
+    the marginal residual of that side as its gradient and a negative Hessian
+    that is the sum of the Laplacian of the coupling ``pi' diag(1 / pi 1) pi``,
+    a non-negative multiple of that coupling when the larger side is relaxed,
+    and the diagonal of the penalty of the smaller side when it is relaxed.
+    All three are formed without subtracting nearly equal numbers.  Newton
+    steps with a Levenberg damping that grows until the dual objective does not
+    fall (within rounding), and with every coordinate limited to
+    ``_RESCUE_STEP_CAP``, update the log-scalings.
+
+    The costs are shifted by their row minima and then their column minima, and
+    the log-scalings are measured from the shifts divided by ``eps``, so the
+    exponents that are evaluated stay of moderate size.  The problem is solved
+    for a decreasing sequence of regularisation strengths that starts at the
+    larger of ``eps`` and the largest cost, shrinks geometrically by a factor of
+    at most ``_RESCUE_RATIOS[0]`` and ends at ``eps``; each stage starts from the
+    dual potentials ``eps * psi`` (in cost units) of the previous one.  When the
+    final stage does not reach ``tol``, the continuation is repeated with the
+    next, finer, ratio of ``_RESCUE_RATIOS``, and the best result is returned.
+
+    Parameters
+    ----------
+    a, b : ndarray
+        Strictly positive source and target masses.
+    C : ndarray, shape (len(a), len(b))
+        Cost matrix.
+    eps : float
+        Regularisation strength.
+    rho_s, rho_t : float or None
+        Penalty strengths of the source and target marginals, ``None`` when enforced.
+    tol : float
+        Tolerance on the marginal residual relative to the total mass of the plan.
+
+    Returns
+    -------
+    pi : ndarray, shape (len(a), len(b))
+        The plan of the best state found.
+    err : float
+        Its marginal residual divided by its total mass, as defined for ``Plan.marginal_error``.
+    n_steps : int
+        Number of Newton steps taken in all stages and continuations.
+    """
+    if C.shape[1] > C.shape[0]:
+        pi, err, n_steps = _log_domain_rescue(b, a, C.T, eps, rho_t, rho_s, tol)
+        return pi.T, err, n_steps
+    m = C.shape[1]
+    log_a, log_b = np.log(a), np.log(b)
+    row_min = C.min(axis=1)
+    col_min = (C - row_min[:, None]).min(axis=0)
+    shifted = C - row_min[:, None] - col_min[None, :]
+    first = max(eps, float(C.max()))
+
+    def newton(e: float, y: np.ndarray, accept: float, max_steps: int, polish: bool) -> tuple[dict[str, Any], int]:
+        """Newton iterations at strength ``e`` from the column log-scalings ``y``; the best state and the steps taken."""
+        kernel = log_a[:, None] + log_b[None, :] - shifted / e
+        ks = 0.0 if rho_s is None else e / rho_s
+        kt = 0.0 if rho_t is None else e / rho_t
+
+        def state(yy: np.ndarray) -> dict[str, Any]:
+            """Row log-scalings, plan, dual objective and marginal residual at the column log-scalings ``yy``."""
+            with np.errstate(over="ignore", under="ignore", invalid="ignore", divide="ignore"):
+                grid = kernel + yy[None, :]
+                top = grid.max(axis=1)
+                lse = top + np.log(np.exp(grid - top[:, None]).sum(axis=1))
+                if rho_s is None:
+                    xx = log_a - lse
+                    row_ref = a
+                    dual = float(a @ xx)
+                    size = abs(dual)
+                else:
+                    xx = (rho_s / (rho_s + e)) * (log_a - row_min / rho_s - lse)
+                    row_ref = np.exp(log_a - row_min / rho_s - ks * xx)
+                    penalty = float(row_ref.sum()) / ks
+                    dual = -penalty
+                    size = penalty
+                if rho_t is None:
+                    col_ref = b
+                    linear = float(b @ yy)
+                    dual += linear
+                    size += abs(linear)
+                else:
+                    col_ref = np.exp(log_b - col_min / rho_t - kt * yy)
+                    penalty = float(col_ref.sum()) / kt
+                    dual -= penalty
+                    size += penalty
+                pi = np.exp(grid + xx[:, None])
+                row, col = pi.sum(axis=1), pi.sum(axis=0)
+                total = float(row.sum())
+                dual -= total
+                size += total
+                err = max(np.abs(row - row_ref).sum(), np.abs(col - col_ref).sum()) / total if total > 0 else np.inf
+            return {
+                "y": yy, "pi": pi, "row": row, "col": col, "col_ref": col_ref, "dual": dual, "size": size, "err": float(err)
+            }
+
+        current = best = state(y)
+        taken = settled = 0
+        damping = 1e-10
+        while True:
+            if _lower(current["err"], best["err"]):
+                best = current
+            if current["err"] < accept:
+                settled += 1
+                if not polish or current["err"] < 1e-3 * accept or settled > 2:
+                    break
+            if taken >= max_steps:
+                break
+            pi, col, col_ref = current["pi"], current["col"], current["col_ref"]
+            residual = col_ref - col
+            share = np.divide(pi, current["row"][:, None], out=np.zeros_like(pi), where=current["row"][:, None] > 0)
+            coupling = pi.T @ share
+            off = coupling - np.diag(np.diag(coupling))
+            curvature = np.diag(kt * col_ref + off.sum(axis=1)) - off + (ks / (1.0 + ks)) * coupling
+            scale = col + kt * col_ref
+            live = scale > 0
+            dead = np.flatnonzero(~live)
+            passive = scale <= _RESCUE_PASSIVE * float(col.sum())
+            accepted = False
+            for _ in range(14):
+                system = curvature + damping * np.diag(scale)
+                system[dead, :] = 0.0
+                system[:, dead] = 0.0
+                system[dead, dead] = 1.0
+                try:
+                    step = np.linalg.solve(system, np.where(live, residual, 0.0))
+                except np.linalg.LinAlgError:
+                    step = None
+                if step is not None and np.isfinite(step).all():
+                    candidates = [np.clip(step, -_RESCUE_STEP_CAP, _RESCUE_STEP_CAP)]
+                    if current["err"] < _RESCUE_WIDE_ERR:
+                        wide = np.where(passive, candidates[0], np.clip(step, -_RESCUE_WIDE_CAP, _RESCUE_WIDE_CAP))
+                        candidates.insert(0, wide)
+                    for candidate in candidates:
+                        trial = state(current["y"] + candidate)
+                        if np.isfinite(trial["dual"]) and trial["dual"] >= current["dual"] - 1e-13 * current["size"]:
+                            accepted = True
+                            break
+                    if accepted:
+                        break
+                damping *= 100.0
+            if not accepted:
+                break
+            current = trial
+            damping = max(0.1 * damping, 1e-12)
+            taken += 1
+        return best, taken
+
+    n_steps = 0
+    result = None
+    for factor in _RESCUE_RATIOS:
+        strengths = [first]
+        ratio = min(factor, (eps / first) ** (1.0 / _RESCUE_MAX_STAGES))
+        while strengths[-1] > eps:
+            strengths.append(max(eps, strengths[-1] * ratio))
+        y = np.zeros(m)
+        for k, e in enumerate(strengths):
+            last = k == len(strengths) - 1
+            best, taken = newton(
+                e, y, tol if last else _RESCUE_STAGE_TOL, _RESCUE_FINAL_STEPS if last else _RESCUE_STAGE_STEPS, last
+            )
+            n_steps += taken
+            if not last:
+                y = e * best["y"] / strengths[k + 1]
+        if result is None or _lower(best["err"], result["err"]):
+            result = best
+        if best["err"] < tol:
+            break
+    return result["pi"], result["err"], n_steps
+
+
 def _solve(
     a: np.ndarray,
     b: np.ndarray,
@@ -718,8 +971,15 @@ def _solve(
     rho_t: float | None,
     max_iter: int,
     tol: float,
-) -> tuple[np.ndarray, bool, int, float]:
+    rescue: bool = True,
+) -> tuple[np.ndarray, bool, int, float, bool]:
     """Solve on the support of ``a`` and ``b``.
+
+    The scaling iterations of :func:`_sinkhorn_core` run first.  When they do
+    not reach ``tol`` within ``max_iter`` iterations, or produce non-finite
+    values, and ``rescue`` is true, the same problem is solved by
+    :func:`_log_domain_rescue` and the plan with the smaller marginal residual
+    is returned.  Iterations that reach ``tol`` are returned as they are.
 
     Parameters
     ----------
@@ -732,9 +992,11 @@ def _solve(
     rho_s, rho_t : float or None
         Penalty strengths of the source and target marginals, ``None`` when enforced.
     max_iter : int
-        Maximum number of iterations.
+        Maximum number of scaling iterations.
     tol : float
         Tolerance on the marginal residual relative to the total mass of the plan.
+    rescue : bool
+        Whether to run the log-domain rescue when the iterations do not converge.
 
     Returns
     -------
@@ -743,23 +1005,33 @@ def _solve(
     converged : bool
         Whether the relative residual fell below ``tol``.
     n_iter : int
-        Number of iterations performed.
+        Number of scaling iterations performed.
     err : float
         Marginal residual of the returned plan relative to its total mass.
+    rescued : bool
+        Whether the returned plan comes from the rescue and reached ``tol``.
     """
     ia = np.flatnonzero(a > 0)
     jb = np.flatnonzero(b > 0)
     a_s, b_s = a[ia], b[jb]
     if rho_s is None and rho_t is None:
         b_s = b_s * (a_s.sum() / b_s.sum())
-    _, _, pi_s, n_iter, err = _sinkhorn_core(a_s, b_s, C[np.ix_(ia, jb)], eps, rho_s, rho_t, max_iter, tol)
-    if not np.isfinite(pi_s).all():
+    C_s = C[np.ix_(ia, jb)]
+    _, _, pi_s, n_iter, err = _sinkhorn_core(a_s, b_s, C_s, eps, rho_s, rho_t, max_iter, tol)
+    finite = bool(np.isfinite(pi_s).all())
+    rescued = False
+    if rescue and not (finite and err < tol):
+        pi_r, err_r, _ = _log_domain_rescue(a_s, b_s, C_s, eps, rho_s, rho_t, tol)
+        if bool(np.isfinite(pi_r).all()) and (not finite or err_r < err):
+            pi_s, err, finite = pi_r, err_r, True
+            rescued = bool(err_r < tol)
+    if not finite:
         raise ValueError("the scaling iterations produced non-finite values; increase eps or rho")
     if ia.size == a.size and jb.size == b.size:
-        return pi_s, bool(err < tol), n_iter, err
+        return pi_s, bool(err < tol), n_iter, err, rescued
     pi = np.zeros(C.shape)
     pi[np.ix_(ia, jb)] = pi_s
-    return pi, bool(err < tol), n_iter, err
+    return pi, bool(err < tol), n_iter, err, rescued
 
 
 def sinkhorn_plan(
@@ -771,8 +1043,9 @@ def sinkhorn_plan(
     rho_target: float | None = None,
     max_iter: int = 5000,
     tol: float = 1e-9,
+    rescue: bool = True,
 ) -> Plan:
-    """Entropic optimal transport plan by log-domain Sinkhorn iterations.
+    """Entropic optimal transport plan by log-domain Sinkhorn iterations, rescued for small ``eps``.
 
     The plan minimises ``<C, pi> + eps KL(pi | a b') + rho_s KL(pi 1 | a) +
     rho_t KL(pi' 1 | b)`` over non-negative matrices, with
@@ -784,6 +1057,22 @@ def sinkhorn_plan(
     (rounding noise), receive no mass.  When both marginals are
     enforced their total masses must agree to a relative 1e-6, and ``b`` is
     rescaled to the total mass of ``a``.
+
+    Small ``eps``.  A relaxed marginal makes the scaling iterations contract by
+    the factor ``rho / (rho + eps)`` per iteration, which is close to one when
+    ``eps`` is small next to ``rho``, so the iterations can end at ``max_iter``
+    with a marginal residual above ``tol``.  When ``rescue`` is true and that
+    happens, the same problem (the same ``eps``, ``rho`` and masses) is solved
+    from scratch by Newton iterations on the dual objective in the log domain
+    with a continuation in ``eps`` (see the module header), and the plan with
+    the smaller marginal residual is returned.  The returned ``Plan`` has
+    ``log_domain`` true when that plan comes from the rescue and reached
+    ``tol``, and ``converged`` false only when neither the iterations nor the
+    rescue reached ``tol``.  Iterations that reach ``tol`` are returned
+    unchanged, bit for bit, whatever ``rescue`` is.  The rescue is accurate
+    while the exponents ``C / eps`` are resolved in double precision, which
+    bounds the attainable marginal residual below by about ``1e-16 * max(C) /
+    eps``.
 
     Parameters
     ----------
@@ -802,10 +1091,14 @@ def sinkhorn_plan(
     rho_target : float, optional
         Strength of the KL penalty on the target marginal, ``None`` to enforce it.
     max_iter : int
-        Maximum number of iterations.
+        Maximum number of scaling iterations before the rescue.
     tol : float
         Tolerance on ``Plan.marginal_error``, the marginal residual relative to
         the total mass of the plan.
+    rescue : bool
+        Whether to run the log-domain rescue when the scaling iterations do not
+        reach ``tol`` within ``max_iter`` iterations.  With ``False`` the plan
+        of the scaling iterations is returned whatever its residual.
 
     Returns
     -------
@@ -828,7 +1121,9 @@ def sinkhorn_plan(
         gap = abs(a_arr.sum() - b_arr.sum())
         if gap > 1e-6 * max(a_arr.sum(), b_arr.sum()):
             raise ValueError("balanced transport needs a and b with equal total mass")
-    pi, converged, n_iter, err = _solve(a_arr, b_arr, C_arr, eps, rho_s, rho_t, int(max_iter), float(tol))
+    pi, converged, n_iter, err, rescued = _solve(
+        a_arr, b_arr, C_arr, eps, rho_s, rho_t, int(max_iter), float(tol), rescue=bool(rescue)
+    )
     if isinstance(a, pd.Series):
         source_index = a.index
     elif isinstance(C, pd.DataFrame):
@@ -851,6 +1146,7 @@ def sinkhorn_plan(
         rho_target=rho_t,
         source_index=source_index,
         target_index=target_index,
+        log_domain=rescued,
     )
 
 
@@ -1680,16 +1976,26 @@ class LocoResult:
     n_boot : int
         Number of bootstrap resamples of cases, or of groups when groups were given.
     n_nonconverged : int
-        Number of Sinkhorn solves that did not reach the tolerance.  Weights
-        that are close to, but not exactly, concentrated on a feature with few
-        values give a small default ``eps`` (see :func:`select_eps`) and can
-        make the solves fail to converge.
+        Number of Sinkhorn solves that did not reach the tolerance, also after
+        the log-domain rescue of :func:`sinkhorn_plan`.  A solve is counted
+        here only when the scaling iterations and the rescue both stopped with
+        a marginal residual above the tolerance.
     n_eps_fallback : int
         Number of fold solves of the optimal-transport methods in which the
         default regularisation strength came from a fallback of
         :func:`select_eps` (the median of the pairwise weighted distances of the
         fold was zero, so the median of the positive distances, or 1, was
         used).  It is zero when ``eps`` is given.
+    n_log_domain : int
+        Number of fold solves of the optimal-transport methods in which the
+        scaling iterations did not reach the tolerance within their iteration
+        limit and the log-domain rescue of :func:`sinkhorn_plan` solved the same
+        problem to the tolerance.  Weights that are close to, but not exactly,
+        concentrated on a feature with few values give a small default ``eps``
+        (see :func:`select_eps`) for which the scaling iterations are slow, so
+        the folds of such weights are counted here and not in
+        ``n_nonconverged``.  The field is last, so that positional construction
+        with the other fields still works.
     ratio_note : str
         Statement that the intervals of ``ratios`` are descriptive.
 
@@ -1710,6 +2016,7 @@ class LocoResult:
     n_nonconverged: int
     ratio_note: str = _RATIO_NOTE
     n_eps_fallback: int = 0
+    n_log_domain: int = 0
 
     def _wide(self, column: str) -> pd.DataFrame:
         """Return ``column`` of the table with one row per case and one column per method."""
@@ -1967,6 +2274,14 @@ def loco_validation(
     distances can be zero; :func:`select_eps` then falls back to the median of
     the positive distances, or to 1 when all rows coincide, and
     ``LocoResult.n_eps_fallback`` counts the fold solves in which this happened.
+    Weights that are close to, but not exactly, concentrated on such a feature
+    (a largest weight of 0.999 or more with small positive weights elsewhere)
+    give a small positive default ``eps`` with no fallback.  The scaling
+    iterations of such a fold may not reach the tolerance within 5000
+    iterations; the fold is then solved by the log-domain rescue of
+    :func:`sinkhorn_plan` with the same ``eps``, ``rho_source`` and masses, and
+    ``LocoResult.n_log_domain`` counts those folds.  ``LocoResult.n_nonconverged``
+    counts only the solves that do not reach the tolerance even after the rescue.
 
     What the validation measures.  Every fold predicts a case at its own
     features from the other cases (or the cases outside its group), so the
@@ -2093,6 +2408,7 @@ def loco_validation(
     n_used = np.zeros(n, dtype=int)
     n_nonconverged = 0
     n_eps_fallback = 0
+    n_log_domain = 0
     for i in range(n):
         if guard is not None:
             guard()
@@ -2132,8 +2448,9 @@ def loco_validation(
                     eps_m, fell_back = _default_eps(pooled, weights_m)
                     n_eps_fallback += int(fell_back)
                 fold_eps[method].append(eps_m)
-                pi, converged, _, _ = _solve(a_src, b_i, C_m, eps_m, rho_s, None, 5000, 1e-9)
+                pi, converged, _, _, rescued = _solve(a_src, b_i, C_m, eps_m, rho_s, None, 5000, 1e-9)
                 n_nonconverged += int(not converged)
+                n_log_domain += int(rescued)
                 _, effect = _barycentric(pi, tau_src)
                 pred[method][i] = float(effect.mean())
     records = []
@@ -2181,6 +2498,7 @@ def loco_validation(
         n_nonconverged=n_nonconverged,
         ratio_note=_RATIO_NOTE,
         n_eps_fallback=n_eps_fallback,
+        n_log_domain=n_log_domain,
     )
 
 
@@ -2537,7 +2855,14 @@ def bootstrap_transport(
     :func:`target_support` (effective number of sources, range of the
     features).  When the median pairwise weighted distance of the sources is
     zero and ``eps`` is ``None``, :func:`select_eps` falls back to the median
-    of the positive distances, or to 1 when all sources coincide.
+    of the positive distances, or to 1 when all sources coincide.  When the
+    weights are close to, but not exactly, concentrated on a feature with few
+    values, ``eps`` is small and positive and the scaling iterations of a
+    replicate may not reach the tolerance within 5000 iterations; the replicate
+    is then solved by the log-domain rescue of :func:`sinkhorn_plan` with the
+    same ``eps``, ``rho_source`` and masses, and ``n_log_domain`` counts those
+    solves while ``n_nonconverged`` counts the solves that do not reach the
+    tolerance even after the rescue.
 
     The per-case arguments ``tau``, ``se``, ``a`` and ``groups`` (and ``b`` for
     the target points) are used by position, except that a Series whose index
@@ -2591,7 +2916,10 @@ def bootstrap_transport(
         original sources), ``between_sd`` (deconvolved between-case standard
         deviation under the original plan), ``measurement_sd`` (root of the
         usage-weighted mean squared standard error under the original plan),
-        ``eps``, ``n_boot`` and ``n_nonconverged``.
+        ``eps``, ``n_boot``, ``n_nonconverged`` (solves of the original sources
+        and of the replicates that did not reach the tolerance, also after the
+        rescue) and ``n_log_domain`` (solves that the rescue brought to the
+        tolerance).
     """
     if int(n_boot) < 1:
         raise ValueError("n_boot must be at least 1")
@@ -2638,14 +2966,14 @@ def bootstrap_transport(
         noise = np.split(rng.standard_normal(int(lengths.sum())), np.cumsum(lengths)[:-1])
     predictive_noise = rng.standard_normal((n_draws, 2))
 
-    def one(ii: np.ndarray, tau_r: np.ndarray) -> tuple[float, float, float, bool]:
-        """Target effect, between-case variance, measurement variance and convergence flag for the sources ``ii``.
+    def one(ii: np.ndarray, tau_r: np.ndarray) -> tuple[float, float, float, bool, bool]:
+        """Target effect, between-case variance, measurement variance, convergence and rescue flags for the sources ``ii``.
 
         ``tau_r`` holds the effects of the sources including any added noise; the spread is measured on the
         observed effects ``tau_v[ii]``.
         """
         a_r = a_v[ii] / a_v[ii].sum()
-        pi, converged, _, _ = _solve(a_r, b_v, C[ii], eps_v, rho_s, None, 5000, 1e-9)
+        pi, converged, _, _, rescued = _solve(a_r, b_v, C[ii], eps_v, rho_s, None, 5000, 1e-9)
         _, effect = _barycentric(pi, tau_r)
         use = b_v > 0
         value = float((b_v[use] * effect[use]).sum())
@@ -2655,20 +2983,22 @@ def bootstrap_transport(
         centre = float(usage @ observed / total)
         spread = float(usage @ (observed - centre) ** 2 / total)
         measurement = float(usage @ se2[ii] / total)
-        return value, max(spread - measurement, 0.0), measurement, converged
+        return value, max(spread - measurement, 0.0), measurement, converged, rescued
 
     everyone = np.arange(n)
-    estimate, base_between, base_measurement, base_converged = one(everyone, tau_v)
+    estimate, base_between, base_measurement, base_converged, base_rescued = one(everyone, tau_v)
     draws = np.empty(n_draws)
     between = np.empty(n_draws)
     measurement = np.empty(n_draws)
     n_nonconverged = int(not base_converged)
+    n_log_domain = int(base_rescued)
     for r in range(n_draws):
         if guard is not None and r % 50 == 0:
             guard()
         ii = resamples[r]
-        draws[r], between[r], measurement[r], converged = one(ii, tau_v[ii] + se_v[ii] * noise[r])
+        draws[r], between[r], measurement[r], converged, rescued = one(ii, tau_v[ii] + se_v[ii] * noise[r])
         n_nonconverged += int(not converged)
+        n_log_domain += int(rescued)
     predictive = draws + np.sqrt(between) * predictive_noise[:, 0] + np.sqrt(measurement) * predictive_noise[:, 1]
     levels = list(_PERCENTILES)
     return {
@@ -2684,4 +3014,5 @@ def bootstrap_transport(
         "eps": eps_v,
         "n_boot": int(n_boot),
         "n_nonconverged": n_nonconverged,
+        "n_log_domain": n_log_domain,
     }

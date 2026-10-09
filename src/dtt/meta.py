@@ -48,7 +48,11 @@ __all__ = [
 
 _SUMMARY_QUANTILES = (0.05, 0.25, 0.50, 0.75, 0.95)
 _SUMMARY_COLUMNS = ("mean", "sd", "q5", "q25", "q50", "q75", "q95")
+# A slope whose absolute value is at most this multiple of the largest absolute effect is
+# rounding noise and has no meaningful ratio to another slope.
 _SLOPE_FLOOR = 1e-12
+# Relative tolerance of the range check of a new case: a multiple of the larger absolute
+# end of the range of the cases, so that the position does not change with the unit.
 _RANGE_TOL = 1e-9
 _SINGULAR_DESIGN = (
     "The regression has a singular design (collinear features or too few cases for the "
@@ -1053,8 +1057,10 @@ def meta_regression(
         ``unpenalised_slope`` (the standardised slope of the same model with
         ``ridge=0``, NaN when that model is singular or has no residual degree
         of freedom) and ``ratio`` (``ridge_slope`` over ``unpenalised_slope``,
-        NaN where the unpenalised slope is NaN or zero).  The ratio is 1 for
-        every feature when ``ridge`` is zero.
+        NaN where the unpenalised slope is NaN or is rounding noise, that is, its
+        absolute value is at most ``1e-12`` times the largest absolute effect).
+        When ``ridge`` is zero the two slopes are equal, so the ratio is 1 for
+        every feature whose slope is not rounding noise and NaN for the others.
 
     Raises
     ------
@@ -1168,7 +1174,8 @@ def _shrinkage_table(
         ``ridge_slope``, ``unpenalised_slope`` and ``ratio``.  The unpenalised
         slope is NaN when the model with ``ridge=0`` is singular or has no
         residual degree of freedom; the ratio is NaN where the unpenalised slope
-        is NaN or not larger than ``1e-12`` in absolute value.
+        is NaN or its absolute value is at most ``1e-12`` times the largest
+        absolute effect.
     """
     ridge_slope = np.asarray(fit.theta[1:], dtype=float)
     plain = np.full(ridge_slope.size, np.nan)
@@ -1180,7 +1187,8 @@ def _shrinkage_table(
         except (ValueError, np.linalg.LinAlgError):
             pass
     ratio = np.full(ridge_slope.size, np.nan)
-    usable = np.isfinite(plain) & (np.abs(plain) > _SLOPE_FLOOR)
+    floor = _SLOPE_FLOOR * float(np.max(np.abs(y)))
+    usable = np.isfinite(plain) & (np.abs(plain) > floor)
     ratio[usable] = ridge_slope[usable] / plain[usable]
     index = [name for name, flag in zip(names, fit.keep) if flag]
     return pd.DataFrame(
@@ -1210,10 +1218,13 @@ def extrapolation(X: ArrayLike | pd.DataFrame, x_new: Any) -> pd.DataFrame:
         One row per feature of ``X`` with the columns ``x_new`` (the value of the
         new case), ``case_min`` and ``case_max`` (the range of the cases),
         ``position`` (``below`` when the value is under the smallest case value,
-        ``above`` when it is over the largest, ``inside`` otherwise, with a
-        relative tolerance of ``1e-9``) and ``ratio_to_max`` (the value over the
-        largest case value for a feature that is non-negative in every case and
-        positive in at least one; NaN for any other feature).
+        ``above`` when it is over the largest, ``inside`` otherwise) and
+        ``ratio_to_max`` (the value over the largest case value for a feature
+        that is non-negative in every case and positive in at least one; NaN for
+        any other feature).  The position allows a tolerance of ``1e-9`` times
+        the larger of the absolute smallest and largest case value of the
+        feature, so it does not change when a feature is multiplied by a positive
+        constant.  A feature that is zero in every case has no tolerance.
 
     Raises
     ------
@@ -1237,7 +1248,7 @@ def extrapolation(X: ArrayLike | pd.DataFrame, x_new: Any) -> pd.DataFrame:
     target = new[0]
     low = cases.min(axis=0)
     high = cases.max(axis=0)
-    tol = _RANGE_TOL * np.maximum(1.0, np.maximum(np.abs(low), np.abs(high)))
+    tol = _RANGE_TOL * np.maximum(np.abs(low), np.abs(high))
     below = target < low - tol
     above = target > high + tol
     position = np.where(below, "below", np.where(above, "above", "inside"))

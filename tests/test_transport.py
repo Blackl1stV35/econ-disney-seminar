@@ -5,6 +5,7 @@ All data are SIMULATED inside the tests.  POT (``ot``) and cvxpy are used as ind
 tests that need them are skipped when the package is missing.  The solver is also checked against the
 first-order optimality conditions of the objective stated in its documentation and against an exact linear program.
 """
+import dataclasses
 import inspect
 import itertools
 import math
@@ -495,17 +496,17 @@ def test_unbalanced_plan_is_optimal_when_flagged_converged_whatever_the_scale_of
 
 def test_balanced_marginal_error_decreases_with_the_iteration_budget():
     _, _, _, a, b, C = random_problem(7, 8, 9)
-    errors = [tr.sinkhorn_plan(a, b, C, 0.3, max_iter=k, tol=1e-14).marginal_error for k in (2, 8, 32, 128, 512)]
+    errors = [tr.sinkhorn_plan(a, b, C, 0.3, max_iter=k, tol=1e-14, rescue=False).marginal_error for k in (2, 8, 32, 128, 512)]
     assert all(later < earlier for earlier, later in zip(errors, errors[1:]))
     assert errors[-1] < 1e-8
 
 
 def test_non_convergence_is_reported_and_iteration_count_is_exact():
     _, _, _, a, b, C = random_problem(8)
-    plan = tr.sinkhorn_plan(a, b, C, 0.05, max_iter=3, tol=1e-12)
-    assert not plan.converged and plan.n_iter == 3 and plan.marginal_error > 1e-12
+    plan = tr.sinkhorn_plan(a, b, C, 0.05, max_iter=3, tol=1e-12, rescue=False)
+    assert not plan.converged and plan.n_iter == 3 and plan.marginal_error > 1e-12 and not plan.log_domain
     done = tr.sinkhorn_plan(a, b, C, 1.0, max_iter=5000, tol=1e-9)
-    assert done.converged and 0 < done.n_iter < 5000 and done.marginal_error < 1e-9
+    assert done.converged and 0 < done.n_iter < 5000 and done.marginal_error < 1e-9 and not done.log_domain
 
 
 def test_balanced_plan_cost_approaches_the_exact_linprog_cost_as_eps_shrinks():
@@ -2789,9 +2790,10 @@ def test_bootstrap_transport_returns_draws_percentiles_and_predictive_draws():
     res = tr.bootstrap_transport(Zs, Zt, w, tau, se, n_boot=60, seed=1)
     assert set(res) >= {
         "draws", "percentiles", "predictive_draws", "predictive_percentiles", "estimate", "between_sd", "measurement_sd",
-        "eps", "n_boot", "n_nonconverged",
+        "eps", "n_boot", "n_nonconverged", "n_log_domain",
     }
     assert res["draws"].shape == (60,) and res["predictive_draws"].shape == (60,)
+    assert res["n_log_domain"] == 0
     assert list(res["percentiles"].index) == [5, 25, 50, 75, 95]
     assert list(res["predictive_percentiles"].index) == [5, 25, 50, 75, 95]
     np.testing.assert_allclose(res["percentiles"].to_numpy(), np.percentile(res["draws"], [5, 25, 50, 75, 95]))
@@ -3292,6 +3294,387 @@ def test_the_sources_use_no_em_dash_and_only_line_feeds():
         raw = path.read_bytes()
         assert b"\r" not in raw
         assert chr(0x2014) not in raw.decode("utf-8"), path.name
+
+
+# ----------------------------------------------------------------------------
+# Log-domain rescue for small eps
+# ----------------------------------------------------------------------------
+def near_one_hot_weights(d, largest):
+    """Weights with ``largest`` on the last feature and the rest spread evenly over the other features."""
+    w = np.full(d, (1.0 - largest) / (d - 1))
+    w[-1] = largest
+    return w
+
+
+def dummy_cases(seed=3, n=10, d=6, share=0.2):
+    """Cases whose last feature is a 0/1 indicator equal to one for a fifth of them, effects and standard errors
+    (SIMULATED).  More than half of the pairs coincide on the indicator, so weights that are almost, but not exactly,
+    on the indicator give a small positive median pairwise distance and a small default ``eps`` without a fallback."""
+    rng = np.random.default_rng(seed)
+    Z = rng.normal(size=(n, d))
+    indicator = np.zeros(n)
+    indicator[: max(int(round(share * n)), 1)] = 1.0
+    rng.shuffle(indicator)
+    Z[:, -1] = indicator
+    return Z, rng.normal(size=n), np.full(n, 0.2)
+
+
+def single_target_plan(a, cost, eps, rho):
+    """Exact plan of one target point of mass one that is enforced, with the source marginal relaxed with ``rho``.
+
+    The optimality conditions give ``pi_i = a_i exp(-C_i / (rho + eps))`` times a constant, and the constant makes the
+    column sum equal one."""
+    logits = np.log(a) - (cost - cost.min()) / (rho + eps)
+    weights = np.exp(logits - logits.max())
+    return weights / weights.sum()
+
+
+def forced_rescue(a, b, C, eps, rho_s, rho_t):
+    """Plan of :func:`sinkhorn_plan` after a single scaling iteration, so that the log-domain rescue produces it."""
+    plan = tr.sinkhorn_plan(a, b, C, eps, rho_source=rho_s, rho_target=rho_t, max_iter=1)
+    assert plan.log_domain and plan.converged and plan.n_iter == 1 and plan.marginal_error < 1e-9
+    return plan
+
+
+@pytest.mark.parametrize("eps,rho", [(1e-3, 1.0), (1e-4, 0.3), (1e-5, 1.0), (1e-6, 25.0), (1e-6, 0.3)])
+def test_sinkhorn_plan_rescues_a_single_target_exactly_when_the_scaling_iterations_are_too_slow(eps, rho):
+    rng = np.random.default_rng(4)
+    n = 9
+    cost = rng.uniform(0.0, 8.0, size=(n, 1))
+    a = rng.uniform(0.5, 1.5, n)
+    a = a / a.sum()
+    plain = tr.sinkhorn_plan(a, [1.0], cost, eps, rho_source=rho, rescue=False)
+    assert not plain.converged and plain.n_iter == 5000 and not plain.log_domain and plain.marginal_error > 1e-9
+    plan = tr.sinkhorn_plan(a, [1.0], cost, eps, rho_source=rho)
+    assert plan.converged and plan.log_domain and plan.n_iter == 5000 and plan.marginal_error < 1e-9
+    assert plan.eps == eps and plan.rho_source == rho and plan.rho_target is None
+    expected = single_target_plan(a, cost[:, 0], eps, rho)
+    np.testing.assert_allclose(plan.pi[:, 0], expected, rtol=1e-7, atol=1e-9)
+    tau = rng.normal(size=n)
+    assert tr.target_effect(plan, tau) == pytest.approx(float(expected @ tau), abs=1e-8)
+    assert plan.mass == pytest.approx(1.0, abs=1e-9)
+
+
+@pytest.mark.parametrize("largest", [0.999, 0.9999, 1.0 - 1e-6])
+def test_loco_with_weights_that_are_almost_one_hot_converges_by_the_log_domain_rescue(largest):
+    Z, tau, se = dummy_cases(n=8)
+    n, d = Z.shape
+    w = near_one_hot_weights(d, largest)
+    res = tr.loco_validation(Z, tau, se, w, methods=("ot_weighted", "ot_uniform", "equal"), n_boot=5)
+    assert res.n_nonconverged == 0 and res.n_eps_fallback == 0
+    assert res.n_log_domain == n
+    assert np.isfinite(res.table["prediction"]).all()
+    eps = res.eps["ot_weighted"]
+    assert 0.0 < eps < 0.01 and res.eps["ot_uniform"] > 0.1
+    wt = tr._rescaled_weights(w, d)
+    predictions = res.predictions()["ot_weighted"]
+    for i in range(n):
+        src = np.delete(np.arange(n), i)
+        cost = tr.weighted_sq_cost(Z[src], Z[[i]], wt)[:, 0]
+        pi = single_target_plan(np.full(n - 1, 1.0 / (n - 1)), cost, eps, 1.0)
+        assert predictions.iloc[i] == pytest.approx(float(pi @ tau[src]), abs=1e-8), i
+    assert tr.loco_validation(Z, tau, se, w, methods=("equal", "nn1", "kernel"), n_boot=5).n_log_domain == 0
+
+
+def test_loco_with_almost_one_hot_weights_works_for_clouds_groups_masses_and_learned_weights():
+    Z, tau, se = dummy_cases(seed=6, n=10)
+    n, d = Z.shape
+    w = near_one_hot_weights(d, 0.9999)
+    rng = np.random.default_rng(9)
+    clouds = [Z[i] + 0.05 * rng.normal(size=(3, d)) * (np.arange(d) < d - 1) for i in range(n)]
+    groups = np.repeat(np.arange(n // 2), 2)
+    a = np.ones(n)
+    a[[1, 6]] = 0.0
+    calls = []
+
+    def learn(train_idx):
+        calls.append(len(train_idx))
+        return w
+
+    res = tr.loco_validation(Z, tau, se, learn, clouds=clouds, groups=groups, a=a, methods=("ot_weighted", "nn3"), n_boot=5)
+    assert len(calls) == n // 2
+    assert res.n_nonconverged == 0 and res.n_log_domain > 0 and np.isfinite(res.table["prediction"]).all()
+    assert res.n_eps_fallback == 0 and 0.0 < res.eps["ot_weighted"] < 0.05
+
+
+@pytest.mark.parametrize("largest", [0.999, 0.9999, 1.0 - 1e-6])
+def test_bootstrap_transport_with_weights_that_are_almost_one_hot_converges_by_the_log_domain_rescue(largest):
+    Z, tau, se = dummy_cases(seed=5, n=12)
+    n, d = Z.shape
+    w = near_one_hot_weights(d, largest)
+    res = tr.bootstrap_transport(Z, Z[[0]], w, tau, se, n_boot=5, seed=1)
+    assert res["n_nonconverged"] == 0 and res["n_log_domain"] == 6
+    assert np.isfinite(res["draws"]).all() and np.isfinite(res["predictive_draws"]).all()
+    assert 0.0 < res["eps"] < 0.01
+    cost = tr.weighted_sq_cost(Z, Z[[0]], w)[:, 0]
+    pi = single_target_plan(np.full(n, 1.0 / n), cost, res["eps"], 1.0)
+    assert res["estimate"] == pytest.approx(float(pi @ tau), abs=1e-8)
+
+
+def test_bootstrap_transport_with_almost_one_hot_weights_works_for_clouds_and_groups():
+    Z, tau, se = dummy_cases(seed=5, n=12)
+    n, d = Z.shape
+    w = near_one_hot_weights(d, 0.9999)
+    grouped = tr.bootstrap_transport(Z, Z[[0, 1]], w, tau, se, n_boot=4, seed=2, groups=np.arange(n) // 3)
+    assert grouped["n_nonconverged"] == 0 and grouped["n_log_domain"] > 0 and np.isfinite(grouped["draws"]).all()
+
+
+@pytest.mark.parametrize("shape", [(7, 9), (9, 4)])
+@pytest.mark.parametrize("rho_s,rho_t", [p for p in PATTERNS if p != (None, None)])
+@pytest.mark.parametrize("method,eps", [("sinkhorn", 0.05), ("sinkhorn", 0.005), ("sinkhorn", 0.002), ("sinkhorn_stabilized", 0.05)])
+def test_rescue_agrees_with_pot_unbalanced_on_small_problems(shape, rho_s, rho_t, method, eps):
+    ot = pytest.importorskip("ot")
+    n, m = shape
+    _, _, _, a, b, C = random_problem(n + m, n, m)
+    C = C / C.max()
+    plan = forced_rescue(a, b, C, eps, rho_s, rho_t)
+    reg_m = (np.inf if rho_s is None else rho_s, np.inf if rho_t is None else rho_t)
+    reference = ot.unbalanced.sinkhorn_unbalanced(a, b, C, eps, reg_m, method=method, numItermax=100000, stopThr=1e-12)
+    assert np.abs(plan.pi - reference).max() < 1e-7
+    tau = np.random.default_rng(n).normal(size=n)
+    other = tr.Plan(pi=reference, converged=True, n_iter=0, marginal_error=0.0, eps=eps, rho_source=rho_s, rho_target=rho_t)
+    assert tr.target_effect(plan, tau, b) == pytest.approx(tr.target_effect(other, tau, b), abs=1e-7)
+    np.testing.assert_allclose(
+        tr.transported_effects(plan, tau)["effect"].to_numpy(), tr.transported_effects(other, tau)["effect"].to_numpy(), atol=1e-6
+    )
+
+
+@pytest.mark.parametrize("shape", [(7, 9), (9, 4)])
+def test_rescue_agrees_with_pot_balanced_sinkhorn_on_small_problems(shape):
+    ot = pytest.importorskip("ot")
+    n, m = shape
+    _, _, _, a, b, C = random_problem(n + m + 1, n, m)
+    C = C / C.max()
+    plan = forced_rescue(a, b, C, 0.02, None, None)
+    reference = ot.sinkhorn(a, b, C, 0.02, method="sinkhorn_log", numItermax=20000, stopThr=1e-12)
+    assert np.abs(plan.pi - reference).max() < 1e-7
+    assert np.abs(plan.pi.sum(axis=1) - a).sum() < 1e-9 and np.abs(plan.pi.sum(axis=0) - b).sum() < 1e-9
+
+
+@pytest.mark.parametrize("rho_s,rho_t", PATTERNS)
+@pytest.mark.parametrize("shape", [(5, 4), (4, 6)])
+def test_rescued_plan_satisfies_the_first_order_conditions_of_the_documented_objective(rho_s, rho_t, shape):
+    rng = np.random.default_rng(11)
+    n, m = shape
+    C = tr.weighted_sq_cost(rng.normal(size=(n, 3)), rng.normal(size=(m, 3)) + 0.5, [2.0, 1.0, 0.5])
+    a, b = rng.uniform(0.5, 1.5, n), rng.uniform(0.5, 1.5, m)
+    a, b = a / a.sum(), b / b.sum()
+    eps = 0.4
+    plan = forced_rescue(a, b, C, eps, rho_s, rho_t)
+    assert kkt_residual(plan.pi, C, a, b, eps, rho_s, rho_t) < 1e-8
+    scaling = tr.sinkhorn_plan(a, b, C, eps, rho_source=rho_s, rho_target=rho_t, tol=1e-13)
+    assert scaling.converged and not scaling.log_domain
+    assert np.abs(plan.pi - scaling.pi).max() < 1e-8
+
+
+@pytest.mark.parametrize("scale", [1e-9, 1e-3, 1e6])
+@pytest.mark.parametrize("rho_s,rho_t", [(1.0, None), (0.5, 2.0), (None, None), (None, 1.0)])
+def test_rescued_plan_does_not_depend_on_the_scale_of_the_masses(scale, rho_s, rho_t):
+    rng = np.random.default_rng(19)
+    n, m = 6, 4
+    C = tr.weighted_sq_cost(rng.normal(size=(n, 2)), rng.normal(size=(m, 2)) + 0.5, [1.0, 1.0])
+    a, b = rng.uniform(0.5, 1.5, n), rng.uniform(0.5, 1.5, m)
+    a, b = scale * a / a.sum(), scale * b / b.sum()
+    plain = tr.sinkhorn_plan(a, b, C, 0.2, rho_source=rho_s, rho_target=rho_t, tol=1e-12)
+    rescued = forced_rescue(a, b, C, 0.2, rho_s, rho_t)
+    assert plain.converged and not plain.log_domain
+    assert np.abs(rescued.pi - plain.pi).max() < 1e-9 * plain.pi.max()
+
+
+def test_rescued_balanced_plan_stays_within_the_entropic_bound_of_the_exact_cost_for_a_small_eps():
+    n, m = 8, 9
+    Zs, Zt, w, a, b, C = random_problem(3, n, m, uniform=True)
+    exact = tr.wasserstein2(a, b, Zs, Zt, w) ** 2
+    for fraction in (0.01, 0.001):
+        eps = fraction * np.median(C)
+        plan = forced_rescue(a, b, C, eps, None, None)
+        cost = float((plan.pi * C).sum())
+        assert exact - 1e-9 <= cost <= exact + eps * np.log(min(n, m)) + 1e-9
+        assert np.abs(plan.pi.sum(axis=1) - a).sum() < 1e-9 and np.abs(plan.pi.sum(axis=0) - b).sum() < 1e-9
+
+
+def test_iterations_that_converge_are_returned_bit_for_bit_and_the_rescue_is_not_run(monkeypatch):
+    calls = []
+    original = tr._log_domain_rescue
+
+    def spy(*args, **kwargs):
+        calls.append(1)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(tr, "_log_domain_rescue", spy)
+    for seed in range(6):
+        for rho_s, rho_t in PATTERNS:
+            _, _, _, a, b, C = random_problem(seed, 7, 5)
+            plan = tr.sinkhorn_plan(a, b, C, 0.3, rho_source=rho_s, rho_target=rho_t)
+            balanced_b = b * (a.sum() / b.sum()) if rho_s is None and rho_t is None else b
+            core = tr._sinkhorn_core(a, balanced_b, C, 0.3, rho_s, rho_t, 5000, 1e-9)
+            assert plan.converged and not plan.log_domain
+            np.testing.assert_array_equal(plan.pi, core[2])
+            assert plan.n_iter == core[3] and plan.marginal_error == core[4]
+            off = tr.sinkhorn_plan(a, b, C, 0.3, rho_source=rho_s, rho_target=rho_t, rescue=False)
+            np.testing.assert_array_equal(off.pi, plan.pi)
+    Z, tau, se = informative_problem(8, n=14)
+    res = tr.loco_validation(Z, tau, se, [1.0, 0.5, 0.2, 0.1], n_boot=5)
+    boot = tr.bootstrap_transport(Z, Z.iloc[:3] * 0.5, [1.0, 0.5, 0.2, 0.1], tau, se, n_boot=20, seed=1)
+    assert res.n_log_domain == 0 and boot["n_log_domain"] == 0 and res.n_nonconverged == boot["n_nonconverged"] == 0
+    assert calls == []
+
+
+@pytest.mark.parametrize(
+    "seed,rho_s,rho_t,n_iter,error",
+    [
+        (0, None, None, 107, 9.752278706809398e-10),
+        (0, 1.0, None, 75, 8.947065046303879e-10),
+        (0, None, 1.0, 81, 7.789920242713218e-10),
+        (0, 1.0, 2.0, 51, 6.779942365192374e-10),
+        (0, 0.2, 0.3, 15, 2.660509641510021e-10),
+        (1, None, None, 104, 9.476273238329103e-10),
+        (1, 1.0, None, 75, 9.374461970579334e-10),
+        (1, None, 1.0, 83, 8.385218221255298e-10),
+        (1, 1.0, 2.0, 53, 7.826817250458338e-10),
+        (1, 0.2, 0.3, 15, 2.9623425714624097e-10),
+    ],
+)
+def test_scaling_iterations_of_fixed_problems_keep_their_iteration_counts_and_residuals(seed, rho_s, rho_t, n_iter, error):
+    _, _, _, a, b, C = random_problem(seed, 7, 5)
+    plan = tr.sinkhorn_plan(a, b, C, 0.3, rho_source=rho_s, rho_target=rho_t)
+    assert plan.converged and not plan.log_domain
+    assert plan.n_iter == n_iter and plan.marginal_error == pytest.approx(error, rel=1e-8)
+
+
+def test_a_rescue_that_does_not_converge_leaves_the_solve_counted_as_not_converged(monkeypatch):
+    Z, tau, se = dummy_cases(n=7)
+    d = Z.shape[1]
+    w = near_one_hot_weights(d, 0.9999)
+    cost = np.linspace(0.0, 8.0, 6)[:, None]
+    a = np.full(6, 1.0 / 6)
+    plain = tr.sinkhorn_plan(a, [1.0], cost, 1e-5, rho_source=1.0, rescue=False)
+    original = tr._log_domain_rescue
+    outcome = {}
+
+    def failing(a_, b_, C_, eps_, rho_s_, rho_t_, tol_):
+        pi, _, steps = original(a_, b_, C_, eps_, rho_s_, rho_t_, tol_)
+        return pi, outcome["err"], steps
+
+    monkeypatch.setattr(tr, "_log_domain_rescue", failing)
+    outcome["err"] = float("inf")
+    res = tr.loco_validation(Z, tau, se, w, methods=("ot_weighted",), n_boot=5)
+    assert res.n_log_domain == 0 and res.n_nonconverged == Z.shape[0] and np.isfinite(res.table["prediction"]).all()
+    kept = tr.sinkhorn_plan(a, [1.0], cost, 1e-5, rho_source=1.0)
+    assert not kept.converged and not kept.log_domain and kept.n_iter == 5000
+    assert kept.marginal_error == plain.marginal_error
+    np.testing.assert_array_equal(kept.pi, plain.pi)
+    outcome["err"] = 1e-6
+    better = tr.sinkhorn_plan(a, [1.0], cost, 1e-5, rho_source=1.0)
+    assert not better.converged and not better.log_domain and better.marginal_error == 1e-6
+    assert better.marginal_error < plain.marginal_error
+    res = tr.loco_validation(Z, tau, se, w, methods=("ot_weighted",), n_boot=5)
+    assert res.n_log_domain == 0 and res.n_nonconverged == Z.shape[0]
+    boot = tr.bootstrap_transport(Z, Z[[0]], w, tau, se, n_boot=3, seed=1)
+    assert boot["n_log_domain"] == 0 and boot["n_nonconverged"] == 4 and np.isfinite(boot["draws"]).all()
+
+
+def test_a_rescue_below_the_precision_of_the_exponents_reports_the_plan_with_the_smaller_residual():
+    cost = np.linspace(0.0, 8.0, 6)[:, None]
+    a = np.full(6, 1.0 / 6)
+    off = tr.sinkhorn_plan(a, [1.0], cost, 1e-14, rho_source=1.0, rescue=False)
+    plan = tr.sinkhorn_plan(a, [1.0], cost, 1e-14, rho_source=1.0)
+    assert np.isfinite(plan.pi).all() and plan.marginal_error <= off.marginal_error
+    assert plan.converged == (plan.marginal_error < 1e-9) and plan.log_domain == plan.converged
+    for rescue in (False, True):
+        unreachable = tr.sinkhorn_plan(a, [1.0], cost, 1e-3, rho_source=1.0, tol=1e-30, rescue=rescue)
+        assert not unreachable.converged and not unreachable.log_domain and np.isfinite(unreachable.pi).all()
+
+
+def test_the_rescue_takes_few_newton_steps_for_a_cloud_target_and_a_small_eps():
+    rng = np.random.default_rng(31)
+    n, m = 60, 11
+    Zs, Zt = rng.normal(size=(n, 4)), rng.normal(size=(m, 4)) + 0.3
+    w = near_one_hot_weights(4, 0.999)
+    Zs[:, -1] = (rng.uniform(size=n) < 0.3).astype(float)
+    Zt[:, -1] = (rng.uniform(size=m) < 0.3).astype(float)
+    C = tr.weighted_sq_cost(Zs, Zt, w)
+    a, b = np.full(n, 1.0 / n), np.full(m, 1.0 / m)
+    for eps in (1e-3, 1e-5):
+        for rho_s, rho_t in ((1.0, None), (0.5, 2.0), (None, None)):
+            start = time.time()
+            pi, err, steps = tr._log_domain_rescue(a, b, C, eps, rho_s, rho_t, 1e-9)
+            assert err < 1e-9 and steps < 400 and np.isfinite(pi).all(), (eps, rho_s, rho_t, err, steps)
+            assert time.time() - start < 30.0
+    plan = tr.sinkhorn_plan(a, b, C, 1e-5, rho_source=1.0)
+    assert plan.converged and plan.log_domain
+
+
+@pytest.mark.parametrize("largest", [0.999, 0.9999, 1.0 - 1e-6])
+def test_rescued_plans_do_not_change_when_the_inputs_move_by_a_relative_1e_13(largest):
+    Z, tau, se = dummy_cases(seed=7, n=7)
+    n, d = Z.shape
+    w = near_one_hot_weights(d, largest)
+
+    def predict(r=None):
+        f = (lambda x: np.asarray(x, dtype=float)) if r is None else (lambda x: jitter(r, x))
+        zs, ww, tt = f(Z), f(w), f(tau)
+        wt = tr._rescaled_weights(ww, d)
+        eps, _ = tr._default_eps(zs, wt)
+        out = []
+        for i in (0, 3, 6):
+            src = np.delete(np.arange(n), i)
+            cost = tr._sq_cost(zs[src], zs[[i]], wt)
+            plan = tr.sinkhorn_plan(np.full(n - 1, 1.0 / (n - 1)), [1.0], cost, eps, rho_source=1.0)
+            assert plan.converged and plan.log_domain
+            out.append(tr.target_effect(plan, tt[src]))
+        return np.array(out + [eps])
+
+    base = predict()
+    for s in range(2):
+        np.testing.assert_allclose(predict(np.random.default_rng(900 + s)), base, rtol=1e-8, atol=1e-9)
+
+
+def test_loco_predictions_with_almost_one_hot_weights_do_not_change_when_the_inputs_move_by_a_relative_1e_13():
+    Z, tau, se = dummy_cases(seed=8, n=7)
+    d = Z.shape[1]
+    w = near_one_hot_weights(d, 0.9999)
+    methods = ("ot_weighted", "nn1", "kernel")
+    base = tr.loco_validation(Z, tau, se, w, methods=methods, n_boot=5)
+    assert base.n_log_domain > 0 and base.n_nonconverged == 0
+    r = np.random.default_rng(910)
+    moved = tr.loco_validation(jitter(r, Z), jitter(r, tau), se, jitter(r, w), methods=methods, n_boot=5)
+    np.testing.assert_allclose(moved.predictions().to_numpy(), base.predictions().to_numpy(), rtol=1e-8, atol=1e-8)
+    assert moved.n_log_domain == base.n_log_domain and moved.n_nonconverged == base.n_nonconverged == 0
+    assert list(moved.summary["rank"]) == list(base.summary["rank"])
+
+
+def test_rescue_fields_have_defaults_that_keep_positional_construction_working():
+    plan = tr.Plan(np.ones((2, 2)), True, 3, 0.0, 1.0, None, None)
+    assert plan.log_domain is False
+    res = tr.LocoResult(None, None, None, {}, None, 5, 0, "note", 2)
+    assert res.n_log_domain == 0 and res.n_eps_fallback == 2
+    names = [f.name for f in dataclasses.fields(tr.LocoResult)]
+    assert names[-2:] == ["n_eps_fallback", "n_log_domain"]
+    assert [f.name for f in dataclasses.fields(tr.Plan)][-1] == "log_domain"
+    assert inspect.signature(tr.sinkhorn_plan).parameters["rescue"].default is True
+    assert list(inspect.signature(tr.sinkhorn_plan).parameters)[:8] == ["a", "b", "C", "eps", "rho_source", "rho_target", "max_iter", "tol"]
+
+
+def test_documentation_describes_the_log_domain_rescue_and_its_counts():
+    header = flat(tr.__doc__)
+    assert "Small regularisation" in header and "log-domain rescue" in header and "bit for bit" in header
+    assert "n_log_domain" in header and "n_nonconverged" in header and "rho / (rho + eps)" in header
+    assert "no rescue" in header
+    plan_doc = flat(tr.sinkhorn_plan.__doc__)
+    assert "rescue : bool" in plan_doc and "same problem (the same ``eps``, ``rho`` and masses)" in plan_doc
+    assert "bit for bit" in plan_doc and "converged`` false only when neither" in plan_doc and "``log_domain``" in plan_doc
+    loco_doc = flat(tr.loco_validation.__doc__)
+    assert "log-domain rescue" in loco_doc and "n_log_domain" in loco_doc and "0.999" in loco_doc
+    assert "counts only the solves that do not reach the tolerance even after the rescue" in loco_doc
+    result_doc = flat(tr.LocoResult.__doc__)
+    assert "n_log_domain : int" in result_doc and "also after the log-domain rescue" in result_doc
+    assert "last, so that positional construction" in result_doc
+    assert "log_domain : bool" in flat(tr.Plan.__doc__)
+    boot_doc = flat(tr.bootstrap_transport.__doc__)
+    assert "log-domain rescue" in boot_doc and "n_log_domain" in boot_doc.split("Returns")[1]
+    select_doc = flat(tr.select_eps.__doc__)
+    assert "log-domain rescue" in select_doc and "n_log_domain" in select_doc and "n_nonconverged" in select_doc
 
 
 # ----------------------------------------------------------------------------
