@@ -1,0 +1,5 @@
+# Contact string for the SEC, one line with name and e-mail address (never commit it)
+sec_user_agent.txt
+
+# Large intermediate panels used for cloud computing; the script writes them again
+results/cloud_transfer/

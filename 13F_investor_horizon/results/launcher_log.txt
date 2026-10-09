@@ -1,0 +1,9 @@
+==== run_full.bat started Mon 10/05/2026  0:56:27.61 ==== 
+Unable to create process using 'C:\Python314\python.exe -c "import sys; print(sys.version)"  ': The system cannot find the file specified.
+
+3.12.8 (tags/v3.12.8:2dc476b, Dec  3 2024, 19:30:04) [MSC v.1942 64 bit (AMD64)]
+Using: python 
+pandas 2.3.3 numpy 2.4.2
+==== finished Mon 10/05/2026  0:56:30.99 exit code 0 ==== 
+==== finished Mon 10/05/2026  0:56:33.25 exit code 0 ==== 
+==== finished Mon 10/05/2026  1:03:16.57 exit code 0 ==== 
