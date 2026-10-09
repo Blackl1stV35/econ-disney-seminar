@@ -55,12 +55,12 @@ def panel(world) -> pd.DataFrame:
 
 @pytest.fixture
 def small(tmp_path) -> Path:
-    """A fresh 24-economy simulated world; the economies SA00 to SA05 form group G1, SA06 to SA11 group G2, and so on."""
+    """A fresh 24-economy synthetic test world; the economies SA00 to SA05 form group G1, SA06 to SA11 group G2, and so on."""
     return simulate_global_world(tmp_path / "raw", n_econ=SMALL_ECON, n_cases=SMALL_CASES, seed=1).raw_dir
 
 
 # ----------------------------------------------------------------------------
-# Helpers that edit the files of a simulated world
+# Helpers that edit the files of a synthetic test world
 # ----------------------------------------------------------------------------
 def set_cells(raw: Path, changes: dict) -> None:
     """Overwrite single cells; ``changes`` maps (variable, iso3, year) to a number or None (empty cell)."""

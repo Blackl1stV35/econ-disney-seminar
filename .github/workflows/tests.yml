@@ -1,7 +1,7 @@
 name: tests
 
-# Fast checks of the Disney project on every pull request that touches it.
-# The simulated pipeline test and the real-data run are too long for an automatic check; run them locally.
+# Tests of the Disney project on every pull request that touches it.
+# A run of the notebooks on the dataset takes about an hour and is too long for an automatic check; run it locally.
 on:
   pull_request:
     paths:
@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 jobs:
-  disney-fast-tests:
+  disney-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     defaults:
@@ -32,5 +32,5 @@ jobs:
           cache-dependency-path: disney-tourism-thailand/requirements.txt
       - name: Install the requirements
         run: python -m pip install -r requirements.txt
-      - name: Run the fast tests
-        run: python -m pytest -q -p no:cacheprovider --ignore=tests/test_pipeline_sim.py
+      - name: Run the tests
+        run: python -m pytest -q -p no:cacheprovider

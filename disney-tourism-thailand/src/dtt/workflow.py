@@ -5,40 +5,24 @@ the paths of the inputs and outputs, the target economy, the scenarios of the
 Thailand proposal, the thermal guard and the seeds, and it saves tables, JSON
 files and figures below the results and figures directories.
 
-Two modes exist.  The mode ``real`` reads the raw files of the repository and
-needs the environment variable ``DTT_RUN_REAL=1``.  The mode ``sim`` is chosen
-with ``DTT_WORLD=sim``: it builds once a simulated world (see
-:mod:`dtt.simulate_global`) in the directory named by ``DTT_SIM_DIR`` and
-writes every output below ``DTT_RESULTS_DIR`` and ``DTT_FIGURE_DIR``, which
-default to sub-directories of the simulated world.  A simulated run never writes
-to the results directory of the repository.
+The context always reads the dataset of the repository: the World Bank files in
+``data/raw/wdi``, the cases catalogue and the other files in ``data/processed``.
 
 Environment variables
 ---------------------
-DTT_RUN_REAL
-    ``1`` allows a run on the real files; any other value does not.
-DTT_WORLD
-    ``real`` (default) or ``sim``.
-DTT_SIM_DIR
-    Directory of the simulated world (default: a directory in the system
-    temporary directory).
 DTT_RESULTS_DIR, DTT_FIGURE_DIR
-    Override the directories that receive tables and figures.
+    Override the directories that receive tables and figures; they default to
+    ``results`` and ``figures`` of the repository.
 DTT_GUARD
     ``1`` switches the thermal guard on and ``0`` switches it off; the default is
-    on in a real run and off in a simulated run.
-
-A simulated run refuses every output directory that lies inside the ``data``,
-``results`` or ``figures`` directory of the repository, and every directory that
-contains the repository.
+    on.
 
 Printed paths
 -------------
 Everything the context prints names a file by a label that does not depend on
 the machine: ``results/<file>`` and ``figures/<file>`` for the output
-directories, a path relative to the repository for other files of the
-repository, and ``simulated_world/<file>`` for a file of the simulated world.
-No printed line holds an absolute path, so the output stored in an executed
+directories and a path relative to the repository for other files of the
+repository.  No printed line holds an absolute path, so the output stored in an executed
 notebook does not reveal the folders of the computer that ran it.
 
 Result stamps
@@ -70,7 +54,6 @@ import os
 import platform
 import re
 import sys
-import tempfile
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -82,8 +65,6 @@ import numpy as np
 import pandas as pd
 
 __all__ = [
-    "REAL_VARIABLE",
-    "WORLD_VARIABLE",
     "SEEDS",
     "STAMP_FILE",
     "RunContext",
@@ -91,13 +72,9 @@ __all__ = [
     "apply_style",
     "check_requirements",
     "find_root",
-    "resolve_mode",
     "setup_run",
 ]
 
-REAL_VARIABLE = "DTT_RUN_REAL"
-WORLD_VARIABLE = "DTT_WORLD"
-SIM_DIR_VARIABLE = "DTT_SIM_DIR"
 RESULTS_VARIABLE = "DTT_RESULTS_DIR"
 FIGURES_VARIABLE = "DTT_FIGURE_DIR"
 GUARD_VARIABLE = "DTT_GUARD"
@@ -115,22 +92,17 @@ SEEDS: Mapping[str, int] = MappingProxyType(
         "transport bootstrap": 2,
         "overlap test": 3,
         "meta": 0,
-        "simulated world": 0,
     }
 )
 
 #: Packages whose minimum versions in ``requirements.txt`` are enforced by :func:`setup_run`.
 CHECKED_PACKAGES = ("numpy", "pandas", "scipy", "scikit-learn", "statsmodels", "matplotlib", "psutil")
 
-SIM_TARGET_FX = 33.0
-SIM_TARGET_CAPEX_SHARE = 0.015
-
 #: Seconds between two calls that reach the thermal guard.
 GUARD_MIN_INTERVAL_SECONDS = 10.0
 #: Longest wait of the thermal guard for CPU load alone, in seconds.
 GUARD_CPU_WAIT_SECONDS = 300.0
 
-_SIM_LABEL = "simulated_world"
 _STAMP_FORMAT = 1
 _DIGEST_BLOCK = 1 << 20
 _REPLACE_ATTEMPTS = 5
@@ -155,12 +127,6 @@ def _flag(env: Mapping[str, str], name: str, default: bool) -> bool:
     return raw == "1"
 
 
-def _inside(path: Path, parent: Path) -> bool:
-    """Return True if ``path`` is ``parent`` or lies below it."""
-    path, parent = path.resolve(), parent.resolve()
-    return path == parent or parent in path.parents
-
-
 def _relative_to(path: Path, base: Path) -> str | None:
     """Return the POSIX path of ``path`` relative to ``base``, ``""`` for ``base`` itself, or None if it lies elsewhere."""
     try:
@@ -182,17 +148,6 @@ def _under_root(path: Path, root: Path) -> str:
     """Return ``path`` relative to the repository root, or only its file name if it lies outside."""
     relative = _relative_to(path, root)
     return path.name if relative is None else (relative or ".")
-
-
-def _refuse_repository_outputs(root: Path, targets: Mapping[str, Path]) -> None:
-    """Raise ``ValueError`` if a simulated run would write into the data, results or figures of the repository."""
-    protected = [root / "data", root / "results", root / "figures"]
-    for label, path in targets.items():
-        clash = next((p for p in protected if _inside(path, p)), None)
-        if clash is None and _inside(root, path):
-            clash = root
-        if clash is not None:
-            raise ValueError(f"A simulated run must not use {path} as its {label} directory because it overlaps {clash}.")
 
 
 def _sha256_file(path: Path) -> str:
@@ -364,40 +319,6 @@ def find_root(start: str | Path | None = None) -> Path:
     raise FileNotFoundError(f"repository root not found from {here}")
 
 
-def resolve_mode(env: Mapping[str, str] | None = None) -> str:
-    """Return ``"real"`` or ``"sim"`` from the environment variables.
-
-    Parameters
-    ----------
-    env : mapping, optional
-        Environment to read; ``os.environ`` by default.
-
-    Returns
-    -------
-    str
-        ``"sim"`` when ``DTT_WORLD=sim``; ``"real"`` when ``DTT_WORLD`` is
-        ``real`` or unset and ``DTT_RUN_REAL`` is ``1``.
-
-    Raises
-    ------
-    RuntimeError
-        If a real run is requested without ``DTT_RUN_REAL=1``.
-    ValueError
-        If ``DTT_WORLD`` has another value.
-    """
-    env = os.environ if env is None else env
-    world = str(env.get(WORLD_VARIABLE, "")).strip().lower()
-    if world == "sim":
-        return "sim"
-    if world not in ("", "real"):
-        raise ValueError(f"{WORLD_VARIABLE} must be 'real' or 'sim', not {world!r}")
-    if str(env.get(REAL_VARIABLE, "")).strip() == "1":
-        return "real"
-    raise RuntimeError(
-        f"Set {REAL_VARIABLE}=1 to run on the real data, or {WORLD_VARIABLE}=sim to run on a simulated world."
-    )
-
-
 class _ThrottledGuard:
     """Call a guard at most once per ``min_interval`` seconds."""
 
@@ -456,16 +377,14 @@ class RunContext:
     ----------
     stage : str
         Name of the notebook.
-    mode : str
-        ``"real"`` or ``"sim"``.
     root : pathlib.Path
         Repository root.
     raw_dir : pathlib.Path
         Directory with the twenty World Bank indicator files and ``country_metadata.csv``.
     catalogue_path : pathlib.Path
         Cases catalogue.
-    investment_fx_path : pathlib.Path or None
-        File with derived dollar costs; None in a simulated run.
+    investment_fx_path : pathlib.Path
+        File with derived dollar costs.
     baseline_path : pathlib.Path
         Long-format baseline of the target economy.
     proposal_path : pathlib.Path
@@ -492,11 +411,10 @@ class RunContext:
     """
 
     stage: str
-    mode: str
     root: Path
     raw_dir: Path
     catalogue_path: Path
-    investment_fx_path: Path | None
+    investment_fx_path: Path
     baseline_path: Path
     proposal_path: Path
     processed_dir: Path
@@ -512,13 +430,8 @@ class RunContext:
     inputs_registered: dict[str, str] = field(default_factory=dict, repr=False, compare=False)
 
     def __repr__(self) -> str:
-        """Return the stage and the mode; the paths of the context are left out because they are absolute."""
-        return f"RunContext(stage={self.stage!r}, mode={self.mode!r})"
-
-    @property
-    def is_real(self) -> bool:
-        """True for a run on the real files."""
-        return self.mode == "real"
+        """Return the stage; the paths of the context are left out because they are absolute."""
+        return f"RunContext(stage={self.stage!r})"
 
     def primary_scenario(self) -> dict[str, Any]:
         """Return the proposal scenario that is flagged as primary."""
@@ -532,10 +445,7 @@ class RunContext:
     # ------------------------------------------------------------------
     def _label_bases(self) -> list[tuple[str | None, Path]]:
         """Directories that give files their labels, in the order in which they are tried."""
-        bases: list[tuple[str | None, Path]] = [("results", self.results_dir), ("figures", self.figures_dir), (None, self.root)]
-        if self.mode == "sim":
-            bases.append((_SIM_LABEL, self.raw_dir))
-        return bases
+        return [("results", self.results_dir), ("figures", self.figures_dir), (None, self.root)]
 
     def _label(self, path: str | Path) -> str | None:
         """Return the machine-independent label of a file, or None if it lies in none of the known directories."""
@@ -560,8 +470,6 @@ class RunContext:
             base = self.results_dir
         elif head == "figures":
             base = self.figures_dir
-        elif head == _SIM_LABEL and self.mode == "sim":
-            base = self.raw_dir
         else:
             return self.root / label
         return base / rest if rest else base
@@ -596,8 +504,8 @@ class RunContext:
         Parameters
         ----------
         path : str or pathlib.Path
-            An existing file below the results or figures directory, below the
-            repository, or in the simulated world.
+            An existing file below the results or figures directory or below the
+            repository.
 
         Returns
         -------
@@ -909,7 +817,7 @@ class RunContext:
         return f"Thermal guard: on; temperature reading: {reading}{policy}; load reader: {name}."
 
     def describe(self) -> None:
-        """Print the mode, paths, package versions, the thermal guard and the machine headroom.
+        """Print the stage, package versions, the dataset files, the output directories, the thermal guard and the machine headroom.
 
         Paths are printed as labels, never as absolute paths.  One line states
         whether a temperature reading is available on this machine and which
@@ -917,7 +825,7 @@ class RunContext:
         """
         import importlib.metadata as md
 
-        print(f"Stage: {self.stage}   Mode: {self.mode}")
+        print(f"Stage: {self.stage}")
         print(f"Python {sys.version.split()[0]} on {platform.system()} {platform.release()}")
         versions = []
         for pkg in ("numpy", "pandas", "scipy", "scikit-learn", "statsmodels", "matplotlib"):
@@ -932,6 +840,7 @@ class RunContext:
         print(f"Figures:     {self._display(self.figures_dir)}")
         target = self.target_name if self.target_iso3 in self.target_name else f"{self.target_name} ({self.target_iso3})"
         print(f"Target:      {target}")
+        print("Seeds:       " + ", ".join(f"{name} {value}" for name, value in self.seeds.items()))
         readings: Mapping[str, Any] | None = None
         try:
             from dtt.thermal import headroom
@@ -1004,71 +913,8 @@ def apply_style() -> None:
     )
 
 
-def _write_sim_target(sim_dir: Path) -> str:
-    """Create the baseline, proposal and marker files of the simulated target economy.
-
-    Returns
-    -------
-    str
-        Code of the economy chosen as target: the first economy, in alphabetical
-        order, without a case whose receipts, GDP and arrivals are present in
-        every year from 2015 to 2024.
-    """
-    from dtt import panel as panel_mod
-
-    cat = pd.read_csv(sim_dir / "cases_catalogue.csv", encoding="utf-8-sig")
-    case_economies = set(cat["iso3"].astype(str))
-    panel = panel_mod.build_global_panel(sim_dir)
-    years = range(2015, 2025)
-    needed = ["receipts_usd", "gdp_usd", "arrivals", "receipts_pct_gdp"]
-    complete = panel.loc[panel["year"].isin(years), ["iso3", "year", *needed]].dropna()
-    counts = complete.groupby("iso3")["year"].nunique()
-    candidates = sorted(i for i in counts.index if i not in case_economies and counts[i] == len(years))
-    if not candidates:
-        raise RuntimeError("the simulated world has no economy that can serve as the target")
-    iso3 = candidates[0]
-    sub = panel[(panel["iso3"] == iso3) & (panel["year"] >= 2015)].sort_values("year")
-    rows = []
-    for _, r in sub.iterrows():
-        year = int(r["year"])
-        values = {
-            "intl_tourism_receipts_usd_bn": r["receipts_usd"] / 1e9,
-            "gdp_current_usd_bn": r["gdp_usd"] / 1e9,
-            "intl_arrivals_million": r["arrivals"] / 1e6,
-            "fx_thb_per_usd": SIM_TARGET_FX,
-            "receipts_pct_gdp": r["receipts_pct_gdp"],
-        }
-        for var, val in values.items():
-            rows.append({"year": year, "variable": var, "value": val, "unit": "", "source": "simulated", "url": "", "note": ""})
-    pd.DataFrame(rows).to_csv(sim_dir / "target_baseline.csv", index=False)
-    last = sub.dropna(subset=["gdp_usd"]).iloc[-1]
-    capex_usd_bn = SIM_TARGET_CAPEX_SHARE * float(last["gdp_usd"]) / 1e9
-    proposal = {
-        "status": "Simulated target economy with a simulated investment scenario.",
-        "fx_thb_per_usd_reference": SIM_TARGET_FX,
-        "scenarios": [
-            {
-                "name": "complex_total",
-                "capex_thb_bn": round(capex_usd_bn * SIM_TARGET_FX, 3),
-                "scope": "simulated scenario",
-                "primary": True,
-            },
-            {
-                "name": "half_scale",
-                "capex_thb_bn": round(0.5 * capex_usd_bn * SIM_TARGET_FX, 3),
-                "scope": "simulated scenario at half scale",
-                "primary": False,
-            },
-        ],
-    }
-    (sim_dir / "target_proposal.json").write_text(json.dumps(proposal, indent=2), encoding="utf-8")
-    (sim_dir / "target_iso3.txt").write_text(iso3, encoding="utf-8")
-    return iso3
-
-
 def setup_run(
     stage: str,
-    mode: str | None = None,
     root: str | Path | None = None,
     env: Mapping[str, str] | None = None,
 ) -> RunContext:
@@ -1079,9 +925,6 @@ def setup_run(
     stage : str
         Name of the notebook, used in file names of the figure inventory and
         as the producer named in the stamps of the files it writes.
-    mode : {"real", "sim"}, optional
-        Overrides the mode from the environment; a real run still needs
-        ``DTT_RUN_REAL=1`` and is refused while ``DTT_WORLD=sim`` is set.
     root : str or pathlib.Path, optional
         Repository root; found from the current directory by default.
     env : mapping, optional
@@ -1090,76 +933,43 @@ def setup_run(
     Returns
     -------
     RunContext
-        The context.  A real run reads only the proposal file here and checks
-        that the other input files exist; a simulated run builds its world on
-        first use.
+        The context.  It reads the proposal file and checks that the other input
+        files of the dataset exist.
 
     Raises
     ------
     RuntimeError
-        If the mode cannot be resolved from the environment, a real run is
-        requested without ``DTT_RUN_REAL=1``, or an installed package is older
-        than ``requirements.txt`` asks for (see :func:`check_requirements`).
+        If an installed package is older than ``requirements.txt`` asks for (see
+        :func:`check_requirements`).
     ValueError
-        If ``mode`` or a switch variable has an invalid value, or a simulated
-        run is given an output directory that overlaps the repository data,
-        results or figures.
+        If ``DTT_GUARD`` has an invalid value.
     FileNotFoundError
-        If an input file of a real run is missing.  A real run needs
-        ``data/processed/cases_investment_fx.csv`` like the other input files.
+        If an input file of the dataset is missing.
     """
     env = os.environ if env is None else env
-    if mode is None:
-        mode = resolve_mode(env)
-    elif mode not in ("real", "sim"):
-        raise ValueError("mode must be 'real' or 'sim'")
-    elif mode == "real" and resolve_mode(env) != "real":
-        raise RuntimeError(f"A real run is refused while {WORLD_VARIABLE}=sim is set.")
     seeds = dict(SEEDS)
     root_path = find_root(root)
     check_requirements(root_path)
     if str(root_path / "src") not in sys.path:
         sys.path.insert(0, str(root_path / "src"))
 
-    if mode == "real":
-        raw_dir = root_path / "data" / "raw" / "wdi"
-        processed_dir = root_path / "data" / "processed"
-        catalogue_path = processed_dir / "cases_catalogue.csv"
-        fx = processed_dir / "cases_investment_fx.csv"
-        investment_fx_path: Path | None = fx
-        baseline_path = processed_dir / "thailand_baseline.csv"
-        proposal_path = processed_dir / "thailand_proposal.json"
-        results_dir = Path(env.get(RESULTS_VARIABLE) or root_path / "results")
-        figures_dir = Path(env.get(FIGURES_VARIABLE) or root_path / "figures")
-        target_iso3, target_name = "THA", "Thailand"
-        required = [raw_dir / "country_metadata.csv", catalogue_path, fx, baseline_path, proposal_path]
-        missing = [p for p in required if not p.is_file()]
-        if missing:
-            message = "input files missing: " + ", ".join(_under_root(p, root_path) for p in missing)
-            if fx in missing:
-                message += f". The file {fx.name} holds the derived dollar costs of the cases, and a real run needs it"
-            raise FileNotFoundError(message)
-        guard_on = _flag(env, GUARD_VARIABLE, True)
-    else:
-        sim_dir = Path(env.get(SIM_DIR_VARIABLE) or Path(tempfile.gettempdir()) / "dtt_sim_world")
-        results_dir = Path(env.get(RESULTS_VARIABLE) or sim_dir / "results")
-        figures_dir = Path(env.get(FIGURES_VARIABLE) or sim_dir / "figures")
-        _refuse_repository_outputs(root_path, {"world": sim_dir, "results": results_dir, "figures": figures_dir})
-        guard_on = _flag(env, GUARD_VARIABLE, False)
-        if not (sim_dir / "cases_catalogue.csv").is_file():
-            from dtt.simulate_global import simulate_global_world
-
-            simulate_global_world(sim_dir, n_econ=60, n_cases=16, seed=seeds["simulated world"], cluster_economies=True)
-        if not (sim_dir / "target_iso3.txt").is_file():
-            _write_sim_target(sim_dir)
-        target_iso3 = (sim_dir / "target_iso3.txt").read_text(encoding="utf-8").strip()
-        target_name = f"{target_iso3} (simulated)"
-        raw_dir = sim_dir
-        processed_dir = sim_dir / "processed"
-        catalogue_path = sim_dir / "cases_catalogue.csv"
-        investment_fx_path = None
-        baseline_path = sim_dir / "target_baseline.csv"
-        proposal_path = sim_dir / "target_proposal.json"
+    raw_dir = root_path / "data" / "raw" / "wdi"
+    processed_dir = root_path / "data" / "processed"
+    catalogue_path = processed_dir / "cases_catalogue.csv"
+    investment_fx_path = processed_dir / "cases_investment_fx.csv"
+    baseline_path = processed_dir / "thailand_baseline.csv"
+    proposal_path = processed_dir / "thailand_proposal.json"
+    results_dir = Path(env.get(RESULTS_VARIABLE) or root_path / "results")
+    figures_dir = Path(env.get(FIGURES_VARIABLE) or root_path / "figures")
+    target_iso3, target_name = "THA", "Thailand"
+    required = [raw_dir / "country_metadata.csv", catalogue_path, investment_fx_path, baseline_path, proposal_path]
+    missing = [p for p in required if not p.is_file()]
+    if missing:
+        message = "input files missing: " + ", ".join(_under_root(p, root_path) for p in missing)
+        if investment_fx_path in missing:
+            message += f". The file {investment_fx_path.name} holds the derived dollar costs of the cases"
+        raise FileNotFoundError(message)
+    guard_on = _flag(env, GUARD_VARIABLE, True)
 
     processed_dir.mkdir(parents=True, exist_ok=True)
     results_dir.mkdir(parents=True, exist_ok=True)
@@ -1174,7 +984,6 @@ def setup_run(
     apply_style()
     return RunContext(
         stage=stage,
-        mode=mode,
         root=root_path,
         raw_dir=raw_dir,
         catalogue_path=catalogue_path,

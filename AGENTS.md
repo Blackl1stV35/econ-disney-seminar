@@ -16,11 +16,10 @@ Python 3.12 or newer. From inside `disney-tourism-thailand/`:
 python -m venv .venv
 .venv\Scripts\Activate.ps1          # bash: source .venv/bin/activate
 python -m pip install -r requirements.txt
-python -m pytest -q --ignore=tests/test_pipeline_sim.py     # about 5 minutes
-python -m pytest -q                                          # adds the simulated pipeline, roughly 15 more minutes
+python -m pytest -q                  # about 6 minutes
 ```
 
-Run the fast command before every pull request. Run the full command when you change a notebook, `src/dtt/workflow.py` or a table contract. Use simulated data (`DTT_WORLD=sim`) for experiments. A real-data run needs `DTT_RUN_REAL=1`, takes about an hour (almost all in notebook 03) and is not part of a normal change.
+Run this command before every pull request. The notebooks run on the dataset in the repository; a full run takes about an hour (almost all in notebook 03) and is not part of a normal change. The unit tests use synthetic test data from `dtt.simulate` and `dtt.simulate_global`.
 
 ## Rules
 

@@ -1,4 +1,4 @@
-"""Tests for dtt.simulate_global: file formats, schema, truth and feasibility of the simulated world.
+"""Tests for dtt.simulate_global: file formats, schema, truth and feasibility of the synthetic test world.
 
 All data are SIMULATED by the generator under test.
 """

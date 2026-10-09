@@ -1,4 +1,4 @@
-"""Tests for dtt.simulate (SIMULATED validation panels; no real data are involved)."""
+"""Tests for dtt.simulate (SIMULATED validation panels)."""
 import numpy as np
 import pandas as pd
 import pytest

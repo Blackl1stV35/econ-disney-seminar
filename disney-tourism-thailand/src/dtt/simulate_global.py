@@ -1,10 +1,10 @@
-"""Simulated global worlds in the file format of the raw World Bank data.
+"""Synthetic test worlds in the file format of the raw World Bank data.
 
 :func:`simulate_global_world` writes, into a directory, the twenty indicator
 files ``wdi_{group}_{indicator}.csv``, the file ``country_metadata.csv`` and a
 cases catalogue ``cases_catalogue.csv`` with the 21-column schema of
 :data:`dtt.cases.CASE_COLUMNS`. The economies are called ``SA00``, ``SA01`` and so
-on. Nothing in the output is real data.
+on. The output is synthetic test data.
 
 Data-generating process
 -----------------------
@@ -98,7 +98,7 @@ _INCOME_LEVELS = ("High income", "Upper middle income", "Lower middle income", "
 
 @dataclass(eq=False)
 class SimWorld:
-    """A simulated world written to disk, with its known truth.
+    """A synthetic test world written to disk, with its known truth.
 
     Attributes
     ----------
@@ -288,7 +288,7 @@ def simulate_global_world(
     seed: int = 0,
     cluster_economies: bool = False,
 ) -> SimWorld:
-    """Write a simulated world in the format of the raw files and return its truth.
+    """Write a synthetic test world in the format of the raw files and return its truth.
 
     Parameters
     ----------

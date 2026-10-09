@@ -11,24 +11,24 @@ Folder: [disney-tourism-thailand](disney-tourism-thailand). It builds on the fir
 **Method in short.** Each opening worldwide gets its own synthetic-control estimate on a World Bank panel of 96 economies (1995 to 2024; 2020 to 2022 are left out), with placebo tests for inference. The case effects are then moved to Thailand by one of two routes. A rule fixed in advance chooses the route: importance-weighted optimal transport if its checks pass, otherwise an "ambient" route (a pooled hierarchical model, a scaling law in the cost share of GDP, or a meta-regression). The README in the project folder has the details.
 
 **Where it stands**
-- The code package, six Jupyter notebooks (no Stata needed any more) and the tests exist. The module test files and the pipeline tests passed when they were last run.
-- A first end-to-end run on the real data is finished. Tables are in `disney-tourism-thailand/results`, figures in `disney-tourism-thailand/figures` (start with `impact_routes.png`).
+- The code package, six Jupyter notebooks (no Stata needed any more) and the tests exist. The module test files passed when they were last run.
+- A first end-to-end run on the dataset is finished. Tables are in `disney-tourism-thailand/results`, figures in `disney-tourism-thailand/figures` (start with `impact_routes.png`).
 
-**First real-data result (preliminary)**
+**First result of the run on the dataset (preliminary)**
 - Sample: 44 openings (episodes), 27 feasible, 19 in the primary sample, in 19 economies. The importance route needs at least 20, so the rule picked the ambient route. The importance model also showed no usable signal (cross-validated R2 0.056, permutation p-value 0.94).
 - Selected estimator: the scaling law in the cost share. For the THB 300 billion complex (about 1.6 percent of GDP) it gives a median of about +US$2.2 billion a year in tourism receipts (+0.4 percent of GDP, +3.4 percent of receipts). The 90 percent interval runs from about -US$6.2 to +US$10.5 billion, so it includes zero.
 - The other routes disagree in sign: pooled mean about -0.7, meta-regression about -4.9 and transport about -5.7 US$ billion a year. Thailand's receipts share (12.1 percent of GDP) is above every opening in the sample, so the meta-regression and the transport route extrapolate.
 - Reading: the data point to a positive effect that grows with the cost of the project, but they cannot separate it from zero. An after-the-fact check on Thailand's own data would detect an effect of this size only about 7 percent of the time. The officials' figure of 1 percent of GDP a year is a reference line in the figure, not a result.
 
 **Open items**
-- Final verification: a full test run on the final version, the same results on different CPU math libraries, a clean install on Python 3.12 and 3.13, and an independent review of the real-data results.
+- Final verification: a full test run on the final version, the same results on different CPU math libraries, a clean install on Python 3.12 and 3.13, and an independent review of the results.
 - Data notice: attribution for the World Bank data (CC BY 4.0), the origin of `data/raw/disney_did_panel.csv`, and the choice of a code licence.
 - Check of the 20 World Bank files against the official API (a script for this is still to be written).
-- Run the single-country replication notebook (01) on the real data, which also answers where Hong Kong ranks in the original Stata table.
+- Run the single-country replication notebook (01) on the panel file, which also answers where Hong Kong ranks in the original Stata table.
 - Only 53 of the 96 economies have a complete outcome series for 1995 to 2019, so the donor pool is smaller than first planned.
 - Dollar costs of the openings are derived estimates, not reported figures.
 
-**How to run.** See `disney-tourism-thailand/README.md`. A full real-data run takes roughly 70 minutes on a laptop, almost all of it in notebook 03.
+**How to run.** See `disney-tourism-thailand/README.md`. A full run on the dataset takes roughly 70 minutes on a laptop, almost all of it in notebook 03.
 
 ## 2. Investor horizon of Disney's shareholders (SEC Form 13F)
 

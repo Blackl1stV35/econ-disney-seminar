@@ -1503,7 +1503,7 @@ def test_headroom_reports_none_for_every_entry_when_everything_fails(monkeypatch
     assert list(info) == HEADROOM_KEYS and all(value is None for value in info.values())
 
 
-def test_real_headroom_has_sane_values(monkeypatch):
+def test_measured_headroom_has_sane_values(monkeypatch):
     monkeypatch.setattr(thermal.psutil, "cpu_percent", lambda interval=None: 7.0)
     info = thermal.headroom()
     assert info["cpu_percent"] == 7.0

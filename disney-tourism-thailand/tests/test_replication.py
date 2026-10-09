@@ -1,13 +1,12 @@
 """Tests for dtt.replication: panel loading, the analysis driver, the equivalence check and the reference values.
 
-The analysis is run on a SIMULATED panel.  The equivalence check is exercised
+The analysis is run on a synthetic test panel.  The equivalence check is exercised
 with pseudo-targets built from the Python results themselves (every row must
 pass) and with perturbed copies (the perturbed rows must fail), and against the
 reference values for the quantities that depend only on the sample structure.
 The reference file is checked against numbers read by hand from the original
 output and against the arithmetic relations that tie its entries together.  The
-test that needs the real panel runs only when DTT_RUN_REAL=1 is set and the
-panel file exists.
+test that uses the panel file runs whenever data/raw/disney_did_panel.csv exists.
 """
 import json
 
@@ -833,7 +832,7 @@ def test_summary_and_formatted_table(results, pseudo):
 
 
 def test_equivalence_with_the_reference_values_on_simulated_data_fails_loudly(results, reference):
-    """Numbers from a simulated panel must not pass as the real results."""
+    """Numbers from a synthetic panel must not pass as the results of the original study."""
     table = rp.check_equivalence(results, reference)
     det = table[table.kind == "deterministic"]
     assert (det.status == "FAIL").mean() > 0.9
@@ -849,22 +848,13 @@ def test_equivalence_accepts_the_path_of_a_reference_file(results, reference, tm
 
 
 # ----------------------------------------------------------------------------
-# Real panel (runs only on request)
+# Panel file of the repository
 # ----------------------------------------------------------------------------
-def test_real_run_requires_the_switch_and_the_panel_file(sim, tmp_path):
-    path = tmp_path / "panel.csv"
-    sim.to_csv(path, index=False)
-    assert rp.REAL_RUN_VARIABLE == "DTT_RUN_REAL"
-    assert rp.real_run_enabled(path, env={"DTT_RUN_REAL": "1"})
-    assert not rp.real_run_enabled(path, env={})
-    assert not rp.real_run_enabled(path, env={"DTT_RUN_REAL": "0"})
-    assert not rp.real_run_enabled(path, env={"DTT_RUN_REAL": "true"})
-    assert not rp.real_run_enabled(tmp_path / "absent.csv", env={"DTT_RUN_REAL": "1"})
+def test_default_panel_is_the_file_of_the_original_study():
     assert rp.DEFAULT_PANEL == rp.REPO_ROOT / "data" / "raw" / "disney_did_panel.csv"
 
 
-@pytest.mark.skipif(not rp.real_run_enabled(), reason="real-data check not run (set DTT_RUN_REAL=1 to run on the desktop)")
-def test_real_panel_matches_the_reference_values(reference):
+def test_panel_file_matches_the_reference_values(reference):
     df = rp.load_panel()
     res = rp.run_all(df)
     table = rp.check_equivalence(res, reference)

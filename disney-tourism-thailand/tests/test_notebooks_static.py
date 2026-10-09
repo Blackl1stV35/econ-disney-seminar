@@ -62,7 +62,9 @@ def test_notebook_opens_with_the_bootstrap_cell_and_the_description(path):
     first_markdown = next(c for c in notebook.cells if c.cell_type == "markdown")
     for heading in ("**Purpose.**", "**Input files.**", "**Output files.**", "**How to run.**", "**Run time.**"):
         assert heading in first_markdown.source, f"{path.stem} lacks {heading}"
-    assert "DTT_RUN_REAL=1" in first_markdown.source and "DTT_WORLD=sim" in first_markdown.source
+    assert "python -m nbconvert --to notebook --execute --ExecutePreprocessor.kernel_name=dtt-venv --output-dir executed" in first_markdown.source
+    for variable in ("DTT_RESULTS_DIR", "DTT_FIGURE_DIR", "DTT_GUARD"):
+        assert variable in first_markdown.source
     last_markdown = [c for c in notebook.cells if c.cell_type == "markdown"][-1]
     assert last_markdown.source.lstrip().startswith("## Scope and limits")
 
@@ -103,6 +105,12 @@ def test_notebook_text_has_no_todo_and_no_review_references(path):
     text = "\n".join(cell.source for cell in _read(path).cells)
     assert not re.search(r"\bTODO\b|\bFIXME\b", text)
     assert not re.search(r"\b(?:review finding|reviewers?|wave [0-9])\b", text, re.IGNORECASE)
+
+
+@pytest.mark.parametrize("path", sorted(NOTEBOOK_DIR.glob("*.ipynb")), ids=lambda p: p.stem)
+def test_notebook_has_no_run_mode(path):
+    text = "\n".join(cell.source for cell in _read(path).cells)
+    assert not re.search(r"DTT_RUN_REAL|DTT_WORLD|DTT_SIM_DIR|ctx\.mode|is_real|\bFAST\b|simulated world", text)
 
 
 def _code(name: str) -> list[str]:

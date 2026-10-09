@@ -1611,7 +1611,7 @@ def test_every_case_of_the_simulated_catalogue_is_its_own_episode(cases):
 
 
 # ----------------------------------------------------------------------------
-# Episodes with a panel: a simulated world in which economies host several cases
+# Episodes with a panel: a synthetic test world in which economies host several cases
 # ----------------------------------------------------------------------------
 @pytest.fixture(scope="module")
 def cluster_world(tmp_path_factory):

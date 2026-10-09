@@ -7,7 +7,7 @@ This repository holds the working projects of the seminar group. Anyone invited 
 1. Read [STATUS.md](STATUS.md) and pick an open item, or open a GitHub Issue (template "Task") and say that you take it. One person per task.
 2. Clone the repository and create a branch: `git switch -c <your-name>/<topic>`.
 3. Make a small, focused change inside one project folder. Add or update tests with code changes.
-4. Run the fast tests of the project before you push (commands in AGENTS.md).
+4. Run the tests of the project before you push (command in AGENTS.md).
 5. Push the branch and open a pull request. Fill in the template. Ask the owner of the project folder for a review.
 6. Do not merge your own pull request. After the merge, delete the branch.
 
@@ -17,7 +17,7 @@ This repository holds the working projects of the seminar group. Anyone invited 
 
 ## Long runs
 
-A real-data run of the Disney project takes about an hour on a laptop (notebook 03). It does not belong in an automatic check; run it on your own machine and share the outputs through a re-run pull request.
+A run of the notebooks of the Disney project on its dataset takes about an hour (almost all in notebook 03). It does not belong in an automatic check; run it on your own machine and share the outputs through a re-run pull request.
 
 ## Data and privacy
 

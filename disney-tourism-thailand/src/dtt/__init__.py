@@ -20,7 +20,7 @@ replication
     Panel loading, the full single-country analysis and the equivalence check
     against the reference values.
 simulate
-    Simulated single-country panels for validating the estimators.
+    Synthetic single-country test panels for validating the estimators.
 
 Global extension
 ----------------
@@ -33,7 +33,7 @@ effects
     Synthetic-control effect of every feasible case with placebo-in-space
     inference.
 simulate_global
-    Simulated worlds with known case effects for end-to-end checks.
+    Synthetic test worlds with known case effects.
 
 Transport to the target economy
 -------------------------------

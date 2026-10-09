@@ -9,9 +9,6 @@ The first component of a key (``log1`` or ``log2``) names the run that printed
 the number.  ``check_equivalence`` compares the two sets of numbers with
 explicit tolerances and returns a PASS/FAIL table.
 
-Computations with the real panel are switched on by the environment variable
-``DTT_RUN_REAL=1`` (see :func:`real_run_enabled`).
-
 Tolerance rules (``TOLERANCES``)
 --------------------------------
 count
@@ -31,8 +28,8 @@ degenerate coefficient rows
 panel_stat
     ``sigma_u``, ``sigma_e``, ``rho``, ``corr(u_i, Xb)`` and the between and
     overall R-squared: as deterministic.  They follow the documented
-    definitions of the ``xtreg, fe`` output and are checked only on the real
-    panel.
+    definitions of the ``xtreg, fe`` output and are checked only on the panel
+    file.
 mc_p, mc_ci
     wild-bootstrap p-values and confidence limits printed by ``boottest`` come
     from 9,999 random Webb draws.  The Python value is the exact (enumerated)
@@ -57,7 +54,6 @@ scm_ratio
 from __future__ import annotations
 
 import json
-import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -74,12 +70,10 @@ __all__ = [
     "REPO_ROOT",
     "DEFAULT_PANEL",
     "DEFAULT_TARGETS",
-    "REAL_RUN_VARIABLE",
     "COLUMNS",
     "TOLERANCES",
     "SE_NOISE_RELATIVE",
     "SCM_SPEC",
-    "real_run_enabled",
     "load_panel",
     "validate_panel",
     "wide_block",
@@ -96,12 +90,10 @@ __all__ = [
 ]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-#: CSV file with the real panel (177 rows)
+#: CSV file with the panel of the original study (177 rows)
 DEFAULT_PANEL = REPO_ROOT / "data" / "raw" / "disney_did_panel.csv"
 #: JSON file with the reference values used as equivalence targets
 DEFAULT_TARGETS = REPO_ROOT / "data" / "reference" / "replication_reference_values.json"
-#: name of the environment variable that switches on the computations with the real panel
-REAL_RUN_VARIABLE = "DTT_RUN_REAL"
 
 COLUMNS = ["unit_id", "year", "receipts_pct_gdp", "treated", "post", "treated_post", "study_case", "rel_year"]
 Y = "receipts_pct_gdp"
@@ -137,26 +129,6 @@ TOLERANCES = {
 # ----------------------------------------------------------------------------
 # Loading and validation
 # ----------------------------------------------------------------------------
-def real_run_enabled(path: str | Path = DEFAULT_PANEL, env: Mapping[str, str] | None = None) -> bool:
-    """Report whether the computations with the real panel are switched on.
-
-    Parameters
-    ----------
-    path : str or Path
-        Location of the panel file.
-    env : mapping, optional
-        Environment to inspect; the default is ``os.environ``.
-
-    Returns
-    -------
-    bool
-        True when the environment variable ``DTT_RUN_REAL`` equals ``"1"`` and
-        the panel file exists.
-    """
-    environment = os.environ if env is None else env
-    return environment.get(REAL_RUN_VARIABLE, "") == "1" and Path(path).is_file()
-
-
 def load_panel(path: str | Path = DEFAULT_PANEL, validate: bool = True) -> pd.DataFrame:
     """Read the panel CSV into the standard column set and types.
 

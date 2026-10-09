@@ -1,4 +1,4 @@
-"""Tests of the run context used by the notebooks (simulated data and stub files only)."""
+"""Tests of the run context used by the notebooks (the dataset of the repository and stub files)."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ import pytest
 from dtt import impact, thermal, workflow as wf
 
 ROOT = Path(__file__).resolve().parents[1]
-REAL_ENV = {wf.REAL_VARIABLE: "1", wf.GUARD_VARIABLE: "0"}
+NO_GUARD_ENV = {wf.GUARD_VARIABLE: "0"}
 FLOAT_TEXTS = [
     "0.0034558419206478603",
     "0.0003304370761833871",
@@ -34,9 +34,10 @@ FLOAT_TEXTS = [
 
 
 @pytest.fixture(scope="module")
-def sim_env(tmp_path_factory):
-    base = tmp_path_factory.mktemp("sim_world")
-    return {wf.WORLD_VARIABLE: "sim", wf.SIM_DIR_VARIABLE: str(base / "world")}
+def repo_env(tmp_path_factory):
+    """Environment for the dataset of the repository with the outputs below a temporary directory and the guard off."""
+    base = tmp_path_factory.mktemp("outputs")
+    return {wf.RESULTS_VARIABLE: str(base / "results"), wf.FIGURES_VARIABLE: str(base / "figures"), wf.GUARD_VARIABLE: "0"}
 
 
 @pytest.fixture()
@@ -87,9 +88,9 @@ def fake_guard(monkeypatch):
     return state
 
 
-def _sim_dirs(sim_env, tmp_path, **extra):
-    """Environment of a simulated run that shares the world and writes below ``tmp_path``."""
-    env = dict(sim_env)
+def _dirs(repo_env, tmp_path, **extra):
+    """Environment for the dataset of the repository that writes below ``tmp_path``."""
+    env = dict(repo_env)
     env[wf.RESULTS_VARIABLE] = str(tmp_path / "r")
     env[wf.FIGURES_VARIABLE] = str(tmp_path / "f")
     env.update(extra)
@@ -105,67 +106,35 @@ def test_find_root_fails_outside_a_repository(tmp_path):
         wf.find_root(tmp_path)
 
 
-@pytest.mark.parametrize(
-    "env, expected",
-    [
-        ({wf.WORLD_VARIABLE: "sim"}, "sim"),
-        ({wf.WORLD_VARIABLE: "SIM", wf.REAL_VARIABLE: "1"}, "sim"),
-        ({wf.REAL_VARIABLE: "1"}, "real"),
-        ({wf.WORLD_VARIABLE: "real", wf.REAL_VARIABLE: "1"}, "real"),
-    ],
-)
-def test_resolve_mode(env, expected):
-    assert wf.resolve_mode(env) == expected
-
-
-@pytest.mark.parametrize(
-    "env",
-    [
-        {},
-        {wf.REAL_VARIABLE: "0"},
-        {wf.REAL_VARIABLE: "true"},
-        {wf.REAL_VARIABLE: "yes"},
-        {wf.REAL_VARIABLE: "2"},
-        {wf.WORLD_VARIABLE: "real"},
-        {wf.WORLD_VARIABLE: "real", wf.REAL_VARIABLE: "on"},
-    ],
-)
-def test_real_mode_needs_the_explicit_switch(env):
-    with pytest.raises(RuntimeError, match="DTT_RUN_REAL"):
-        wf.resolve_mode(env)
-
-
-def test_unknown_world_is_rejected():
-    with pytest.raises(ValueError):
-        wf.resolve_mode({wf.WORLD_VARIABLE: "other"})
-
-
-def test_sim_context_builds_a_world_and_a_target(sim_env, keep_sys_path):
-    ctx = wf.setup_run("test_stage", root=ROOT, env=sim_env)
-    assert ctx.mode == "sim" and not ctx.is_real
-    assert ctx.guard is None
-    assert ctx.investment_fx_path is None
-    cat = pd.read_csv(ctx.catalogue_path, encoding="utf-8-sig")
-    assert ctx.target_iso3 not in set(cat["iso3"])
-    assert str(ctx.results_dir).startswith(sim_env[wf.SIM_DIR_VARIABLE])
-    assert ROOT / "results" not in ctx.results_dir.parents and ctx.results_dir != ROOT / "results"
+def test_context_uses_the_dataset_of_the_repository(repo_env, keep_sys_path):
+    ctx = wf.setup_run("test_stage", root=ROOT, env=repo_env)
+    assert ctx.guard is None and ctx.target_iso3 == "THA" and ctx.target_name == "Thailand"
+    assert ctx.raw_dir == ROOT / "data" / "raw" / "wdi"
+    assert ctx.catalogue_path == ROOT / "data" / "processed" / "cases_catalogue.csv"
+    assert ctx.investment_fx_path == ROOT / "data" / "processed" / "cases_investment_fx.csv"
+    assert ctx.baseline_path.is_file() and ctx.proposal_path.is_file()
+    assert ctx.results_dir != ROOT / "results" and ctx.figures_dir != ROOT / "figures"
     baseline = impact.load_thailand_baseline(ctx.baseline_path)
     assert {"gdp_usd_bn", "receipts_usd_bn", "receipts_pct_gdp", "fx_thb_per_usd"} <= set(baseline.columns)
-    assert 2019 in baseline.index and 2024 in baseline.index
     scenario = ctx.primary_scenario()
     assert scenario["primary"] is True and scenario["capex_thb_bn"] > 0
 
 
-def test_second_setup_reuses_the_world(sim_env, keep_sys_path):
-    first = wf.setup_run("a", root=ROOT, env=sim_env)
-    stamp = first.catalogue_path.stat().st_mtime_ns
-    second = wf.setup_run("b", root=ROOT, env=sim_env)
-    assert second.catalogue_path.stat().st_mtime_ns == stamp
-    assert second.target_iso3 == first.target_iso3
+@pytest.mark.parametrize("stage", ["00_build_global_panel", "02_case_effects", "03_feature_importance", "04_optimal_transport", "05_thailand_impact"])
+def test_setup_run_works_for_each_stage(repo_env, keep_sys_path, stage):
+    ctx = wf.setup_run(stage, root=ROOT, env=repo_env)
+    assert ctx.stage == stage and ctx.results_dir.is_dir() and ctx.figures_dir.is_dir()
 
 
-def test_table_json_and_figure_round_trip(sim_env, tmp_path, keep_sys_path):
-    ctx = wf.setup_run("roundtrip", root=ROOT, env=_sim_dirs(sim_env, tmp_path))
+def test_setup_run_takes_only_the_stage_the_root_and_the_environment():
+    import inspect
+
+    assert list(inspect.signature(wf.setup_run).parameters) == ["stage", "root", "env"]
+    assert not hasattr(wf, "resolve_mode")
+
+
+def test_table_json_and_figure_round_trip(repo_env, tmp_path, keep_sys_path):
+    ctx = wf.setup_run("roundtrip", root=ROOT, env=_dirs(repo_env, tmp_path))
     df = pd.DataFrame({"a": [1, 2], "b": [0.5, np.nan]})
     path = ctx.save_table(df, "t_example")
     assert path.name == "t_example.csv"
@@ -195,8 +164,8 @@ def test_table_json_and_figure_round_trip(sim_env, tmp_path, keep_sys_path):
     assert inventory.loc[0, "legend entries"] == 1
 
 
-def test_results_directory_can_be_overridden(sim_env, tmp_path, keep_sys_path):
-    env = dict(sim_env)
+def test_results_directory_can_be_overridden(repo_env, tmp_path, keep_sys_path):
+    env = dict(repo_env)
     env[wf.RESULTS_VARIABLE] = str(tmp_path / "out" / "r")
     env[wf.FIGURES_VARIABLE] = str(tmp_path / "out" / "f")
     ctx = wf.setup_run("override", root=ROOT, env=env)
@@ -207,9 +176,9 @@ def test_results_directory_can_be_overridden(sim_env, tmp_path, keep_sys_path):
 # ----------------------------------------------------------------------------
 # Thermal guard
 # ----------------------------------------------------------------------------
-def test_guard_is_optional_in_a_simulated_run(sim_env, tmp_path, fake_guard, capsys, keep_sys_path):
+def test_guard_runs_when_the_switch_is_on(repo_env, tmp_path, fake_guard, capsys, keep_sys_path):
     fake_guard.temperature = 50.0
-    ctx = wf.setup_run("guarded", root=ROOT, env=_sim_dirs(sim_env, tmp_path, **{wf.GUARD_VARIABLE: "1"}))
+    ctx = wf.setup_run("guarded", root=ROOT, env=_dirs(repo_env, tmp_path, **{wf.GUARD_VARIABLE: "1"}))
     assert callable(ctx.guard) and ctx.guard_object is not None
     ctx.guard()
     log = pd.read_csv(tmp_path / "r" / "thermal_log.csv")
@@ -218,17 +187,17 @@ def test_guard_is_optional_in_a_simulated_run(sim_env, tmp_path, fake_guard, cap
     assert "thermal guard" not in capsys.readouterr().out
 
 
-def test_guard_is_built_with_the_cpu_wait_and_the_printing_switched_on(sim_env, tmp_path, fake_guard, keep_sys_path):
-    ctx = wf.setup_run("guarded", root=ROOT, env=_sim_dirs(sim_env, tmp_path, **{wf.GUARD_VARIABLE: "1"}))
+def test_guard_is_built_with_the_cpu_wait_and_the_printing_switched_on(repo_env, tmp_path, fake_guard, keep_sys_path):
+    ctx = wf.setup_run("guarded", root=ROOT, env=_dirs(repo_env, tmp_path, **{wf.GUARD_VARIABLE: "1"}))
     assert fake_guard.kwargs["max_cpu_wait_seconds"] == wf.GUARD_CPU_WAIT_SECONDS == 300.0
     assert fake_guard.kwargs["verbose"] is True
     assert Path(fake_guard.kwargs["log_path"]) == tmp_path / "r" / "thermal_log.csv"
     assert isinstance(ctx.guard, wf._ThrottledGuard) and ctx.guard._min_interval == wf.GUARD_MIN_INTERVAL_SECONDS == 10.0
 
 
-def test_guard_waits_for_cpu_load_on_the_fake_clock_and_reports_the_timeout(sim_env, tmp_path, fake_guard, capsys, keep_sys_path):
+def test_guard_waits_for_cpu_load_on_the_fake_clock_and_reports_the_timeout(repo_env, tmp_path, fake_guard, capsys, keep_sys_path):
     fake_guard.cpu = 99.0
-    ctx = wf.setup_run("busy", root=ROOT, env=_sim_dirs(sim_env, tmp_path, **{wf.GUARD_VARIABLE: "1"}))
+    ctx = wf.setup_run("busy", root=ROOT, env=_dirs(repo_env, tmp_path, **{wf.GUARD_VARIABLE: "1"}))
     ctx.guard()
     assert fake_guard.clock.now == pytest.approx(wf.GUARD_CPU_WAIT_SECONDS)
     assert sum(fake_guard.clock.sleeps) == pytest.approx(wf.GUARD_CPU_WAIT_SECONDS)
@@ -246,26 +215,26 @@ def test_guard_waits_for_cpu_load_on_the_fake_clock_and_reports_the_timeout(sim_
     assert pd.read_csv(tmp_path / "r" / "thermal_log.csv")["action"].tolist() == ["cpu_timeout", "ok"]
 
 
-def test_guard_still_raises_for_heat_on_the_fake_clock(sim_env, tmp_path, fake_guard, keep_sys_path):
+def test_guard_still_raises_for_heat_on_the_fake_clock(repo_env, tmp_path, fake_guard, keep_sys_path):
     fake_guard.temperature = 95.0
-    ctx = wf.setup_run("hot", root=ROOT, env=_sim_dirs(sim_env, tmp_path, **{wf.GUARD_VARIABLE: "1"}))
+    ctx = wf.setup_run("hot", root=ROOT, env=_dirs(repo_env, tmp_path, **{wf.GUARD_VARIABLE: "1"}))
     with pytest.raises(thermal.ThermalTimeout):
         ctx.guard()
     assert fake_guard.clock.now == pytest.approx(ctx.guard_object.max_wait_seconds)
     assert ctx.guard_summary()["cpu_timeouts"] == 0
 
 
-def test_guard_summary_without_a_guard_reports_zero_cpu_timeouts(sim_env, capsys, keep_sys_path):
-    ctx = wf.setup_run("noguard", root=ROOT, env=sim_env)
+def test_guard_summary_without_a_guard_reports_zero_cpu_timeouts(repo_env, capsys, keep_sys_path):
+    ctx = wf.setup_run("noguard", root=ROOT, env=repo_env)
     summary = ctx.guard_summary(show=True)
     assert summary["active"] is False and summary["cpu_timeouts"] == 0 and summary["checks"] == 0
     assert summary["max_temperature_c"] is None and summary["temperature_source"] is None
     assert "Thermal guard: off." in capsys.readouterr().out
 
 
-def test_guard_summary_line_reports_the_totals(sim_env, tmp_path, fake_guard, capsys, keep_sys_path):
+def test_guard_summary_line_reports_the_totals(repo_env, tmp_path, fake_guard, capsys, keep_sys_path):
     fake_guard.temperature = 61.5
-    ctx = wf.setup_run("line", root=ROOT, env=_sim_dirs(sim_env, tmp_path, **{wf.GUARD_VARIABLE: "1"}))
+    ctx = wf.setup_run("line", root=ROOT, env=_dirs(repo_env, tmp_path, **{wf.GUARD_VARIABLE: "1"}))
     ctx.guard()
     capsys.readouterr()
     summary = ctx.guard_summary(show=True)
@@ -302,10 +271,10 @@ def _fake_root(tmp_path: Path, name: str = "repo") -> Path:
     return root
 
 
-def test_real_context_reads_no_data_and_uses_repository_paths(tmp_path, keep_sys_path):
+def test_context_uses_repository_paths_and_reads_only_the_proposal(tmp_path, keep_sys_path):
     root = _fake_root(tmp_path)
-    ctx = wf.setup_run("real_stage", root=root, env=REAL_ENV)
-    assert ctx.is_real and ctx.target_iso3 == "THA"
+    ctx = wf.setup_run("real_stage", root=root, env=NO_GUARD_ENV)
+    assert ctx.target_iso3 == "THA"
     assert ctx.raw_dir == root / "data" / "raw" / "wdi"
     assert ctx.results_dir == root / "results" and ctx.figures_dir == root / "figures"
     assert ctx.investment_fx_path == root / "data" / "processed" / "cases_investment_fx.csv"
@@ -313,18 +282,18 @@ def test_real_context_reads_no_data_and_uses_repository_paths(tmp_path, keep_sys
     assert ctx.primary_scenario()["name"] == "s2"
 
 
-def test_real_context_builds_the_guard_by_default(tmp_path, fake_guard, keep_sys_path):
+def test_context_builds_the_guard_by_default(tmp_path, fake_guard, keep_sys_path):
     root = _fake_root(tmp_path)
-    ctx = wf.setup_run("real_stage", root=root, env={wf.REAL_VARIABLE: "1"})
+    ctx = wf.setup_run("real_stage", root=root, env={})
     assert callable(ctx.guard) and ctx.guard_object is not None
     assert Path(fake_guard.kwargs["log_path"]) == root / "results" / "thermal_log.csv"
 
 
-def test_real_context_reports_missing_inputs(tmp_path, keep_sys_path):
+def test_context_reports_missing_inputs(tmp_path, keep_sys_path):
     root = _fake_root(tmp_path)
     (root / "data" / "processed" / "thailand_proposal.json").unlink()
     with pytest.raises(FileNotFoundError, match="thailand_proposal.json"):
-        wf.setup_run("real_stage", root=root, env={wf.REAL_VARIABLE: "1"})
+        wf.setup_run("real_stage", root=root, env={})
 
 
 @pytest.mark.parametrize(
@@ -337,93 +306,46 @@ def test_real_context_reports_missing_inputs(tmp_path, keep_sys_path):
         "data/processed/thailand_proposal.json",
     ],
 )
-def test_real_context_names_each_missing_input_without_an_absolute_path(tmp_path, keep_sys_path, relative):
+def test_context_names_each_missing_input_without_an_absolute_path(tmp_path, keep_sys_path, relative):
     root = _fake_root(tmp_path)
     (root / relative).unlink()
     with pytest.raises(FileNotFoundError) as caught:
-        wf.setup_run("real_stage", root=root, env=REAL_ENV)
+        wf.setup_run("real_stage", root=root, env=NO_GUARD_ENV)
     message = str(caught.value)
     assert message.startswith("input files missing: ") and relative in message
     assert str(tmp_path) not in message
 
 
-def test_real_context_requires_the_investment_costs_with_a_clear_message(tmp_path, keep_sys_path):
+def test_context_requires_the_investment_costs_with_a_clear_message(tmp_path, keep_sys_path):
     root = _fake_root(tmp_path)
     (root / "data" / "processed" / "cases_investment_fx.csv").unlink()
     with pytest.raises(FileNotFoundError) as caught:
-        wf.setup_run("real_stage", root=root, env=REAL_ENV)
+        wf.setup_run("real_stage", root=root, env=NO_GUARD_ENV)
     message = str(caught.value)
     assert "data/processed/cases_investment_fx.csv" in message
-    assert "derived dollar costs" in message and "a real run needs it" in message
+    assert "derived dollar costs" in message
     assert not (root / "results").exists()
 
 
-def test_real_context_lists_every_missing_input_at_once(tmp_path, keep_sys_path):
+def test_context_lists_every_missing_input_at_once(tmp_path, keep_sys_path):
     root = _fake_root(tmp_path)
     (root / "data" / "processed" / "cases_investment_fx.csv").unlink()
     (root / "data" / "processed" / "thailand_baseline.csv").unlink()
     with pytest.raises(FileNotFoundError) as caught:
-        wf.setup_run("real_stage", root=root, env=REAL_ENV)
+        wf.setup_run("real_stage", root=root, env=NO_GUARD_ENV)
     assert "thailand_baseline.csv" in str(caught.value) and "cases_investment_fx.csv" in str(caught.value)
-
-
-def test_real_context_without_the_switch_is_refused(tmp_path, keep_sys_path):
-    root = _fake_root(tmp_path)
-    with pytest.raises(RuntimeError):
-        wf.setup_run("real_stage", root=root, env={})
-
-
-def test_explicit_real_mode_still_needs_the_switch(tmp_path, keep_sys_path):
-    root = _fake_root(tmp_path)
-    with pytest.raises(RuntimeError, match="DTT_RUN_REAL"):
-        wf.setup_run("real_stage", mode="real", root=root, env={})
-    with pytest.raises(RuntimeError, match="sim"):
-        wf.setup_run("real_stage", mode="real", root=root, env={wf.WORLD_VARIABLE: "sim", wf.REAL_VARIABLE: "1"})
-
-
-def test_invalid_mode_argument_is_rejected(tmp_path, keep_sys_path):
-    root = _fake_root(tmp_path)
-    with pytest.raises(ValueError, match="mode"):
-        wf.setup_run("stage", mode="other", root=root, env={wf.REAL_VARIABLE: "1"})
 
 
 @pytest.mark.parametrize("value", ["yes", "true", "2", "on"])
 def test_guard_switch_accepts_only_zero_or_one(tmp_path, keep_sys_path, value):
     root = _fake_root(tmp_path)
     with pytest.raises(ValueError, match=wf.GUARD_VARIABLE):
-        wf.setup_run("real_stage", root=root, env={wf.REAL_VARIABLE: "1", wf.GUARD_VARIABLE: value})
-    env = {wf.WORLD_VARIABLE: "sim", wf.SIM_DIR_VARIABLE: str(tmp_path / "world"), wf.GUARD_VARIABLE: value}
-    with pytest.raises(ValueError, match=wf.GUARD_VARIABLE):
-        wf.setup_run("sim_stage", root=root, env=env)
-    assert not (tmp_path / "world").exists()
+        wf.setup_run("real_stage", root=root, env={wf.GUARD_VARIABLE: value})
 
 
-@pytest.mark.parametrize(
-    "variable, relative",
-    [
-        (wf.SIM_DIR_VARIABLE, "data/world"),
-        (wf.SIM_DIR_VARIABLE, "data"),
-        (wf.SIM_DIR_VARIABLE, "results/world"),
-        (wf.SIM_DIR_VARIABLE, "."),
-        (wf.SIM_DIR_VARIABLE, ".."),
-        (wf.RESULTS_VARIABLE, "results"),
-        (wf.RESULTS_VARIABLE, "data/processed"),
-        (wf.FIGURES_VARIABLE, "figures/sim"),
-    ],
-)
-def test_simulated_run_refuses_repository_outputs(tmp_path, keep_sys_path, variable, relative):
+def test_directory_names_that_only_share_a_prefix_are_allowed(repo_env, tmp_path, keep_sys_path):
     root = _fake_root(tmp_path)
-    env = {wf.WORLD_VARIABLE: "sim", wf.SIM_DIR_VARIABLE: str(tmp_path / "world"), variable: str(root / relative)}
-    before = sorted(p.relative_to(tmp_path).as_posix() for p in tmp_path.rglob("*"))
-    with pytest.raises(ValueError, match="overlaps"):
-        wf.setup_run("sim_stage", root=root, env=env)
-    after = sorted(p.relative_to(tmp_path).as_posix() for p in tmp_path.rglob("*"))
-    assert after == before
-
-
-def test_directory_names_that_only_share_a_prefix_are_allowed(sim_env, tmp_path, keep_sys_path):
-    root = _fake_root(tmp_path)
-    env = dict(sim_env)
+    env = dict(repo_env)
     env[wf.RESULTS_VARIABLE] = str(root / "results_old")
     env[wf.FIGURES_VARIABLE] = str(root / "figures_old")
     ctx = wf.setup_run("prefix", root=root, env=env)
@@ -431,10 +353,10 @@ def test_directory_names_that_only_share_a_prefix_are_allowed(sim_env, tmp_path,
     assert ctx.figures_dir == root / "figures_old" and ctx.figures_dir.is_dir()
 
 
-def test_figure_level_legend_entries_are_counted(sim_env, tmp_path, keep_sys_path):
+def test_figure_level_legend_entries_are_counted(repo_env, tmp_path, keep_sys_path):
     from matplotlib.lines import Line2D
 
-    ctx = wf.setup_run("legends", root=ROOT, env=_sim_dirs(sim_env, tmp_path))
+    ctx = wf.setup_run("legends", root=ROOT, env=_dirs(repo_env, tmp_path))
     fig, (left, right) = plt.subplots(1, 2)
     left.plot([0, 1], [0, 1], label="one")
     right.plot([0, 1], [1, 0], label="two")
@@ -448,19 +370,16 @@ def test_figure_level_legend_entries_are_counted(sim_env, tmp_path, keep_sys_pat
     assert inventory.loc[0, "legend entries"] == 4
 
 
-def test_simulated_target_baseline_is_complete(sim_env, keep_sys_path):
-    ctx = wf.setup_run("target", root=ROOT, env=sim_env)
+def test_target_baseline_holds_the_variables_of_the_impact_stage(repo_env, keep_sys_path):
+    ctx = wf.setup_run("target", root=ROOT, env=repo_env)
     baseline = pd.read_csv(ctx.baseline_path)
     assert {"intl_tourism_receipts_usd_bn", "gdp_current_usd_bn", "intl_arrivals_million"} <= set(baseline["variable"])
-    for variable, group in baseline.groupby("variable"):
-        years = sorted(group.loc[group["value"].notna(), "year"].astype(int))
-        assert years == list(range(2015, 2025)), variable
 
 
-def test_seeds_are_copied_for_every_context(sim_env, keep_sys_path):
-    first = wf.setup_run("a", root=ROOT, env=sim_env)
+def test_seeds_are_copied_for_every_context(repo_env, keep_sys_path):
+    first = wf.setup_run("a", root=ROOT, env=repo_env)
     first.seeds["effects"] = 99
-    second = wf.setup_run("b", root=ROOT, env=sim_env)
+    second = wf.setup_run("b", root=ROOT, env=repo_env)
     assert second.seeds["effects"] == 0 and wf.SEEDS["effects"] == 0
     with pytest.raises(TypeError):
         wf.SEEDS["effects"] = 1
@@ -533,36 +452,36 @@ def test_check_requirements_is_skipped_without_the_file(tmp_path):
     wf.check_requirements(tmp_path)
 
 
-def test_setup_run_refuses_an_environment_below_requirements(sim_env, tmp_path, monkeypatch, keep_sys_path):
+def test_setup_run_refuses_an_environment_below_requirements(repo_env, tmp_path, monkeypatch, keep_sys_path):
     import importlib.metadata as md
 
     real = md.version
     monkeypatch.setattr(md, "version", lambda name: "0.0.1" if name == "scikit-learn" else real(name))
     with pytest.raises(RuntimeError, match="scikit-learn 0.0.1 is older"):
-        wf.setup_run("requirements", root=ROOT, env=_sim_dirs(sim_env, tmp_path))
+        wf.setup_run("requirements", root=ROOT, env=_dirs(repo_env, tmp_path))
 
 
-def test_describe_prints_mode_and_paths(sim_env, capsys, monkeypatch, keep_sys_path):
+def test_describe_prints_stage_dataset_seeds_and_directories(repo_env, capsys, monkeypatch, keep_sys_path):
     monkeypatch.setattr(thermal, "headroom", lambda: _readings(55.0))
-    ctx = wf.setup_run("describe", root=ROOT, env=sim_env)
+    ctx = wf.setup_run("describe", root=ROOT, env=repo_env)
     ctx.describe()
     out = capsys.readouterr().out
-    assert "Mode: sim" in out and "Results:" in out and "Headroom" in out
+    assert "Stage: describe" in out and "Mode" not in out and "Results:" in out and "Seeds:" in out and "Headroom" in out
     assert "temperature 55 C" in out
     assert "Claude" not in out and "process" not in out.split("Headroom")[1].splitlines()[0]
 
 
-def test_describe_runs_with_the_real_headroom(sim_env, capsys, keep_sys_path):
-    ctx = wf.setup_run("describe", root=ROOT, env=sim_env)
+def test_describe_runs_with_the_measured_headroom(repo_env, capsys, keep_sys_path):
+    ctx = wf.setup_run("describe", root=ROOT, env=repo_env)
     ctx.describe()
     out = capsys.readouterr().out
     assert "Headroom: CPU" in out and len(_thermal_lines(out)) == 1
 
 
-def test_describe_handles_unreadable_headroom(sim_env, capsys, monkeypatch, keep_sys_path):
+def test_describe_handles_unreadable_headroom(repo_env, capsys, monkeypatch, keep_sys_path):
     unreadable = {"cpu_percent": None, "mem_available_gb": None, "temperature_c": None, "claude_processes": None}
     monkeypatch.setattr(thermal, "headroom", lambda: unreadable)
-    ctx = wf.setup_run("describe", root=ROOT, env=sim_env)
+    ctx = wf.setup_run("describe", root=ROOT, env=repo_env)
     ctx.describe()
     out = capsys.readouterr().out
     assert "CPU unavailable" in out and "memory available unavailable" in out
@@ -570,17 +489,17 @@ def test_describe_handles_unreadable_headroom(sim_env, capsys, monkeypatch, keep
     assert _thermal_lines(out) == ["Thermal guard: off; temperature reading: not available on this machine; load reader: none."]
 
 
-def test_describe_states_in_one_line_that_a_temperature_is_available(sim_env, tmp_path, fake_guard, capsys, monkeypatch, keep_sys_path):
+def test_describe_states_in_one_line_that_a_temperature_is_available(repo_env, tmp_path, fake_guard, capsys, monkeypatch, keep_sys_path):
     monkeypatch.setattr(thermal, "headroom", lambda: _readings(61.0))
-    ctx = wf.setup_run("describe", root=ROOT, env=_sim_dirs(sim_env, tmp_path, **{wf.GUARD_VARIABLE: "1"}))
+    ctx = wf.setup_run("describe", root=ROOT, env=_dirs(repo_env, tmp_path, **{wf.GUARD_VARIABLE: "1"}))
     ctx.describe()
     lines = _thermal_lines(capsys.readouterr().out)
     assert lines == ["Thermal guard: on; temperature reading: available, the guard waits while it exceeds 85 C; load reader: custom function <lambda>."]
 
 
-def test_describe_states_in_one_line_that_no_temperature_is_available(sim_env, tmp_path, fake_guard, capsys, monkeypatch, keep_sys_path):
+def test_describe_states_in_one_line_that_no_temperature_is_available(repo_env, tmp_path, fake_guard, capsys, monkeypatch, keep_sys_path):
     monkeypatch.setattr(thermal, "headroom", lambda: _readings(None))
-    ctx = wf.setup_run("describe", root=ROOT, env=_sim_dirs(sim_env, tmp_path, **{wf.GUARD_VARIABLE: "1"}))
+    ctx = wf.setup_run("describe", root=ROOT, env=_dirs(repo_env, tmp_path, **{wf.GUARD_VARIABLE: "1"}))
     ctx.describe()
     lines = _thermal_lines(capsys.readouterr().out)
     assert len(lines) == 1
@@ -588,21 +507,21 @@ def test_describe_states_in_one_line_that_no_temperature_is_available(sim_env, t
     assert "waits while the load exceeds 92 percent, for at most 300 seconds per wait" in lines[0]
 
 
-def test_describe_names_the_default_load_reader_of_the_guard(sim_env, tmp_path, capsys, monkeypatch, keep_sys_path):
+def test_describe_names_the_default_load_reader_of_the_guard(repo_env, tmp_path, capsys, monkeypatch, keep_sys_path):
     monkeypatch.setattr(thermal, "headroom", lambda: _readings(None))
-    ctx = wf.setup_run("describe", root=ROOT, env=_sim_dirs(sim_env, tmp_path, **{wf.GUARD_VARIABLE: "1"}))
+    ctx = wf.setup_run("describe", root=ROOT, env=_dirs(repo_env, tmp_path, **{wf.GUARD_VARIABLE: "1"}))
     assert type(ctx.guard_object._read_cpu).__name__ in wf._LOAD_READER_NAMES
     ctx.describe()
     lines = _thermal_lines(capsys.readouterr().out)
     assert len(lines) == 1 and lines[0].endswith("load reader: system load without this program and its child processes.")
 
 
-def test_describe_survives_a_failing_headroom(sim_env, capsys, monkeypatch, keep_sys_path):
+def test_describe_survives_a_failing_headroom(repo_env, capsys, monkeypatch, keep_sys_path):
     def broken():
         raise RuntimeError("no sensors")
 
     monkeypatch.setattr(thermal, "headroom", broken)
-    ctx = wf.setup_run("describe", root=ROOT, env=sim_env)
+    ctx = wf.setup_run("describe", root=ROOT, env=repo_env)
     ctx.describe()
     out = capsys.readouterr().out
     assert "Headroom: not available (RuntimeError)" in out
@@ -613,14 +532,14 @@ def test_describe_survives_a_failing_headroom(sim_env, capsys, monkeypatch, keep
 # read_table
 # ----------------------------------------------------------------------------
 def test_read_table_returns_exactly_the_floats_that_were_written(tmp_path, keep_sys_path):
-    ctx = wf.setup_run("round_trip", root=_fake_root(tmp_path), env=REAL_ENV)
+    ctx = wf.setup_run("round_trip", root=_fake_root(tmp_path), env=NO_GUARD_ENV)
     ctx.table_path("floats").write_text("x\n" + "\n".join(FLOAT_TEXTS) + "\n", encoding="utf-8")
     back = ctx.read_table("floats")["x"].tolist()
     assert back == [float(text) for text in FLOAT_TEXTS]
 
 
 def test_saved_floats_survive_a_save_and_read_cycle(tmp_path, keep_sys_path):
-    ctx = wf.setup_run("cycle", root=_fake_root(tmp_path), env=REAL_ENV)
+    ctx = wf.setup_run("cycle", root=_fake_root(tmp_path), env=NO_GUARD_ENV)
     rng = np.random.default_rng(5)
     values = rng.normal(size=2000) * 10.0 ** rng.integers(-4, 5, size=2000)
     ctx.save_table(pd.DataFrame({"x": values}), "values")
@@ -628,7 +547,7 @@ def test_saved_floats_survive_a_save_and_read_cycle(tmp_path, keep_sys_path):
 
 
 def test_read_table_passes_options_and_respects_an_explicit_float_precision(tmp_path, monkeypatch, keep_sys_path):
-    ctx = wf.setup_run("options", root=_fake_root(tmp_path), env=REAL_ENV)
+    ctx = wf.setup_run("options", root=_fake_root(tmp_path), env=NO_GUARD_ENV)
     ctx.save_table(pd.DataFrame({"m": ["a"], "x": [1.5]}), "t")
     seen = []
     real = pd.read_csv
@@ -660,7 +579,7 @@ def _simple_figure():
 
 def test_saving_prints_repository_relative_paths_only(tmp_path, capsys, keep_sys_path):
     root = _fake_root(tmp_path)
-    ctx = wf.setup_run("paths", root=root, env=REAL_ENV)
+    ctx = wf.setup_run("paths", root=root, env=NO_GUARD_ENV)
     ctx.save_table(pd.DataFrame({"a": [1]}), "t_one")
     ctx.save_table(pd.DataFrame({"a": [1]}), "sub/t_two.csv")
     ctx.save_json({"a": 1}, "j_one")
@@ -675,8 +594,8 @@ def test_saving_prints_repository_relative_paths_only(tmp_path, capsys, keep_sys
     assert str(tmp_path) not in out
 
 
-def test_saving_in_a_simulated_run_prints_labels_not_the_output_folders(sim_env, tmp_path, capsys, keep_sys_path):
-    ctx = wf.setup_run("paths", root=ROOT, env=_sim_dirs(sim_env, tmp_path))
+def test_saving_with_redirected_outputs_prints_labels_not_the_output_folders(repo_env, tmp_path, capsys, keep_sys_path):
+    ctx = wf.setup_run("paths", root=ROOT, env=_dirs(repo_env, tmp_path))
     ctx.save_table(pd.DataFrame({"a": [1]}), "t_one")
     ctx.save_json({"a": 1}, "j_one")
     ctx.save_figure(_simple_figure(), "fig_one.png", show=False)
@@ -687,7 +606,7 @@ def test_saving_in_a_simulated_run_prints_labels_not_the_output_folders(sim_env,
 
 def test_describe_prints_no_absolute_path(tmp_path, capsys, monkeypatch, keep_sys_path):
     monkeypatch.setattr(thermal, "headroom", lambda: _readings(None))
-    ctx = wf.setup_run("paths", root=_fake_root(tmp_path), env=REAL_ENV)
+    ctx = wf.setup_run("paths", root=_fake_root(tmp_path), env=NO_GUARD_ENV)
     ctx.describe()
     out = capsys.readouterr().out
     assert "Raw files:   data/raw/wdi" in out and "Catalogue:   data/processed/cases_catalogue.csv" in out
@@ -696,26 +615,25 @@ def test_describe_prints_no_absolute_path(tmp_path, capsys, monkeypatch, keep_sy
     assert str(tmp_path) not in out and str(Path.home()) not in out
 
 
-def test_describe_of_a_simulated_run_prints_no_absolute_path(sim_env, tmp_path, capsys, monkeypatch, keep_sys_path):
+def test_describe_of_the_repository_dataset_prints_no_absolute_path(repo_env, tmp_path, capsys, monkeypatch, keep_sys_path):
     monkeypatch.setattr(thermal, "headroom", lambda: _readings(None))
-    ctx = wf.setup_run("paths", root=ROOT, env=_sim_dirs(sim_env, tmp_path))
+    ctx = wf.setup_run("paths", root=ROOT, env=_dirs(repo_env, tmp_path))
     ctx.describe()
     out = capsys.readouterr().out
-    assert "Raw files:   simulated_world" in out and "Catalogue:   simulated_world/cases_catalogue.csv" in out
+    assert "Raw files:   data/raw/wdi" in out and "Catalogue:   data/processed/cases_catalogue.csv" in out
     assert "Results:     results" in out and "Figures:     figures" in out
-    target_line = next(line for line in out.splitlines() if line.startswith("Target:"))
-    assert target_line == f"Target:      {ctx.target_iso3} (simulated)"
-    assert str(tmp_path) not in out and sim_env[wf.SIM_DIR_VARIABLE] not in out and str(Path.home()) not in out
+    assert "Target:      Thailand (THA)" in out
+    assert str(tmp_path) not in out and str(ROOT) not in out and str(Path.home()) not in out
 
 
 def test_the_representation_of_the_context_holds_no_path(tmp_path, keep_sys_path):
-    ctx = wf.setup_run("repr_stage", root=_fake_root(tmp_path), env=REAL_ENV)
-    assert repr(ctx) == "RunContext(stage='repr_stage', mode='real')"
+    ctx = wf.setup_run("repr_stage", root=_fake_root(tmp_path), env=NO_GUARD_ENV)
+    assert repr(ctx) == "RunContext(stage='repr_stage')"
     assert str(tmp_path) not in repr(ctx)
 
 
 def test_require_and_read_errors_name_labels_not_absolute_paths(tmp_path, keep_sys_path):
-    ctx = wf.setup_run("errors", root=_fake_root(tmp_path), env=REAL_ENV)
+    ctx = wf.setup_run("errors", root=_fake_root(tmp_path), env=NO_GUARD_ENV)
     with pytest.raises(FileNotFoundError) as required:
         ctx.require("absent_table", "absent_json.json")
     assert "results/absent_table.csv, results/absent_json.json" in str(required.value)
@@ -731,7 +649,7 @@ def test_require_and_read_errors_name_labels_not_absolute_paths(tmp_path, keep_s
 # Figure inventory
 # ----------------------------------------------------------------------------
 def test_saving_a_figure_again_replaces_its_inventory_row(tmp_path, keep_sys_path):
-    ctx = wf.setup_run("rerun", root=_fake_root(tmp_path), env=REAL_ENV)
+    ctx = wf.setup_run("rerun", root=_fake_root(tmp_path), env=NO_GUARD_ENV)
     ctx.save_figure(_simple_figure(), "fig_a.png", show=False)
     ctx.save_figure(_simple_figure(), "fig_b.png", show=False)
     fig, (left, right) = plt.subplots(1, 2)
@@ -746,7 +664,7 @@ def test_saving_a_figure_again_replaces_its_inventory_row(tmp_path, keep_sys_pat
 
 
 def test_a_changed_figure_replaces_the_row_in_place(tmp_path, keep_sys_path):
-    ctx = wf.setup_run("replace", root=_fake_root(tmp_path), env=REAL_ENV)
+    ctx = wf.setup_run("replace", root=_fake_root(tmp_path), env=NO_GUARD_ENV)
     ctx.save_figure(_simple_figure(), "fig_a.png", show=False)
     ctx.save_figure(_simple_figure(), "fig_b.png", show=False)
     fig, axes = plt.subplots(1, 3)
@@ -771,7 +689,7 @@ def _stamps(ctx) -> dict:
 
 def _stage(root, name, reads=(), tables=None, env=None):
     """Run one stage of a small chain: require files, then save the tables given as name to DataFrame."""
-    ctx = wf.setup_run(name, root=root, env=REAL_ENV if env is None else env)
+    ctx = wf.setup_run(name, root=root, env=NO_GUARD_ENV if env is None else env)
     if reads:
         ctx.require(*reads)
     for table, frame in (tables or {}).items():
@@ -831,7 +749,7 @@ def test_stamps_do_not_depend_on_where_the_results_directory_is(tmp_path, keep_s
         ctx.save_figure(_simple_figure(), "fig.png", show=False)
     assert (first / "results" / wf.STAMP_FILE).read_bytes() == (second / "results" / wf.STAMP_FILE).read_bytes()
     elsewhere = tmp_path / "elsewhere"
-    env = {wf.REAL_VARIABLE: "1", wf.GUARD_VARIABLE: "0", wf.RESULTS_VARIABLE: str(elsewhere / "r"), wf.FIGURES_VARIABLE: str(elsewhere / "f")}
+    env = {wf.GUARD_VARIABLE: "0", wf.RESULTS_VARIABLE: str(elsewhere / "r"), wf.FIGURES_VARIABLE: str(elsewhere / "f")}
     _stage(first, "02_effects", tables={"case_effects": _frame(3.0)}, env=env)
     moved = json.loads((elsewhere / "r" / wf.STAMP_FILE).read_text(encoding="utf-8"))["files"]
     original = json.loads((first / "results" / wf.STAMP_FILE).read_text(encoding="utf-8"))["files"]
@@ -849,7 +767,7 @@ def test_a_repeated_run_writes_identical_stamps(tmp_path, keep_sys_path):
 def test_the_unchanged_chain_passes_and_registers_the_inputs(tmp_path, keep_sys_path):
     root = _fake_root(tmp_path)
     _chain(root)
-    ctx = wf.setup_run("report", root=root, env=REAL_ENV)
+    ctx = wf.setup_run("report", root=root, env=NO_GUARD_ENV)
     ctx.require("impact", "weights.csv", "case_effects")
     assert sorted(ctx.inputs_registered) == ["results/case_effects.csv", "results/impact.csv", "results/weights.csv"]
     for label, digest in ctx.inputs_registered.items():
@@ -861,7 +779,7 @@ def test_editing_a_table_by_hand_is_caught_by_the_stage_that_reads_it(tmp_path, 
     _chain(root)
     table = root / "results" / "case_effects.csv"
     table.write_text(table.read_text(encoding="utf-8").replace("3.0", "3.1"), encoding="utf-8")
-    ctx = wf.setup_run("05_impact", root=root, env=REAL_ENV)
+    ctx = wf.setup_run("05_impact", root=root, env=NO_GUARD_ENV)
     with pytest.raises(wf.StaleResultError) as caught:
         ctx.require("weights", "case_effects")
     message = str(caught.value)
@@ -878,7 +796,7 @@ def test_editing_a_table_by_hand_is_caught_through_the_recorded_inputs(tmp_path,
     _chain(root)
     table = root / "results" / "case_effects.csv"
     table.write_text(table.read_text(encoding="utf-8").replace("3.0", "3.1"), encoding="utf-8")
-    ctx = wf.setup_run("05_impact", root=root, env=REAL_ENV)
+    ctx = wf.setup_run("05_impact", root=root, env=NO_GUARD_ENV)
     with pytest.raises(wf.StaleResultError, match="results/case_effects.csv was written by stage 02_effects") as caught:
         ctx.require("weights")
     assert "03_weights" not in caught.value.args[0].splitlines()[-1]
@@ -916,7 +834,7 @@ def test_a_producer_that_wrote_new_content_makes_its_consumers_stale(tmp_path, k
     root = _fake_root(tmp_path)
     _chain(root)
     _stage(root, "02_effects", tables={"case_effects": _frame(7.0)})
-    ctx = wf.setup_run("05_impact", root=root, env=REAL_ENV)
+    ctx = wf.setup_run("05_impact", root=root, env=NO_GUARD_ENV)
     with pytest.raises(wf.StaleResultError) as caught:
         ctx.require("weights")
     message = str(caught.value)
@@ -942,7 +860,7 @@ def test_a_removed_input_is_reported_with_its_producer(tmp_path, keep_sys_path):
     root = _fake_root(tmp_path)
     _chain(root)
     (root / "results" / "case_effects.csv").unlink()
-    ctx = wf.setup_run("05_impact", root=root, env=REAL_ENV)
+    ctx = wf.setup_run("05_impact", root=root, env=NO_GUARD_ENV)
     with pytest.raises(wf.StaleResultError) as caught:
         ctx.require("weights")
     assert "results/case_effects.csv was written by stage 02_effects and no longer exists" in str(caught.value)
@@ -980,7 +898,7 @@ def test_a_removed_file_without_a_stamp_is_reported_by_the_file_computed_from_it
 def test_a_raw_data_file_of_the_repository_is_an_input_with_a_repository_label(tmp_path, keep_sys_path):
     root = _fake_root(tmp_path)
     metadata = root / "data" / "raw" / "wdi" / "country_metadata.csv"
-    ctx = wf.setup_run("00_panel", root=root, env=REAL_ENV)
+    ctx = wf.setup_run("00_panel", root=root, env=NO_GUARD_ENV)
     ctx.require(metadata)
     ctx.save_table(_frame(1.0), "from_raw")
     label = "data/raw/wdi/country_metadata.csv"
@@ -992,7 +910,7 @@ def test_a_raw_data_file_of_the_repository_is_an_input_with_a_repository_label(t
 
 def test_stamp_file_stamps_a_file_written_elsewhere(tmp_path, keep_sys_path):
     root = _fake_root(tmp_path)
-    ctx = wf.setup_run("00_panel", root=root, env=REAL_ENV)
+    ctx = wf.setup_run("00_panel", root=root, env=NO_GUARD_ENV)
     panel = ctx.processed_dir / "global_panel.csv"
     panel.write_text("iso3,year\nTHA,2019\n", encoding="utf-8")
     assert ctx.stamp_file(panel) == panel
@@ -1015,7 +933,7 @@ def test_a_damaged_stamp_file_stops_the_run_with_a_clear_message(tmp_path, keep_
     stamp = root / "results" / wf.STAMP_FILE
     for damaged in ("not json", json.dumps({"format": 2, "files": {}}), json.dumps({"format": 1, "files": {"x": {"sha256": 1}}}), "[]"):
         stamp.write_text(damaged, encoding="utf-8")
-        ctx = wf.setup_run("05_impact", root=root, env=REAL_ENV)
+        ctx = wf.setup_run("05_impact", root=root, env=NO_GUARD_ENV)
         with pytest.raises(ValueError, match=r"the stamp file results/file_stamps.json cannot be used"):
             ctx.require("weights")
         with pytest.raises(ValueError, match="stamp file"):
@@ -1027,12 +945,12 @@ def test_a_damaged_stamp_file_stops_the_run_with_a_clear_message(tmp_path, keep_
         assert not (root / "results" / "never.csv").exists() and not (root / "results" / "never.json").exists()
         assert not (root / "figures" / "never.png").exists()
     stamp.unlink()
-    wf.setup_run("05_impact", root=root, env=REAL_ENV).require("weights")
+    wf.setup_run("05_impact", root=root, env=NO_GUARD_ENV).require("weights")
 
 
 def test_saved_files_use_line_feeds_and_leave_no_temporary_files(tmp_path, keep_sys_path):
     root = _fake_root(tmp_path)
-    ctx = wf.setup_run("lf", root=root, env=REAL_ENV)
+    ctx = wf.setup_run("lf", root=root, env=NO_GUARD_ENV)
     ctx.save_table(pd.DataFrame({"a": [1, 2], "b": ["x", "y"]}), "t")
     ctx.save_json({"a": [1, 2]}, "j")
     assert b"\r" not in (ctx.results_dir / "t.csv").read_bytes()
@@ -1073,8 +991,8 @@ def test_a_lasting_denial_raises_and_leaves_no_temporary_file(tmp_path, monkeypa
     assert len(attempts) == 5 and list(tmp_path.iterdir()) == []
 
 
-def test_stamps_are_written_in_a_simulated_run_too(sim_env, tmp_path, keep_sys_path):
-    env = _sim_dirs(sim_env, tmp_path)
+def test_stamps_are_written_with_redirected_outputs(repo_env, tmp_path, keep_sys_path):
+    env = _dirs(repo_env, tmp_path)
     first = wf.setup_run("02_effects", root=ROOT, env=env)
     first.save_table(_frame(3.0), "case_effects")
     first.save_figure(_simple_figure(), "fig.png", show=False)

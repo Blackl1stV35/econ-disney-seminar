@@ -28,8 +28,8 @@ The outcome is international tourism receipts as a percentage of GDP. The effect
   - `importance.py`: stacked ensemble and lambda-averaged permutation importance.
   - `transport.py`: unbalanced optimal transport, validation, bootstrap and overlap test.
   - `meta.py`, `impact.py`: ambient meta-analysis, scaling to US dollars and baht, detection and the route rule.
-  - `did.py`, `replication.py`, `simulate.py` and the estimation primitives they use: the single-country analysis and its equivalence check.
-  - `simulate_global.py`: simulated worlds with known effects for end-to-end checks.
+  - `did.py`, `replication.py`, `simulate.py` (synthetic test panels) and the estimation primitives they use: the single-country analysis and its equivalence check.
+  - `simulate_global.py`: synthetic test worlds with known effects for the unit tests.
   - `thermal.py`, `workflow.py`: temperature guard and the run context shared by the notebooks.
 - `notebooks/`: the analysis, to be run in this order.
   - `00_build_global_panel.ipynb`: builds the panel and records which economies can serve as donors.
@@ -38,7 +38,7 @@ The outcome is international tourism receipts as a percentage of GDP. The effect
   - `03_feature_importance.ipynb`: importance of the features and the weights of the transport cost.
   - `04_optimal_transport.ipynb`: validation of the transport rule, the transported effect for Thailand and its uncertainty.
   - `05_thailand_impact.ipynb`: route decision, ambient routes, scaling to US dollars and baht, detection and the reference comparison.
-- `tests/`: the pytest suite, which runs on simulated data and stored reference values, with one check on the real panel of the single-country analysis that runs only when `DTT_RUN_REAL=1` is set. `test_pipeline_sim.py` executes notebooks 00 and 02 to 05 in order on a simulated world (roughly 15 minutes on a laptop) and checks the files of every notebook; `test_notebooks_static.py` checks that the shipped notebooks have no stored outputs and that no file of the repository holds an em dash or a token-like string.
+- `tests/`: the pytest suite, which runs on synthetic test data and stored reference values, with one check of the single-country analysis on `data/raw/disney_did_panel.csv`. `test_notebooks_static.py` checks that the shipped notebooks have no stored outputs and that no file of the repository holds an em dash or a token-like string.
 - `data/raw/`: the World Bank indicator files in `wdi/` and the panel of the single-country analysis.
 - `data/processed/`: the cases catalogue, the derived dollar costs, the Thailand baseline and the proposal file.
 - `data/reference/`: the numbers that the single-country analysis must reproduce.
@@ -49,7 +49,7 @@ The outcome is international tourism receipts as a percentage of GDP. The effect
 ## Data and provenance
 
 - **World Bank indicators.** The panel uses five indicators from the World Development Indicators in the vintage of 2026-07-13: international tourism receipts (ST.INT.RCPT.CD), international tourism arrivals (ST.INT.ARVL), GDP in current US dollars (NY.GDP.MKTP.CD), population (SP.POP.TOTL) and air passengers carried (IS.AIR.PSGR). They cover 96 economies in four country groups, which gives twenty files in `data/raw/wdi/`, next to `country_metadata.csv` and the fetch logs of each group.
-- **Cases catalogue.** `data/processed/cases_catalogue.csv` lists 69 cases in 32 economies. Each case carries an evidence grade. Grade A needs an operator, government or annual report page that confirms the opening month and, where a dollar cost is given, the cost. Grade B needs two news or press release pages. Grade C rests on one secondary page or an encyclopedia. The catalogue has 20 rows of grade A, 28 of grade B and 21 of grade C. It flags 54 rows as feasible on the panel by their opening year; merging the openings from 2000 onward gives 44 episodes, of which 31 meet the year rules, and notebook 02 applies the donor and fit rules to them on the real panel. `docs/cases_catalogue_notes.md` lists the rows where sources conflict and the fields that are blank.
+- **Cases catalogue.** `data/processed/cases_catalogue.csv` lists 69 cases in 32 economies. Each case carries an evidence grade. Grade A needs an operator, government or annual report page that confirms the opening month and, where a dollar cost is given, the cost. Grade B needs two news or press release pages. Grade C rests on one secondary page or an encyclopedia. The catalogue has 20 rows of grade A, 28 of grade B and 21 of grade C. It flags 54 rows as feasible on the panel by their opening year; merging the openings from 2000 onward gives 44 episodes, of which 31 meet the year rules, and notebook 02 applies the donor and fit rules to them on the panel. `docs/cases_catalogue_notes.md` lists the rows where sources conflict and the fields that are blank.
 - **Derived dollar costs.** `data/processed/cases_investment_fx.csv` holds 27 costs derived from reported local-currency figures and official annual-average exchange rates. They are derived estimates and not reported costs. `docs/investment_fx_notes.md` describes how they were built.
 - **Thailand baseline and proposal.** `data/processed/thailand_baseline.csv` holds the adopted series for 2015 to 2025 (receipts, arrivals, GDP, exchange rate and receipts as a share of GDP) in long format, together with alternative definitions and cross-checks. `docs/thailand_baseline_notes.md` gives the sources, the reasons for the adopted series and the status of theme-park proposals as of 2026-10-08. `data/processed/thailand_proposal.json` records the three cost scenarios of the proposal, the status text (a proposal only, with no signed agreement, approved budget, named operator or site allocation found in the sources reviewed) and the claims that officials have made, which cite no study.
 - **Single-country analysis.** `data/raw/disney_did_panel.csv` is the panel of nine economies used by that analysis, and `data/reference/replication_reference_values.json` holds the reference numbers with the number of decimals printed.
@@ -78,31 +78,20 @@ python -m pip install -r requirements.txt
 
 ### Tests
 
-The test suite checks every module against simulated data. One test runs the single-country analysis on its real panel and compares the results with the stored reference values; it runs only when `DTT_RUN_REAL=1` is set.
+The test suite checks every module against synthetic test data. One test runs the single-country analysis on the panel file `data/raw/disney_did_panel.csv` and compares the results with the stored reference values. The whole suite takes about 6 minutes.
 
-PowerShell:
-
-```powershell
-$env:DTT_RUN_REAL = "1"
-python -m pytest
+```
+python -m pytest -q
 ```
 
-bash:
+### Notebooks
 
-```bash
-export DTT_RUN_REAL=1
-python -m pytest
-```
-
-### Notebooks on the real data
-
-A run on the real files needs the environment variable `DTT_RUN_REAL=1`; any other value, including `true`, is refused. Execute the notebooks in numerical order, because each one reads the files that the earlier ones wrote. The first cell of each notebook states its approximate run time.
+The notebooks run on the dataset in the repository: the World Bank files in `data/raw/wdi`, the cases catalogue and the other files in `data/processed`. Execute the notebooks in numerical order, because each one reads the files that the earlier ones wrote. The first cell of each notebook states its measured run time. A full run takes about an hour, almost all of it in notebook 03.
 
 PowerShell:
 
 ```powershell
 python -m ipykernel install --prefix $env:VIRTUAL_ENV --name dtt-venv
-$env:DTT_RUN_REAL = "1"
 foreach ($nb in (Get-ChildItem notebooks\0*.ipynb | Sort-Object Name)) {
     python -m nbconvert --to notebook --execute --ExecutePreprocessor.kernel_name=dtt-venv --output-dir executed $nb.FullName
     if ($LASTEXITCODE -ne 0) { break }
@@ -113,41 +102,12 @@ bash:
 
 ```bash
 python -m ipykernel install --prefix "$VIRTUAL_ENV" --name dtt-venv
-export DTT_RUN_REAL=1
 for nb in notebooks/0*.ipynb; do
     python -m nbconvert --to notebook --execute --ExecutePreprocessor.kernel_name=dtt-venv --output-dir executed "$nb" || break
 done
 ```
 
 The first command registers a Jupyter kernel inside the virtual environment, so that the notebooks run with the installed packages and not with another interpreter; the run context stops with a message when an installed package is older than the minimum in `requirements.txt`. The notebooks in `notebooks/` are shipped without stored outputs; the executed copies are written to `executed/`, which git ignores. Tables and JSON files land in `results/`, figures in `figures/` and the assembled panel in `data/processed/global_panel.csv`. The environment variables `DTT_RESULTS_DIR` and `DTT_FIGURE_DIR` redirect the tables and the figures to other directories.
-
-### Simulated check
-
-The environment variable `DTT_WORLD=sim` runs the same notebooks on a simulated world with 60 economies, 16 cases (several of them in shared economies) and a simulated target economy with its own baseline and proposal. A simulated run reads nothing from `data/raw` or `data/processed` and writes nothing to `results/` or `figures/`; it refuses an output directory that lies inside the `data`, `results` or `figures` directory of the repository. Name three empty directories outside the repository for the simulated world, the tables and the figures, and write the executed copies of the notebooks to a fourth directory so that the notebooks of the repository stay unchanged.
-
-PowerShell:
-
-```powershell
-$env:DTT_WORLD = "sim"
-$env:DTT_SIM_DIR = "$env:TEMP\dtt_sim\world"
-$env:DTT_RESULTS_DIR = "$env:TEMP\dtt_sim\results"
-$env:DTT_FIGURE_DIR = "$env:TEMP\dtt_sim\figures"
-foreach ($nb in (Get-ChildItem notebooks\0*.ipynb | Sort-Object Name)) {
-    jupyter nbconvert --to notebook --execute --output-dir "$env:TEMP\dtt_sim\executed" $nb.FullName
-    if ($LASTEXITCODE -ne 0) { break }
-}
-Remove-Item Env:DTT_WORLD, Env:DTT_SIM_DIR, Env:DTT_RESULTS_DIR, Env:DTT_FIGURE_DIR
-```
-
-bash:
-
-```bash
-export DTT_WORLD=sim DTT_SIM_DIR=/tmp/dtt_sim/world DTT_RESULTS_DIR=/tmp/dtt_sim/results DTT_FIGURE_DIR=/tmp/dtt_sim/figures
-for nb in notebooks/0*.ipynb; do
-    jupyter nbconvert --to notebook --execute --output-dir /tmp/dtt_sim/executed "$nb" || break
-done
-unset DTT_WORLD DTT_SIM_DIR DTT_RESULTS_DIR DTT_FIGURE_DIR
-```
 
 ## Outputs of the notebooks
 
@@ -165,11 +125,11 @@ Long computations call a guard from `src/dtt/thermal.py` that pauses them while 
 
 When the temperature is above 85 degrees Celsius the guard waits in steps of 5 seconds until a reading at or below 78 degrees is obtained; a step without a reading does not end the wait. When no temperature sensor answers, the guard waits in steps of 5 seconds while the CPU load of other programs is above 92 percent (the load of the analysis itself and of its child processes is subtracted) and otherwise lets the computation continue. A wait for the CPU load alone ends after 300 seconds: the guard logs the action `cpu_timeout`, prints one line, and does not wait for the CPU load again in that run. The guard raises an error only when a wait that began with a temperature above the limit exceeds 30 minutes. The guard prints one line when a wait starts and one when it ends. Every check appends a row with the time, the temperature, the CPU load, the memory use, the action and the waiting time to `results/thermal_log.csv`. A notebook calls the guard at most once every 10 seconds.
 
-The guard is on in every real run, and `DTT_GUARD=0` switches it off. It is off in simulated runs, and `DTT_GUARD=1` switches it on. The variable accepts only 0 and 1. The guard never changes a result. Many desktop computers expose no temperature to ordinary programs; the guard then relies on the CPU load, and the first lines of each notebook print whether a temperature is available.
+The guard is on by default, and `DTT_GUARD=0` switches it off. The variable accepts only 0 and 1. The guard never changes a result. Many desktop computers expose no temperature to ordinary programs; the guard then relies on the CPU load, and the first lines of each notebook print whether a temperature is available.
 
 ## Reproducibility
 
-Every random draw uses a numpy generator seeded from a named seed in `src/dtt/workflow.py`: effects 0, importance 0, importance bootstrap 1, transport 0, transport bootstrap 2, overlap test 3, meta-analysis 0 and simulated world 0. The settings cell of each notebook prints the seeds and the bootstrap sizes in use. No computation uses parallel workers. In a simulated run only the numbers of repeats and bootstrap resamples are reduced; the methods are the same. Every comparison of two computed numbers in the importance and transport steps uses an explicit tolerance, so that rounding noise does not change a verdict, a rank or a count; continuous results can still differ in the last digits between machines that use different numerical libraries.
+Every random draw uses a numpy generator seeded from a named seed in `src/dtt/workflow.py`: effects 0, importance 0, importance bootstrap 1, transport 0, transport bootstrap 2, overlap test 3, and meta-analysis 0. The settings cell of each notebook prints the seeds and the bootstrap sizes in use. No computation uses parallel workers. Every comparison of two computed numbers in the importance and transport steps uses an explicit tolerance, so that rounding noise does not change a verdict, a rank or a count; continuous results can still differ in the last digits between machines that use different numerical libraries.
 
 ## Limitations
 

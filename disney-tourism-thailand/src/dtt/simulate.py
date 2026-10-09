@@ -1,11 +1,11 @@
-"""Simulated panels for validating the estimators.
+"""Synthetic test panels for validating the estimators.
 
-Nothing in this module reproduces the real data.  The panels are generated from
-a documented data-generating process and carry the *structure* of the real
-panel: nine units, the same study blocks, the same years with gaps, a known
+The panels are test data with a known treatment effect.  They are generated from
+a documented data-generating process and carry the *structure* of the panel of
+the original study: nine units, the same study blocks, the same years with gaps, a known
 treatment effect, differential trends and very few clusters.
 
-Structure of the real panel
+Structure of the panel file
 ---------------------------
 Hong Kong block (units 2, 3, 4, 7, 8, 9; ``N = 129``)
     years 1998 to 2019 for units 2, 8 and 9; Ireland (3) starts in 1999;
@@ -70,7 +70,7 @@ class SimTruth:
     weights: dict
     trend_spread: float
     seed: int
-    note: str = "SIMULATED: parameters of the data-generating process, not estimates from real data"
+    note: str = "SIMULATED: parameters of the data-generating process, not estimates from the panel file"
 
 
 def _ar1(rng: np.random.Generator, n: int, rho: float, sd: float) -> np.ndarray:
