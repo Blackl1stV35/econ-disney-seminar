@@ -4,7 +4,7 @@ Working projects of the seminar group at the Faculty of Economics, Kasetsart Uni
 
 | Folder | Question | State |
 | --- | --- | --- |
-| [disney-tourism-thailand](disney-tourism-thailand) | How much do theme-park and destination-resort openings change tourism receipts, and what does that imply for a proposed park complex in Thailand? | The analysis runs end to end on the dataset in the repository. The first results are preliminary; verification and packaging are open. |
+| [disney-tourism-thailand](disney-tourism-thailand) | What would a Disney-type theme-park complex in Thailand add to tourism spending, financial returns and national economic value? | Bottom-up appraisal in preparation for the Phase 1 document due 16 October 2026. The historical analysis of Hong Kong and Shanghai is supplementary. See STATUS.md for the plan. |
 
 The project is work in progress. Results are preliminary until the open items in STATUS.md are closed.
 
