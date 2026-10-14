@@ -124,5 +124,30 @@ def test_adb_standard_discount_rate_is_recorded_as_sourced():
 
 def test_base_case_cannot_run_while_inputs_are_pending():
     table = ap.load_inputs(INPUTS)
-    with pytest.raises(ValueError, match="discount_rate_national_economic"):
-        ap.require_values(table, ["discount_rate_national_economic"])
+    with pytest.raises(ValueError, match="attendance_million_per_year, incremental_share"):
+        ap.require_values(table, ["attendance_million_per_year", "incremental_share"])
+
+
+def test_nesdc_social_discount_rate_matches_the_guide():
+    table = ap.load_inputs(INPUTS)
+    assert table.loc["discount_rate_social_nesdc", "value"] == pytest.approx(ap.SOCIAL_DISCOUNT_RATE_NESDC)
+    low, high = ap.SOCIAL_DISCOUNT_RATE_RANGE
+    assert low <= ap.SOCIAL_DISCOUNT_RATE_NESDC <= high
+    assert table.loc["discount_rate_social_nesdc", "status"].startswith("sourced")
+
+
+def test_standard_conversion_factor_matches_the_guide():
+    table = ap.load_inputs(INPUTS)
+    assert table.loc["conversion_factor_standard", "value"] == pytest.approx(ap.STANDARD_CONVERSION_FACTOR)
+
+
+def test_sensitivity_cases_are_five_ten_and_twenty_percent():
+    assert ap.SENSITIVITY_PERCENTS == (5, 10, 20)
+
+
+def test_project_life_and_financial_rate_stay_pending_until_the_team_states_them():
+    table = ap.load_inputs(INPUTS)
+    for name in ("project_life_years", "wacc_financial"):
+        assert pd.isna(table.loc[name, "value"])
+        with pytest.raises(ValueError, match=name):
+            ap.require_values(table, [name])

@@ -9,6 +9,16 @@ Units: visits are in million visits per year, spending per visit is in THB, and 
 import numpy as np
 import pandas as pd
 
+# Values taken from the NESDC (2024) Guide to Public Investment Project Appraisal (Thai text, read locally).
+# The social discount rate is 7 percent for appraisals begun in 2025 or later (section 6.2.2), within a
+# range of 6.55 to 7.59 percent (section 6.2.1). The standard conversion factor 0.7 applies when shadow
+# prices cannot be computed (summary, PDF page 5). Sensitivity cases vary construction cost, operating cost
+# and revenue by these percentages, and the single-factor and two-factor cases are in section 6.3.
+SOCIAL_DISCOUNT_RATE_NESDC = 0.07
+SOCIAL_DISCOUNT_RATE_RANGE = (0.0655, 0.0759)
+STANDARD_CONVERSION_FACTOR = 0.7
+SENSITIVITY_PERCENTS = (5, 10, 20)
+
 
 def discount_factors(rate, n_years):
     """Return discount factors for the years 0 to ``n_years - 1``.

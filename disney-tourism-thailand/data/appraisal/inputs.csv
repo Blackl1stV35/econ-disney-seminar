@@ -5,10 +5,13 @@ capex_park_low_thb_bn,100,THB bn,data/processed/thailand_proposal.json scenario 
 claim_additional_visitors_million_per_year,10,million visits per year,data/processed/thailand_proposal.json ministerial_claims,claim (reference only)
 claim_revenue_thb_bn,150,THB bn,data/processed/thailand_proposal.json ministerial_claims,claim (reference only)
 claim_share_of_gdp_percent_per_year,1,percent of GDP per year,data/processed/thailand_proposal.json ministerial_claims,claim (reference only)
-discount_rate_eirr_standard,0.09,rate,ADB (2017) Guidelines paragraph 194,sourced (ADB 2017)
-discount_rate_eirr_social_sector,0.06,rate,ADB (2017) Guidelines paragraph 194,sourced (ADB 2017; social sector and environmental projects)
-discount_rate_national_economic,,rate,NESDC (2024) Guide to Public Investment Project Appraisal,pending (guide not yet read)
-conversion_factor_capex,,ratio,ADB (2017) conversion factors (Section on shadow prices),pending (section not yet read)
+discount_rate_eirr_standard,0.09,rate,ADB (2017) Guidelines paragraph 194 (page 53),sourced (ADB 2017; cross-check only)
+discount_rate_eirr_social_sector,0.06,rate,ADB (2017) Guidelines paragraph 194 (page 53),sourced (ADB 2017; social sector and environmental projects)
+discount_rate_social_nesdc,0.07,rate,NESDC (2024) Guide section 6.2.2 (PDF page 28); range 6.55 to 7.59 percent in section 6.2.1 (PDF page 26),sourced (NESDC 2024; applies to appraisals begun in 2025 or later)
+discount_rate_social_nesdc_pre2025,0.12,rate,NESDC (2024) Guide section 6.2.2 (PDF page 28),reference only (applies to appraisals begun before 2025)
+conversion_factor_standard,0.7,ratio,NESDC (2024) Guide standard conversion factor (PDF page 5); used when shadow prices cannot be computed,sourced (NESDC 2024)
+project_life_years,,years,team; must be stated and justified (NESDC 2024 section 6.1.1; PDF page 22),pending
+wacc_financial,,rate,team; financial cost of capital (NESDC 2024 section 6.1.1; PDF page 22),pending
 attendance_million_per_year,,million visits per year,team (demand study),pending
 incremental_share,,share,team (segment study),pending
 displacement_share,,share,team (segment study),pending

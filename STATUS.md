@@ -1,4 +1,4 @@
-# Project status
+﻿# Project status
 
 Last updated: 2026-10-14. This page gives the approved seminar topic, the decisions taken, the team roles, the work plan with dates, the supplementary historical analysis and the open items. Figures marked preliminary are not yet reviewed.
 
@@ -61,7 +61,7 @@ Work is coordinated through GitHub Issues, using the template "Task", as describ
 | 15 Oct | Integrate the sections and check consistency | chow, Peem | Draft |
 | 16 Oct | Submit the Phase 1 seminar document | Peem | Submitted |
 | From 19 Oct (estimate) | Source the Thai inputs: segment mix, attendance ramp, spending, capex, operating costs, tax rates, discount rate and shadow parameters from NESDC (2024) | Team | Input table with a source for every value |
-| From 19 Oct (estimate) | Build the appraisal model in `disney-tourism-thailand`, with tests for the three ledgers, the scenario switch and break-even | Peem, with an agent | Model, notebook and tests. A skeleton with 20 tests and an input table is in place; the Thai inputs are pending |
+| From 19 Oct (estimate) | Build the appraisal model in `disney-tourism-thailand`, with tests for the three ledgers, the scenario switch and break-even | Peem, with an agent | Model, notebook and tests. A skeleton with 24 tests and an input table is in place. The NESDC values are sourced; project life, the financial cost of capital and the other Thai inputs are pending |
 | From 26 Oct (estimate) | Stress tests following ADB (2017), sensitivity on displacement and incremental share, limitations and decision gates | Team | Results |
 | November (estimate) | Final report and presentation | Team | Final report |
 
@@ -85,14 +85,21 @@ Folder: `disney-tourism-thailand`. Question: did the Hong Kong and Shanghai open
 ## 7. Open items
 
 - References for the Phase 1 document. Checked on 14 October 2026 against published bibliographic records: Abadie (2021), Journal of Economic Literature 59(2), 391 to 425; Cameron and Miller (2015), Journal of Human Resources 50(2), 317 to 372; Plaza (2006), International Journal of Urban and Regional Research 30(2), 452 to 467 (sole author); Burgan and Mules (2001), Tourism Economics 7(4), 321 to 330; Dwyer, Forsyth, Madden and Spurr (2000), Current Issues in Tourism 3(4), 325 to 363. Milman (2010) is listed by the publisher as a sole-author article, Worldwide Hospitality and Tourism Themes 2(3), 220 to 237, so the three-author citation in the recommendation must be corrected. Full text of the articles was not read.
-- ADB (2017) read: a 9 percent minimum required economic internal rate of return for investment projects, and 6 percent for social sector and environmental projects (paragraph 194); the sensitivity and switching-value rules (Section VII). The NESDC (2024) guide could not be read in this session. Its discount rate and shadow parameters are open until the file is available.
+- ADB (2017) read: a 9 percent minimum required economic internal rate of return for investment projects, and 6 percent for social sector and environmental projects (paragraph 194); the sensitivity and switching-value rules (Section VII).
+- NESDC (2024) guide read from the Thai text: a social discount rate of 7 percent for appraisals begun in 2025 or later (range 6.55 to 7.59 percent), a standard conversion factor of 0.7, and sensitivity cases of 5, 10 and 20 percent. Project life and the financial cost of capital must be stated by the team.
 - Source the Thai inputs. No government document was found that states the assumptions behind the projection of Thai GDP.
 - Confirm the proposal parameters (capex, site, operator and timing) with the professor.
 - Data notice: the origin of `data/raw/disney_did_panel.csv` and the World Bank attribution (CC BY 4.0).
 - Check of the 20 World Bank files against the official API (a script is still to be written).
+
+## 8. Working documents
+
+- `seminar/PHASE1_DRAFT.md`: the Phase 1 document in working form, with PENDING markers for the team.
+- `seminar/TEAM_BRIEFS.md`: the aligned brief for each role, with the corrections and the checks.
 
 ## How you can help
 
 - Read the topic and hypotheses above, then comment in the group.
 - Claim a task in a GitHub Issue (template "Task") so that two people do not work on the same thing.
 - Follow [CONTRIBUTING.md](CONTRIBUTING.md): work on a branch, open a pull request, and do not hand-edit generated results.
+
