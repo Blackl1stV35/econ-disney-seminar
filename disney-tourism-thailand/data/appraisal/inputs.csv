@@ -1,0 +1,19 @@
+parameter,value,unit,source,status
+capex_complex_thb_bn,300,THB bn,data/processed/thailand_proposal.json scenario complex_total,from proposal (not verified)
+capex_park_high_thb_bn,200,THB bn,data/processed/thailand_proposal.json scenario park_high,from proposal (not verified)
+capex_park_low_thb_bn,100,THB bn,data/processed/thailand_proposal.json scenario park_low,from proposal (not verified)
+claim_additional_visitors_million_per_year,10,million visits per year,data/processed/thailand_proposal.json ministerial_claims,claim (reference only)
+claim_revenue_thb_bn,150,THB bn,data/processed/thailand_proposal.json ministerial_claims,claim (reference only)
+claim_share_of_gdp_percent_per_year,1,percent of GDP per year,data/processed/thailand_proposal.json ministerial_claims,claim (reference only)
+discount_rate_eirr_standard,0.09,rate,ADB (2017) Guidelines paragraph 194,sourced (ADB 2017)
+discount_rate_eirr_social_sector,0.06,rate,ADB (2017) Guidelines paragraph 194,sourced (ADB 2017; social sector and environmental projects)
+discount_rate_national_economic,,rate,NESDC (2024) Guide to Public Investment Project Appraisal,pending (guide not yet read)
+conversion_factor_capex,,ratio,ADB (2017) conversion factors (Section on shadow prices),pending (section not yet read)
+attendance_million_per_year,,million visits per year,team (demand study),pending
+incremental_share,,share,team (segment study),pending
+displacement_share,,share,team (segment study),pending
+spend_per_visit_thb,,THB per visit,team (tourism statistics; to verify),pending
+domestic_retention_share,,share,team (economic study),pending
+tax_share_of_spend,,share,Thai tax rates (to verify),pending
+opex_thb_bn_per_year,,THB bn per year,team (operator cost study),pending
+exchange_rate_thb_per_usd,,THB per USD,Bank of Thailand (to verify),pending
