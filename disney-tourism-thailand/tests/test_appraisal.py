@@ -13,6 +13,34 @@ from dtt import appraisal as ap
 
 ROOT = Path(__file__).resolve().parents[1]
 INPUTS = ROOT / "data" / "appraisal" / "inputs.csv"
+ASSUMPTIONS = ROOT / "data" / "appraisal" / "assumptions.csv"
+CBRE_ROWS = ("pattaya_hotel_keys_h2_2025",)
+PROXY_ROWS = ("pattaya_hotel_keys_h2_2024", "pattaya_occupancy_2024_cbre")
+
+# Synthetic fixture values: every number below is invented for these tests and is not an estimate.
+SYNTHETIC_GRID = {
+    "project_life_years": 3,
+    "construction_years": 2,
+    "wacc_financial": 0.10,
+    "attendance_million_per_year": 5.0,
+    "international_share": 0.5,
+    "incremental_share": 0.5,
+    "displacement_share": 0.25,
+    "spend_per_visit_thb": 10_000.0,
+    "domestic_retention_share": 0.5,
+    "tax_share_of_spend": 0.1,
+    "opex_share": 0.5,
+    "ticket_revenue_per_visit_thb": 2_000.0,
+    "nights_per_stay": 2.0,
+    "guests_per_room": 2.0,
+    "movements_per_visit": 2.0,
+    "current_airport_use_passengers_per_year": 1_000_000.0,
+    "planned_airport_addition_passengers_per_year": 0.0,
+    "public_cost_after_construction_thb_bn_per_year": 0.5,
+    "rooms_serving_site": 10_000.0,
+    "occupancy_serving_site": 0.8,
+    "occupancy_ceiling_serving_site": 1.0,
+}
 
 
 def test_discount_factors_start_at_one_and_decline():
@@ -291,3 +319,472 @@ def test_capped_net_spend_never_exceeds_the_uncapped_spend():
 def test_capped_net_spend_rejects_negative_headroom():
     with pytest.raises(ValueError):
         ap.capped_net_spend(10.0, 0.1, [-1.0], 10_000.0, 0.0)
+
+
+def _synthetic_sourced(**overrides):
+    """Return an input table of synthetic values. The values are invented for these tests."""
+    values = {
+        "utapao_terminal_capacity_passengers_per_year": 4_000_000.0,
+        "capex_complex_thb_bn": 10.0,
+        "discount_rate_social_nesdc": 0.05,
+        "conversion_factor_standard": 0.7,
+    }
+    values.update(overrides)
+    names = list(values)
+    return pd.DataFrame(
+        {
+            "value": [values[n] for n in names],
+            "unit": ["synthetic"] * len(names),
+            "source": ["synthetic fixture"] * len(names),
+            "status": ["sourced (synthetic fixture)"] * len(names),
+        },
+        index=pd.Index(names, name="parameter"),
+    )
+
+
+def _synthetic_assumptions(**overrides):
+    """Return an assumptions table with the same synthetic value in all three cases."""
+    values = {**SYNTHETIC_GRID, **overrides}
+    names = list(values)
+    return pd.DataFrame(
+        {
+            "low_case": [float(values[n]) for n in names],
+            "base_case": [float(values[n]) for n in names],
+            "high_case": [float(values[n]) for n in names],
+            "unit": ["synthetic"] * len(names),
+            "basis": ["synthetic fixture, not an estimate"] * len(names),
+            "status": ["assumption (synthetic fixture; not sourced)"] * len(names),
+        },
+        index=pd.Index(names, name="parameter"),
+    )
+
+
+def test_synthetic_case_matches_a_hand_calculation():
+    # Synthetic fixture. Free rooms: 10,000 * (1 - 0.8) = 2,000, the ceiling being 1.0. Accommodation cap: 2,000 * 365 * 2 / 2 / 1e6 = 0.73 million visits.
+    # Headroom: 4,000,000 - 1,000,000 = 3,000,000 passengers. Airport cap: 3,000,000 / 2 / 1e6 = 1.5 million visits. Accommodation binds.
+    # Physical cap: the smaller of 4,000,000 / 2 / 1e6 = 2.0 and 10,000 * 365 * 2 / 2 / 1e6 = 3.65 million visits, so 2.0 binds.
+    # International visits: 5 * 0.5 = 2.5 million. To the complex: min(2.5, 2.0) = 2.0 million. Lost to the operator: 0.5 million.
+    # Incremental demand: 2.0 * 0.5 = 1.0 million, capped to the headroom of 0.73. Above the headroom: 0.27 million.
+    # Net spend: 0.73 * 10,000 / 1000 * (1 - 0.25) = 5.475 THB bn per year.
+    # Operator visits: 5 - 0.5 = 4.5 million. Revenue: 4.5 * 2,000 / 1000 = 9.0 THB bn. Opex: 0.5 * 9.0 = 4.5.
+    # National operating cost: the whole operating cost, 4.5 THB bn.
+    # Construction 2 years and life 3 years make 5 years. Capex 10 / 2 = 5 in each construction year.
+    sourced = _synthetic_sourced()
+    assumptions = _synthetic_assumptions()
+    inp = ap.case_inputs(sourced, assumptions, "base_case")
+    annual = ap.case_annual(inp)
+    npt.assert_allclose([annual["accom_cap_m"], annual["airport_cap_m"], annual["infra_cap_m"]], [0.73, 1.5, 0.73])
+    assert annual["binding_constraint"] == "accommodation"
+    npt.assert_allclose(annual["physical_cap_m"], 2.0)
+    npt.assert_allclose(
+        [annual["intl_m"], annual["intl_to_complex_m"], annual["incr_demand_m"], annual["incr_m"], annual["excluded_m"], annual["headroom_excess_m"]],
+        [2.5, 2.0, 1.0, 0.73, 0.5, 0.27],
+    )
+    npt.assert_allclose(annual["net_spend_bn_per_year"], 5.475)
+    npt.assert_allclose(annual["operator_visits_m"], 4.5)
+    npt.assert_allclose(annual["revenue_bn_per_year"], 9.0)
+    npt.assert_allclose(annual["opex_bn_per_year"], 4.5)
+    npt.assert_allclose(annual["national_opex_bn_per_year"], 4.5)
+
+    flows = ap.case_flows(inp, annual)
+    for name in ("capex", "revenue", "opex", "national_opex", "net_spend", "public", "zeros"):
+        assert len(flows[name]) == 5, name
+    npt.assert_allclose(flows["capex"], [5.0, 5.0, 0.0, 0.0, 0.0])
+    npt.assert_allclose(flows["revenue"], [0.0, 0.0, 9.0, 9.0, 9.0])
+    npt.assert_allclose(flows["opex"], [0.0, 0.0, 4.5, 4.5, 4.5])
+    npt.assert_allclose(flows["national_opex"], [0.0, 0.0, 4.5, 4.5, 4.5])
+    npt.assert_allclose(flows["net_spend"], [0.0, 0.0, 5.475, 5.475, 5.475])
+    npt.assert_allclose(flows["public"], [0.0, 0.0, 0.5, 0.5, 0.5])
+
+    result = ap.labelled_case(sourced, assumptions, "base_case")
+    # Operator flows: -5, -5, then revenue less opex of 9.0 - 4.5 = 4.5 in each operating year, discounted at 10 percent term by term.
+    expected_operator = -5.0 - 5.0 / 1.1 + 4.5 * (1 / 1.1**2 + 1 / 1.1**3 + 1 / 1.1**4)
+    assert result["operator_npv_bn"] == pytest.approx(expected_operator, rel=1e-12)
+    # National flows: 0.5 * net spend - 0.7 * (capex + national operating cost), discounted at 5 percent.
+    national = [-3.5, -3.5] + [0.5 * 5.475 - 0.7 * 4.5] * 3
+    expected_national = sum(f / 1.05**t for t, f in enumerate(national))
+    assert result["national_npv_bn"] == pytest.approx(expected_national, rel=1e-12)
+    # Fiscal flows without the capital cost: 0.1 * net spend - public cost, discounted at 10 percent.
+    fiscal = [0.0, 0.0] + [0.1 * 5.475 - 0.5] * 3
+    expected_fiscal_excl = sum(f / 1.1**t for t, f in enumerate(fiscal))
+    assert result["fiscal_npv_excl_public_capex_bn"] == pytest.approx(expected_fiscal_excl, rel=1e-12)
+    # The primary fiscal ledger charges the complex capital cost in the construction years.
+    capex = [5.0, 5.0, 0.0, 0.0, 0.0]
+    expected_fiscal = sum((f - c) / 1.1**t for t, (f, c) in enumerate(zip(fiscal, capex)))
+    assert result["fiscal_npv_bn"] == pytest.approx(expected_fiscal, rel=1e-12)
+    assert result["case"] == "base_case" and result["assumption_driven"] is True
+
+
+def test_synthetic_operator_irr_is_a_root_and_zero_rate_npv_is_the_sum():
+    inp = ap.case_inputs(_synthetic_sourced(), _synthetic_assumptions(), "base_case")
+    flows = ap.case_flows(inp, ap.case_annual(inp))
+    operator = ap.operator_flows(flows["revenue"], flows["opex"], flows["capex"])
+    rate = ap.irr(operator)
+    assert np.isfinite(rate)
+    assert ap.npv(operator, rate) == pytest.approx(0.0, abs=1e-6)
+    assert ap.npv(operator, 0.0) == pytest.approx(float(np.sum(operator)))
+
+
+def test_synthetic_binding_constraint_is_the_smaller_cap():
+    # Accommodation cap 0.73 against airport cap 1.5: accommodation binds.
+    default = ap.case_annual(ap.case_inputs(_synthetic_sourced(), _synthetic_assumptions(), "base_case"))
+    assert default["binding_constraint"] == "accommodation"
+    assert default["infra_cap_m"] == pytest.approx(0.73)
+    # Airport capacity of 2 million passengers gives 0.5 million visits of headroom, so the airport cap of 0.5 binds.
+    airport = ap.case_annual(
+        ap.case_inputs(_synthetic_sourced(utapao_terminal_capacity_passengers_per_year=2_000_000.0), _synthetic_assumptions(), "base_case")
+    )
+    assert airport["binding_constraint"] == "airport"
+    assert airport["infra_cap_m"] == pytest.approx(0.5)
+    assert airport["incr_m"] == pytest.approx(0.5)
+    assert airport["excluded_m"] == pytest.approx(2.5 - 1.0)
+    assert airport["headroom_excess_m"] == pytest.approx(0.0)
+    # A tie gives the airport. Synthetic fixture: both caps are 1.825 million visits.
+    tie = ap.case_annual(
+        ap.case_inputs(
+            _synthetic_sourced(utapao_terminal_capacity_passengers_per_year=3_650_000.0),
+            _synthetic_assumptions(current_airport_use_passengers_per_year=0.0, nights_per_stay=1.0, guests_per_room=1.0, occupancy_serving_site=0.5),
+            "base_case",
+        )
+    )
+    assert tie["airport_cap_m"] == pytest.approx(1.825) and tie["accom_cap_m"] == pytest.approx(1.825)
+    assert tie["binding_constraint"] == "airport"
+
+
+def test_pending_sourced_value_stops_a_labelled_case():
+    with pytest.raises(ValueError, match="utapao_terminal_capacity_passengers_per_year"):
+        ap.case_inputs(_synthetic_sourced(utapao_terminal_capacity_passengers_per_year=np.nan), _synthetic_assumptions(), "base_case")
+
+
+def test_pending_proposal_value_stops_a_labelled_case():
+    with pytest.raises(ValueError, match="capex_complex_thb_bn"):
+        ap.case_inputs(_synthetic_sourced(capex_complex_thb_bn=np.nan), _synthetic_assumptions(), "base_case")
+
+
+def test_grid_value_sourced_in_the_input_table_is_refused():
+    with pytest.raises(ValueError, match="must not also be a grid value"):
+        ap.case_inputs(_synthetic_sourced(project_life_years=3.0), _synthetic_assumptions(), "base_case")
+
+
+def test_unknown_case_and_non_whole_years_are_refused():
+    with pytest.raises(ValueError):
+        ap.case_inputs(_synthetic_sourced(), _synthetic_assumptions(), "mid_case")
+    with pytest.raises(ValueError, match="whole number of years"):
+        ap.case_inputs(_synthetic_sourced(), _synthetic_assumptions(construction_years=2.5), "base_case")
+
+
+def test_load_assumptions_reads_the_three_cases_as_floats():
+    table = ap.load_assumptions(ASSUMPTIONS)
+    assert table.index.name == "parameter"
+    for case in ap.CASES:
+        assert table[case].dtype == np.float64
+        assert np.isfinite(table[case]).all()
+
+
+def test_real_labelled_cases_give_three_finite_rows():
+    df = ap.run_labelled_cases(ap.load_inputs(INPUTS), ap.load_assumptions(ASSUMPTIONS))
+    assert list(df["case"]) == list(ap.CASES)
+    numeric = [
+        "accom_cap_m",
+        "airport_cap_m",
+        "infra_cap_m",
+        "intl_m",
+        "incr_demand_m",
+        "incr_m",
+        "excluded_m",
+        "net_spend_bn_per_year",
+        "revenue_bn_per_year",
+        "operator_visits_m",
+        "operator_npv_bn",
+        "national_npv_bn",
+        "fiscal_npv_bn",
+        "fiscal_npv_excl_public_capex_bn",
+        "physical_cap_m",
+        "intl_to_complex_m",
+        "headroom_excess_m",
+    ]
+    assert np.isfinite(df[numeric].to_numpy()).all()
+
+
+def test_real_low_case_has_no_irr_because_its_operating_flows_are_negative():
+    sourced, assumptions = ap.load_inputs(INPUTS), ap.load_assumptions(ASSUMPTIONS)
+    df = ap.run_labelled_cases(sourced, assumptions)
+    assert np.isnan(df.loc[df["case"] == "low_case", "operator_irr"].iloc[0])
+    flows = ap.case_flows(ap.case_inputs(sourced, assumptions, "low_case"), ap.case_annual(ap.case_inputs(sourced, assumptions, "low_case")))
+    operating = flows["revenue"] > 0
+    assert np.all(flows["revenue"][operating] - flows["opex"][operating] < 0)
+
+
+def test_real_cases_are_assumption_driven_and_list_their_labels():
+    df = ap.run_labelled_cases(ap.load_inputs(INPUTS), ap.load_assumptions(ASSUMPTIONS))
+    assert df["assumption_driven"].all()
+    for labels in df["labels"]:
+        assert len(labels) == len(ap.SOURCED_NAMES) + len(ap.PROPOSAL_NAMES) + len(ap.GRID_NAMES)
+        assert any(label.startswith("sourced:") for label in labels)
+        assert any(label.startswith("assumption:") for label in labels)
+        assert any(label.startswith("generalized:") for label in labels)
+        assert any(label.startswith("other:") for label in labels)
+
+
+def test_real_binding_constraint_is_the_smaller_of_the_two_caps():
+    df = ap.run_labelled_cases(ap.load_inputs(INPUTS), ap.load_assumptions(ASSUMPTIONS))
+    for _, row in df.iterrows():
+        expected = "airport" if row["airport_cap_m"] <= row["accom_cap_m"] else "accommodation"
+        assert row["binding_constraint"] == expected, row["case"]
+        assert row["infra_cap_m"] == pytest.approx(min(row["airport_cap_m"], row["accom_cap_m"]))
+        assert row["incr_m"] <= row["incr_demand_m"] + 1e-12
+        assert row["incr_m"] <= row["infra_cap_m"] + 1e-12
+        assert row["intl_to_complex_m"] + row["excluded_m"] == pytest.approx(row["intl_m"])
+        assert row["intl_to_complex_m"] <= row["physical_cap_m"] + 1e-12
+        assert row["headroom_excess_m"] == pytest.approx(row["incr_demand_m"] - row["incr_m"])
+        assert row["incr_demand_m"] <= row["intl_m"] + 1e-12
+
+
+def test_real_operator_npv_runs_from_pessimistic_to_optimistic():
+    df = ap.run_labelled_cases(ap.load_inputs(INPUTS), ap.load_assumptions(ASSUMPTIONS))
+    low, base, high = df["operator_npv_bn"]
+    assert low < base < high
+
+
+def test_real_fiscal_primary_is_below_its_variant_and_the_high_case_beats_the_base():
+    # The low case is not the worst fiscal case. Its higher discount rate and longer build reduce the present value of the capital cost,
+    # so its primary fiscal NPV can exceed the base. The test checks that the capital cost lowers every case and that the high case beats the base.
+    df = ap.run_labelled_cases(ap.load_inputs(INPUTS), ap.load_assumptions(ASSUMPTIONS))
+    assert (df["fiscal_npv_bn"] < df["fiscal_npv_excl_public_capex_bn"]).all()
+    base = df.loc[df["case"] == "base_case", "fiscal_npv_bn"].iloc[0]
+    high = df.loc[df["case"] == "high_case", "fiscal_npv_bn"].iloc[0]
+    assert base < high
+
+
+def test_real_national_npv_is_negative_in_the_base_case_because_the_whole_operating_cost_is_charged():
+    # The national ledger charges the whole operating cost and credits only the net spending of the incremental visits.
+    df = ap.run_labelled_cases(ap.load_inputs(INPUTS), ap.load_assumptions(ASSUMPTIONS))
+    assert np.isfinite(df["national_npv_bn"]).all()
+    base = df.loc[df["case"] == "base_case", "national_npv_bn"].iloc[0]
+    assert base < 0
+
+
+def test_real_cbre_rows_read_as_sourced_with_their_values():
+    table = ap.load_inputs(INPUTS)
+    for name in CBRE_ROWS:
+        status = table.loc[name, "status"]
+        assert status.startswith("sourced (CBRE"), name
+        assert "broker" in status, name
+        assert pd.notna(table.loc[name, "value"]), name
+    for name in PROXY_ROWS:
+        assert str(table.loc[name, "status"]).startswith("generalized (CBRE"), name
+
+
+def test_every_assumption_row_is_labelled_as_an_assumption_or_a_generalization():
+    table = ap.load_assumptions(ASSUMPTIONS)
+    for name, status in table["status"].items():
+        assert status.startswith("assumption") or status.startswith("generalized"), name
+
+
+def test_no_grid_row_is_marked_sourced():
+    table = ap.load_assumptions(ASSUMPTIONS)
+    for name, status in table["status"].items():
+        assert not status.startswith("sourced"), name
+
+
+def test_assumption_table_covers_exactly_the_grid_parameters():
+    table = ap.load_assumptions(ASSUMPTIONS)
+    assert set(table.index) == set(ap.GRID_NAMES)
+    assert table[list(ap.CASES)].notna().all().all()
+
+
+def test_grid_parameters_are_not_sourced_in_the_input_table():
+    inputs = ap.load_inputs(INPUTS)
+    for name in ap.load_assumptions(ASSUMPTIONS).index:
+        if name in inputs.index:
+            assert not str(inputs.loc[name, "status"]).startswith("sourced"), name
+
+
+def test_physical_cap_limits_all_international_visits_and_headroom_limits_the_incremental_ones():
+    # The physical cap applies to all international visits. Spending uses the incremental share of the capped visits,
+    # and the infrastructure headroom caps those incremental visits.
+    sourced, assumptions = ap.load_inputs(INPUTS), ap.load_assumptions(ASSUMPTIONS)
+    for case in ap.CASES:
+        inp = ap.case_inputs(sourced, assumptions, case)
+        annual = ap.case_annual(inp)
+        intl = inp["attendance_million_per_year"] * inp["international_share"]
+        to_complex = min(intl, annual["physical_cap_m"])
+        assert annual["intl_to_complex_m"] == pytest.approx(to_complex)
+        assert annual["excluded_m"] == pytest.approx(intl - to_complex)
+        assert annual["operator_visits_m"] == pytest.approx(inp["attendance_million_per_year"] - annual["excluded_m"])
+        demand = to_complex * inp["incremental_share"]
+        assert annual["incr_demand_m"] == pytest.approx(demand)
+        assert annual["incr_m"] == pytest.approx(min(demand, annual["infra_cap_m"]))
+        expected_spend = annual["incr_m"] * inp["spend_per_visit_thb"] / 1000.0 * (1.0 - inp["displacement_share"])
+        assert annual["net_spend_bn_per_year"] == pytest.approx(expected_spend)
+
+
+def test_base_case_net_spend_counts_only_the_capped_incremental_visits():
+    # Base case: free rooms 31,581 * (0.85 - 0.71) = 4,421.3, so the accommodation cap is 4,421.3 * 365 * 2.0 / 10.66 / 1e6 = 0.302775 million visits.
+    # The physical cap is the airport total of 3,700,000 / 2 / 1e6 = 1.85 million, so the international visits 4.425 million are capped to 1.85 million.
+    # Incremental demand: 1.85 * 0.30 = 0.555 million, capped to 0.302775 million. Net spend: 0.302775 * 10,000 / 1000 * (1 - 0.3) = 2.11942 THB bn per year.
+    sourced, assumptions = ap.load_inputs(INPUTS), ap.load_assumptions(ASSUMPTIONS)
+    annual = ap.case_annual(ap.case_inputs(sourced, assumptions, "base_case"))
+    assert annual["binding_constraint"] == "accommodation"
+    assert annual["physical_cap_m"] == pytest.approx(1.85, abs=1e-9)
+    assert annual["incr_m"] == pytest.approx(0.302775, abs=1e-6)
+    assert annual["net_spend_bn_per_year"] == pytest.approx(2.11942, abs=5e-5)
+
+
+def test_national_ledger_carries_the_whole_operating_cost_so_it_falls_when_visits_above_the_cap_rise():
+    # Synthetic fixture: the physical and accommodation caps bind at both attendances, so the incremental visits and the net spending
+    # are the same. The operator visits and the operating cost rise, and the national ledger carries that cost.
+    low = ap.labelled_case(_synthetic_sourced(), _synthetic_assumptions(), "base_case")
+    high = ap.labelled_case(_synthetic_sourced(), _synthetic_assumptions(attendance_million_per_year=8.0), "base_case")
+    assert high["incr_m"] == pytest.approx(low["incr_m"])
+    assert high["net_spend_bn_per_year"] == pytest.approx(low["net_spend_bn_per_year"])
+    assert high["operator_visits_m"] > low["operator_visits_m"]
+    assert high["national_npv_bn"] < low["national_npv_bn"]
+
+
+def test_national_operating_cost_is_the_whole_operating_cost_of_the_complex():
+    annual = ap.case_annual(ap.case_inputs(_synthetic_sourced(), _synthetic_assumptions(), "base_case"))
+    assert annual["national_opex_bn_per_year"] == pytest.approx(annual["opex_bn_per_year"])
+    assert annual["national_opex_bn_per_year"] == pytest.approx(4.5)
+
+
+def test_primary_fiscal_ledger_includes_the_capital_cost_and_the_variant_leaves_it_out():
+    # Synthetic fixture: capex of 5 in each of two construction years, discounted at the 10 percent financial rate.
+    result = ap.labelled_case(_synthetic_sourced(), _synthetic_assumptions(), "base_case")
+    assert result["fiscal_npv_excl_public_capex_bn"] - result["fiscal_npv_bn"] == pytest.approx(5.0 + 5.0 / 1.1)
+
+
+def test_proposal_capital_cost_is_labelled_other_and_not_sourced():
+    sourced = ap.load_inputs(INPUTS)
+    assert "capex_complex_thb_bn" in ap.PROPOSAL_NAMES
+    assert "capex_complex_thb_bn" not in ap.SOURCED_NAMES
+    assert sourced.loc["capex_complex_thb_bn", "status"].startswith("from proposal")
+    result = ap.labelled_case(sourced, ap.load_assumptions(ASSUMPTIONS), "base_case")
+    assert any(label.startswith("other: capex_complex_thb_bn") for label in result["labels"])
+    assert result["assumption_driven"] is True
+
+
+def test_pattaya_stock_and_occupancy_are_generalized_grid_rows_with_the_pattaya_values():
+    inputs = ap.load_inputs(INPUTS)
+    assumptions = ap.load_assumptions(ASSUMPTIONS)
+    for name in ("rooms_serving_site", "occupancy_serving_site"):
+        assert assumptions.loc[name, "status"].startswith("generalized ("), name
+        assert name not in ap.SOURCED_NAMES and name not in ap.PROPOSAL_NAMES
+    assert assumptions.loc["rooms_serving_site", "base_case"] == pytest.approx(inputs.loc["pattaya_hotel_keys_h2_2024", "value"])
+    assert assumptions.loc["occupancy_serving_site", "base_case"] == pytest.approx(inputs.loc["pattaya_occupancy_2024_cbre", "value"] / 100.0)
+
+
+def test_not_fetched_rows_are_not_listed_as_plain_sourced_values():
+    table = ap.load_inputs(INPUTS)
+    for name, status in table["status"].items():
+        text = str(status)
+        if "not fetched" in text and text.startswith("sourced"):
+            assert "search" in text, name
+
+
+def test_input_tables_carry_no_process_notes_or_local_paths():
+    for path in (INPUTS, ASSUMPTIONS):
+        text = path.read_text(encoding="utf-8")
+        for phrase in ("accepted by the leader", "Searches attempted", "copy read locally", "Downloads", "D:\\", "No value entered", "no value entered", "so no value", " lanes", "in this session"):
+            assert phrase not in text, (path.name, phrase)
+
+
+def test_nights_per_stay_basis_is_an_unsourced_placeholder():
+    basis = ap.load_assumptions(ASSUMPTIONS).loc["nights_per_stay", "basis"]
+    assert "unsourced placeholder" in basis
+    assert "302" not in basis
+
+
+def test_physical_cap_is_the_smaller_of_total_airport_and_total_room_stock():
+    # Airport total: 3,700,000 / 2 / 1e6 = 1.85 million visits. Room stock at full occupancy: 31,581 * 365 * 2 / 10.66 / 1e6 = 2.163 million visits.
+    assert ap.physical_visit_cap(3_700_000.0, 2.0, 31_581.0, 10.66, 2.0) == pytest.approx(1.85)
+    # A small room stock binds instead: 1,000 * 365 * 2 / 2 / 1e6 = 0.365 million visits.
+    assert ap.physical_visit_cap(3_700_000.0, 2.0, 1_000.0, 2.0, 2.0) == pytest.approx(0.365)
+    with pytest.raises(ValueError):
+        ap.physical_visit_cap(3_700_000.0, 0.0, 31_581.0, 10.66, 2.0)
+
+
+def test_occupancy_ceiling_sets_the_free_room_stock_and_no_free_rooms_give_no_headroom():
+    # Free rooms: 10,000 * (0.85 - 0.70) = 1,500. Accommodation cap: 1,500 * 365 * 2 / 2 / 1e6 = 0.5475 million visits.
+    sourced = _synthetic_sourced()
+    annual = ap.case_annual(ap.case_inputs(sourced, _synthetic_assumptions(occupancy_serving_site=0.70, occupancy_ceiling_serving_site=0.85), "base_case"))
+    assert annual["accom_cap_m"] == pytest.approx(0.5475)
+    # Occupancy above the ceiling leaves no free room, so the accommodation headroom and the incremental visits are zero.
+    full = ap.case_annual(ap.case_inputs(sourced, _synthetic_assumptions(occupancy_serving_site=0.9, occupancy_ceiling_serving_site=0.85), "base_case"))
+    assert full["accom_cap_m"] == pytest.approx(0.0)
+    assert full["incr_m"] == pytest.approx(0.0)
+
+
+def test_case_flows_scale_each_factor_and_the_delay_moves_only_the_operations():
+    inp = ap.case_inputs(_synthetic_sourced(), _synthetic_assumptions(), "base_case")
+    annual = ap.case_annual(inp)
+    flows = ap.case_flows(inp, annual, capex_factor=1.1, opex_factor=0.9, revenue_factor=0.8, delay_years=1)
+    # Capital spending keeps its timing; the complex opens one year later, so the operating flows start in year 3.
+    npt.assert_allclose(flows["capex"], [5.5, 5.5, 0.0, 0.0, 0.0, 0.0])
+    npt.assert_allclose(flows["revenue"], [0.0, 0.0, 0.0, 9.0 * 0.8, 9.0 * 0.8, 9.0 * 0.8])
+    npt.assert_allclose(flows["opex"], [0.0, 0.0, 0.0, 4.5 * 0.9, 4.5 * 0.9, 4.5 * 0.9])
+    npt.assert_allclose(flows["national_opex"], [0.0, 0.0, 0.0, 4.5 * 0.9, 4.5 * 0.9, 4.5 * 0.9])
+    with pytest.raises(ValueError):
+        ap.case_flows(inp, annual, capex_factor=-0.1)
+    with pytest.raises(ValueError):
+        ap.case_flows(inp, annual, delay_years=0.5)
+
+
+def test_sensitivity_table_has_the_nesdc_cases_and_its_base_row_matches_the_labelled_case():
+    sourced, assumptions = ap.load_inputs(INPUTS), ap.load_assumptions(ASSUMPTIONS)
+    table = ap.sensitivity_table(sourced, assumptions, "base_case")
+    # Base, then 5, 10 and 20 percent up and down for three single factors, two two-factor pairs for each percentage, and one delay.
+    assert len(table) == 1 + 3 * 6 + 2 * 3 + 1
+    base = table.iloc[0]
+    labelled = ap.labelled_case(sourced, assumptions, "base_case")
+    assert base["sensitivity"] == "base"
+    assert base["operator_npv_bn"] == pytest.approx(labelled["operator_npv_bn"], rel=1e-12)
+    assert base["national_npv_bn"] == pytest.approx(labelled["national_npv_bn"], rel=1e-12)
+    assert base["fiscal_npv_bn"] == pytest.approx(labelled["fiscal_npv_bn"], rel=1e-12)
+    assert base["fiscal_npv_excl_public_capex_bn"] == pytest.approx(labelled["fiscal_npv_excl_public_capex_bn"], rel=1e-12)
+
+
+def test_sensitivity_directions_move_the_npvs_the_right_way():
+    table = ap.sensitivity_table(ap.load_inputs(INPUTS), ap.load_assumptions(ASSUMPTIONS), "base_case").set_index("sensitivity")
+    base = table.loc["base"]
+    assert table.loc["construction cost up 20 percent", "fiscal_npv_bn"] < base["fiscal_npv_bn"]
+    assert table.loc["revenue up 20 percent", "operator_npv_bn"] > base["operator_npv_bn"]
+    assert table.loc["revenue down 20 percent", "operator_npv_bn"] < base["operator_npv_bn"]
+    assert table.loc["operating and maintenance cost up 20 percent", "operator_npv_bn"] < base["operator_npv_bn"]
+    assert table.loc["one-year delay in opening", "operator_npv_bn"] < base["operator_npv_bn"]
+
+
+def test_two_factor_cases_pair_construction_cost_with_revenue_in_both_directions():
+    table = ap.sensitivity_table(ap.load_inputs(INPUTS), ap.load_assumptions(ASSUMPTIONS), "base_case").set_index("sensitivity")
+    adverse = table.loc["two factors: construction cost up 10 percent and revenue down 10 percent"]
+    favourable = table.loc["two factors: construction cost down 10 percent and revenue up 10 percent"]
+    assert adverse["operator_npv_bn"] < table.loc["base", "operator_npv_bn"] < favourable["operator_npv_bn"]
+    assert adverse["fiscal_npv_bn"] < table.loc["base", "fiscal_npv_bn"] < favourable["fiscal_npv_bn"]
+
+
+def test_input_tables_have_no_byte_order_mark_and_use_lf_line_endings():
+    for path in (INPUTS, ASSUMPTIONS):
+        raw = path.read_bytes()
+        assert not raw.startswith(b"\xef\xbb\xbf"), path.name
+        assert b"\r\n" not in raw, path.name
+
+
+def test_lotte_world_adult_price_has_one_row_and_the_2026_price_is_sourced():
+    table = ap.load_inputs(INPUTS)
+    lotte = [name for name in table.index if "lotte_world" in name and "ticket" in name]
+    assert lotte == ["lotte_world_adult_ticket_2026_krw"]
+    assert table.loc["lotte_world_adult_ticket_2026_krw", "value"] == pytest.approx(67000.0)
+
+
+def test_wacc_low_case_is_a_financial_rate_and_not_the_adb_economic_hurdle():
+    assumptions = ap.load_assumptions(ASSUMPTIONS)
+    assert assumptions.loc["wacc_financial", "low_case"] != pytest.approx(0.09)
+    assert "discount_rate_eirr_standard" in assumptions.loc["wacc_financial", "basis"]
+
+
+def test_occupancy_ceiling_is_an_assumed_grid_row_that_stays_above_the_occupancy():
+    assumptions = ap.load_assumptions(ASSUMPTIONS)
+    row = assumptions.loc["occupancy_ceiling_serving_site"]
+    assert row["low_case"] <= row["base_case"] <= row["high_case"]
+    assert row["base_case"] >= assumptions.loc["occupancy_serving_site", "base_case"]
+    assert row["status"].startswith("assumption")
