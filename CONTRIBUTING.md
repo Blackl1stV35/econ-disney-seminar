@@ -22,7 +22,6 @@ A run of the notebooks of the Disney project on its dataset takes one to two hou
 ## Data and privacy
 
 - Never commit tokens, passwords, personal e-mail addresses or other private data.
-- The 13F project needs your own contact line for the SEC. Put it in `13F_investor_horizon/sec_user_agent.txt`, which git ignores. Do not commit it.
 - Raw data files are not edited. If you find an error in the data, open an Issue.
 
 ## Style

@@ -7,7 +7,7 @@ labels: ""
 
 **Project folder**
 
-disney-tourism-thailand or 13F_investor_horizon
+disney-tourism-thailand
 
 **What needs doing**
 
