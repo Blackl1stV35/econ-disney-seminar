@@ -84,14 +84,12 @@ Folder: `disney-tourism-thailand`. Question: did the Hong Kong and Shanghai open
 
 ## 7. Open items
 
-- References for the Phase 1 document. Checked on 14 October 2026 against published bibliographic records: Abadie (2021), Journal of Economic Literature 59(2), 391 to 425; Cameron and Miller (2015), Journal of Human Resources 50(2), 317 to 372; Plaza (2006), International Journal of Urban and Regional Research 30(2), 452 to 467 (sole author); Burgan and Mules (2001), Tourism Economics 7(4), 321 to 330; Dwyer, Forsyth, Madden and Spurr (2000), Current Issues in Tourism 3(4), 325 to 363. Milman (2010) is listed by the publisher as a sole-author article, Worldwide Hospitality and Tourism Themes 2(3), 220 to 237, so the three-author citation in the recommendation must be corrected. Full text of the articles was not read.
-- ADB (2017) read: a 9 percent minimum required economic internal rate of return for investment projects, and 6 percent for social sector and environmental projects (paragraph 194); the sensitivity and switching-value rules (Section VII).
-- NESDC (2024) guide read from the Thai text: a social discount rate of 7 percent for appraisals begun in 2025 or later (range 6.55 to 7.59 percent), a standard conversion factor of 0.7, and sensitivity cases of 5, 10 and 20 percent. Project life and the financial cost of capital must be stated by the team.
-- Source the Thai inputs. No government document was found that states the assumptions behind the projection of Thai GDP.
-- Confirm the proposal parameters (capex, site, operator and timing) with the professor.
-- Data notice: the origin of `data/raw/disney_did_panel.csv` and the World Bank attribution (CC BY 4.0).
-- Check of the 20 World Bank files against the official API (a script is still to be written).
-
+- Thai inputs: 17 values are sourced, 56 are pending. The base case cannot run until each pending input is sourced or shown as a labelled assumption. The infrastructure cap is in the model; testing it needs the demand inputs.
+- Official calendar-2024 and 2019 airport traffic (AOT) and Chon Buri hotel and occupancy data (TAT) could not be read in this session.
+- Sources conflict on the high-speed rail opening year (2031 from the EEC Office, 2029 from Wikipedia) and on Chon Buri foreign visitors in 2024. The conflicting visitor figure is not used.
+- References: Chan (2004) is verified. Tan, How and Koh is not verified and is not cited. Milman (2010) is cited as a single-author article. The ADB and NESDC values are recorded with their pages.
+- Data notice for `data/raw/disney_did_panel.csv` (origin unknown) and the World Bank attribution.
+- Check of the 20 World Bank files against the official API.
 ## 8. Working documents
 
 - `seminar/PHASE1_DRAFT.md`: the Phase 1 document in working form, with PENDING markers for the team.
@@ -102,4 +100,5 @@ Folder: `disney-tourism-thailand`. Question: did the Hong Kong and Shanghai open
 - Read the topic and hypotheses above, then comment in the group.
 - Claim a task in a GitHub Issue (template "Task") so that two people do not work on the same thing.
 - Follow [CONTRIBUTING.md](CONTRIBUTING.md): work on a branch, open a pull request, and do not hand-edit generated results.
+
 

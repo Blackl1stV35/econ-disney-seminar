@@ -45,7 +45,7 @@ Appraising a Proposed Disney-type Theme-Park Complex in Thailand: Bottom-up Tour
 
 **(c) Economic impact and cost-benefit analysis.** Burgan and Mules (2001) argue that economic impact and cost-benefit analysis measure different things and can be reconciled only when resources are idle or underused. Dwyer, Forsyth, Madden and Spurr (2000) show that tourism growth displaces other activity, and recommend computable general equilibrium models for the economy-wide effects.
 
-**(d) Historical cases.** Hong Kong Disneyland and Shanghai Disney Resort are the closest cases. Their evidence is used for calibration ranges and as context, not as a transfer coefficient (section 7.6). Chan (2004) studies residents' perceptions of Hong Kong Disneyland (PENDING: citation details). Tan, How and Koh study Universal Studios Singapore (PENDING: year and citation details).
+**(d) Historical cases.** Hong Kong Disneyland and Shanghai Disney Resort are the closest cases. Their evidence is used for calibration ranges and as context, not as a transfer coefficient (section 7.6). Chan (2004) studies residents' perceptions of Hong Kong Disneyland and its impacts. The thesis reports two telephone surveys of 1,060 respondents and is verified against the PolyU repository record. A second case study, of Universal Studios Singapore by Tan, How and Koh, could not be verified and is not cited in this draft.
 
 **(e) Causal evaluation methods (historical track only).** Abadie (2021) and Cameron and Miller (2015) provide the guidance for synthetic control and cluster-robust inference used in the supplementary historical analysis.
 
@@ -55,8 +55,11 @@ Appraising a Proposed Disney-type Theme-Park Complex in Thailand: Bottom-up Tour
 
 **7.1 Framework.** A bottom-up appraisal that compares the with-project and without-project situations, following the ADB (2017) guidelines and the NESDC (2024) guide.
 
-**7.2 Demand and spending.** Visits are split into segments: Thai residents, international short-haul, international long-haul and repeat visitors. For each segment the team estimates attendance, the incremental share, length of stay, spending per visit, the opening ramp-up and capacity limits (all PENDING). Displaced spending at other Thai destinations is subtracted.
+**7.2 Demand, spending and infrastructure.** The working hypothesis is that public infrastructure variation is the main driver of the tourism effect. The model therefore caps incremental visits by the infrastructure that can serve them, namely airport headroom and accommodation supply. Annual passenger movements convert to visits with `visits_from_passengers`, using two movements per round-trip visit, which is an assumption to be confirmed. Incremental visits are capped by headroom in `capped_net_spend`, and net spending follows from the capped visits after displacement.
 
+Sourced values in the input table: U-Tapao terminal capacity of 3.7 million passengers a year (EEC Office, page status October 2025), its project target of 60 million (EEC Office), national hotel and guesthouse rooms of 956,372 in 2022 (NSO Statistical Yearbook Thailand 2024, Table 17.4), and Pattaya hotel keys of 31,581 in H2 2024 and 34,743 in H2 2025 (CBRE, a third-party broker and not an official source).
+
+Pending inputs: calendar 2024 and 2019 airport traffic, Chon Buri room counts, official occupancy, attendance, incremental share, spending per visit, displacement, and the other rows of the input table. The base case does not run while an input is pending. Scenario ranges for a pending input are shown separately and labelled as assumptions, never as sourced values.
 **7.3 Three ledgers.**
 - **Operator ledger:** revenue minus operating costs and capital expenditure, giving the financial net present value, internal rate of return and break-even attendance at the financial cost of capital (PENDING: WACC and project life, which the NESDC guide requires to be stated and justified).
 - **Fiscal ledger:** tax and fee revenue from the net spending minus public capital and operating costs.
@@ -68,7 +71,7 @@ Appraising a Proposed Disney-type Theme-Park Complex in Thailand: Bottom-up Tour
 
 **7.6 Use of historical evidence.** A transfer of historical estimates from Hong Kong and Shanghai to Thailand was tested in a separate step and did not give a stable result. The primary estimate therefore uses Thai inputs only. Historical cases inform the ranges of attendance and spending, and their limits are reported.
 
-**7.7 Reproducibility.** The model is in the project repository (`disney-tourism-thailand/src/dtt/appraisal.py`). Its inputs are in `data/appraisal/inputs.csv`, where each row states its source and status. The model refuses to run while an input is pending.
+**7.7 Reproducibility.** The model is in the project repository (`disney-tourism-thailand/src/dtt/appraisal.py`), with its inputs in `data/appraisal/inputs.csv`. Each row gives its value, unit, source and status, and the base case refuses to run while an input is pending. The unit tests and repository checks pass (81 tests).
 
 ## 8. Decision rule
 
@@ -76,11 +79,12 @@ The project is supported as a basis for decisions if H3 holds at the 7 percent s
 
 ## 9. Limitations
 
-- The Thai inputs (demand, spending, operating costs, tax rates, financial cost of capital and project life) are not yet sourced. No government document was found that states the assumptions behind the official projection of Thai GDP.
+- The Thai demand, spending and operating inputs are not yet sourced. The base case therefore cannot run.
+- Official calendar-2024 and 2019 airport traffic (AOT) and Chon Buri hotel and occupancy data (TAT) could not be read in the session that produced the table. The occupancy figure in the table is from CBRE.
+- Sources conflict on the high-speed rail opening year (2031 from the EEC Office, 2029 from Wikipedia), and on Chon Buri foreign visitors in 2024. The conflicting visitor figure is not used.
 - The proposal has no signed agreement, approved budget, named operator or site allocation.
 - The historical evidence does not identify the Disney-specific effect separately from concurrent policy changes.
 - The output is a set of scenario ranges, not confidence intervals.
-
 ## 10. Timeline and responsibilities
 
 | Date | Task | Owner |
@@ -97,14 +101,15 @@ The project is supported as a basis for decisions if H3 holds at the 7 percent s
 ## 11. References
 
 - Abadie, A. (2021). Using synthetic controls: Feasibility, data requirements, and methodological aspects. *Journal of Economic Literature*, 59(2), 391-425. https://doi.org/10.1257/JEL.20191450
-- Asian Development Bank. (2017). *Guidelines for the economic analysis of projects*. Manila: ADB. https://www.adb.org/sites/default/files/institutional-document/32256/economic-analysis-projects.pdf
+- Asian Development Bank. (2017). *Guidelines for the economic analysis of projects*. Manila: ADB. https://www.adb.org/sites/default/files/institutional-document/32256/economic-analysis-projects.pdf. DOI: http://dx.doi.org/10.22617/TIM178607-2
 - Burgan, B., & Mules, T. (2001). Reconciling cost-benefit and economic impact assessment for event tourism. *Tourism Economics*, 7(4), 321-330. https://doi.org/10.5367/000000001101297892
 - Cameron, A. C., & Miller, D. L. (2015). A practitioner's guide to cluster-robust inference. *Journal of Human Resources*, 50(2), 317-372. https://doi.org/10.3368/jhr.50.2.317
-- Chan, E. (2004). *Residents' perceptions towards Hong Kong Disneyland and its impacts* [MPhil thesis]. The Hong Kong Polytechnic University. (PENDING: check the citation against the library record.)
+- Chan, E. (2004). *Residents' perceptions towards Hong Kong Disneyland and its impacts* [MPhil thesis]. The Hong Kong Polytechnic University. http://hdl.handle.net/10397/85415
 - Dwyer, L., Forsyth, P., Madden, J. R., & Spurr, R. (2000). Economic impacts of inbound tourism under different assumptions regarding the macroeconomy. *Current Issues in Tourism*, 3(4), 325-363. https://doi.org/10.1080/13683500008667877
 - Milman, A. (2010). The global theme park industry. *Worldwide Hospitality and Tourism Themes*, 2(3), 220-237. https://doi.org/10.1108/17554211011052177
 - National Economic and Social Development Council. (2024). *Guide to public investment project appraisal* (July 2024 edition). https://www.nesdc.go.th/wp-content/uploads/2025/05/article_20241009124821.pdf
 - Plaza, B. (2006). The return on investment of the Guggenheim Museum Bilbao. *International Journal of Urban and Regional Research*, 30(2), 452-467. https://doi.org/10.1111/j.1468-2427.2006.00672.x
-- Tan, W., How, S., & Koh, S. (PENDING: year and title details). Universal Studios Singapore: A case study.
+
+
 
 

@@ -1,6 +1,6 @@
-"""Bottom-up appraisal of a Disney-type complex in Thailand.
+﻿"""Bottom-up appraisal of a Disney-type complex in Thailand.
 
-The module computes the three ledgers of a project appraisal from explicit annual series: the operator (financial) ledger, the fiscal ledger and the national economic ledger. The structure follows the ADB (2017) Guidelines for the Economic Analysis of Projects. The NESDC (2024) Guide to Public Investment Project Appraisal has not yet been checked against the functions here.
+The module computes the three ledgers of a project appraisal from explicit annual series: the operator (financial) ledger, the fiscal ledger and the national economic ledger. The structure follows the ADB (2017) Guidelines for the Economic Analysis of Projects. The discount rate, conversion factor and sensitivity cases follow the NESDC (2024) Guide to Public Investment Project Appraisal, and the input table lists each value with its page.
 
 Every function takes its inputs as numbers or arrays, so that each assumption is visible where it is used. No value in this module is a Thai estimate. Values come from the input table ``data/appraisal/inputs.csv``, in which every row states its source and its status. A row with a blank value is pending, and :func:`require_values` refuses to run on pending values.
 
@@ -202,7 +202,7 @@ def fiscal_flows(net_spend, tax_share, public_capex, public_opex):
 def national_flows(net_spend, domestic_retention, capex, opex, conversion_factor):
     """Return the national economic flows in THB billion per year.
 
-    The benefit term is a placeholder. It takes the domestically retained share of the net spending. The economic benefit definition of ADB (2017) must be confirmed before this function is used for a result.
+    The benefit term is a placeholder. It takes the domestically retained share of the net spending. Until the ADB (2017) definition of economic benefits is applied, the result is a placeholder and not an economic estimate.
 
     Parameters
     ----------
@@ -268,6 +268,169 @@ def break_even_scale(npv_of_scale, lower=0.0, upper=10.0, tol=1e-9):
     return 0.5 * (lower + upper)
 
 
+def visits_from_passengers(passengers, movements_per_visit):
+    """Return visits in million visits per year from annual passenger movements at one airport.
+
+    An airport counts each arrival and each departure as one passenger movement. A visit that enters and leaves by the same airport uses two movements there, so ``movements_per_visit`` is 2 for a round trip through that airport. A visit that uses two airports uses one movement at each, so the value for each airport is 1.
+
+    Parameters
+    ----------
+    passengers : array_like
+        Annual passenger movements at the airport, as a count per year. It must not be negative.
+    movements_per_visit : float
+        Passenger movements at this airport per visit. It must be greater than zero.
+
+    Returns
+    -------
+    numpy.ndarray
+        ``passengers / movements_per_visit / 1e6``, in million visits per year.
+
+    Raises
+    ------
+    ValueError
+        If ``passengers`` contains a negative value or ``movements_per_visit`` is not greater than zero.
+    """
+    pax = np.asarray(passengers, dtype=float)
+    if np.any(pax < 0):
+        raise ValueError("passengers must not be negative")
+    if movements_per_visit <= 0:
+        raise ValueError("movements_per_visit must be greater than zero")
+    return pax / movements_per_visit / 1e6
+
+
+def infrastructure_headroom(capacity, current_use, planned_addition=0.0):
+    """Return the spare capacity of public infrastructure, in million visits per year.
+
+    The headroom is ``capacity + planned_addition - current_use``, floored at zero and computed elementwise. A negative difference means that the infrastructure already carries more visits than its capacity, so its spare capacity is zero. The arguments must be in visits. An airport capacity given in passenger movements must first be converted with :func:`visits_from_passengers`.
+
+    Parameters
+    ----------
+    capacity : array_like
+        Annual capacity in million visits per year. It must not be negative.
+    current_use : array_like
+        Visits that the infrastructure already carries, in million visits per year. It must not be negative.
+    planned_addition : float or array_like, optional
+        Capacity that is planned to open, in million visits per year. The default is zero.
+
+    Returns
+    -------
+    numpy.ndarray
+        ``max(capacity + planned_addition - current_use, 0)``.
+
+    Raises
+    ------
+    ValueError
+        If ``capacity`` or ``current_use`` contains a negative value.
+    """
+    capacity = np.asarray(capacity, dtype=float)
+    current_use = np.asarray(current_use, dtype=float)
+    if np.any(capacity < 0) or np.any(current_use < 0):
+        raise ValueError("capacity and current_use must not be negative")
+    spare = capacity + np.asarray(planned_addition, dtype=float) - current_use
+    return np.maximum(spare, 0.0)
+
+
+def capacity_constrained_visits(demand, headroom):
+    """Return the visits that the site can absorb, in million visits per year.
+
+    The cap is applied to the incremental visits, which are the visits that the project adds. The working hypothesis is that public infrastructure, meaning airport capacity, road and rail access and accommodation supply, is the main driver of the tourism effect. Under this hypothesis the headroom limits the incremental visits. The function applies the limit and does not test the hypothesis.
+
+    Parameters
+    ----------
+    demand : array_like
+        Incremental visits that the market would generate, in million visits per year. It must not be negative.
+    headroom : array_like
+        Spare capacity in million visits per year, from :func:`infrastructure_headroom` or :func:`accommodation_visit_cap`. It must not be negative.
+
+    Returns
+    -------
+    numpy.ndarray
+        ``min(demand, headroom)``, computed elementwise.
+
+    Raises
+    ------
+    ValueError
+        If ``demand`` or ``headroom`` contains a negative value.
+    """
+    demand = np.asarray(demand, dtype=float)
+    headroom = np.asarray(headroom, dtype=float)
+    if np.any(demand < 0) or np.any(headroom < 0):
+        raise ValueError("demand and headroom must not be negative")
+    return np.minimum(demand, headroom)
+
+
+def accommodation_visit_cap(rooms, occupancy, nights, guests_per_room):
+    """Return the overnight visits that the room stock can house in a year, in million visits per year.
+
+    The result is ``rooms * occupancy * 365 * guests_per_room / nights / 1e6``. The product ``rooms * occupancy * 365`` is the number of room nights sold in a year. Multiplying by the guests per room gives guest nights, and dividing by the nights per stay gives overnight visits. The cap is applied to the incremental visits, under the working hypothesis that accommodation supply is one of the public infrastructure limits on the tourism effect.
+
+    Parameters
+    ----------
+    rooms : array_like
+        Rooms in the stock that serves the site, as a count. It must not be negative.
+    occupancy : float or array_like
+        Average occupancy as a share. It must lie in [0, 1]. A percentage from a source must be divided by 100 first.
+    nights : float or array_like
+        Average nights per overnight stay. It must be greater than zero.
+    guests_per_room : float or array_like
+        Average number of guests in an occupied room. It must not be negative.
+
+    Returns
+    -------
+    numpy.ndarray
+        Overnight visits in million visits per year.
+
+    Raises
+    ------
+    ValueError
+        If ``occupancy`` lies outside [0, 1], if ``nights`` is not greater than zero, or if ``rooms`` or ``guests_per_room`` is negative.
+    """
+    occ = np.asarray(occupancy, dtype=float)
+    if np.any(occ < 0) or np.any(occ > 1):
+        raise ValueError("occupancy must lie in [0, 1]")
+    nts = np.asarray(nights, dtype=float)
+    if np.any(nts <= 0):
+        raise ValueError("nights must be greater than 0")
+    rms = np.asarray(rooms, dtype=float)
+    guests = np.asarray(guests_per_room, dtype=float)
+    if np.any(rms < 0) or np.any(guests < 0):
+        raise ValueError("rooms and guests_per_room must not be negative")
+    return rms * occ * 365.0 * guests / nts / 1e6
+
+
+def capped_net_spend(attendance, incremental_share, headroom, spend_per_visit, displacement_share):
+    """Return the incremental visits after the infrastructure cap, and the net tourism spending they generate.
+
+    The incremental visits are ``attendance * incremental_share``. :func:`capacity_constrained_visits` limits them to the headroom, and :func:`net_tourism_spend` converts the capped visits to spending. The cap binds only when the incremental visits exceed the headroom.
+
+    Parameters
+    ----------
+    attendance : array_like
+        Total visits to the complex in million visits per year.
+    incremental_share : float or array_like
+        Share of the visits that the project adds. It must lie in [0, 1].
+    headroom : array_like
+        Spare capacity in million visits per year, from :func:`infrastructure_headroom` or :func:`accommodation_visit_cap`. It must not be negative.
+    spend_per_visit : float
+        Spending per incremental visit in THB.
+    displacement_share : float
+        Share of the gross spending that is moved from other Thai destinations or activities. It must lie in [0, 1].
+
+    Returns
+    -------
+    tuple of numpy.ndarray
+        The capped incremental visits in million visits per year, and the net tourism spending in THB billion per year.
+
+    Raises
+    ------
+    ValueError
+        If a share lies outside [0, 1], or if ``headroom`` contains a negative value.
+    """
+    incremental = incremental_visitors(attendance, incremental_share)
+    capped = capacity_constrained_visits(incremental, headroom)
+    return capped, net_tourism_spend(capped, spend_per_visit, displacement_share)
+
+
 def load_inputs(path):
     """Read the input table of the appraisal.
 
@@ -309,3 +472,4 @@ def require_values(table, names):
     if missing:
         raise ValueError("values not yet sourced: " + ", ".join(missing))
     return {n: float(table.loc[n, "value"]) for n in names}
+
