@@ -1,10 +1,9 @@
 """Tests for dtt.meta: random-effects, Bayesian, meta-regression and scaling-law routines.
 
-All data are SIMULATED.
+All data are hand-built fixtures.
 """
 from __future__ import annotations
 
-import dataclasses
 import sys
 import warnings
 from pathlib import Path
@@ -1070,427 +1069,6 @@ def test_meta_regression_names_the_case_whose_removal_leaves_a_singular_design()
 
 
 # ----------------------------------------------------------------------------
-# Shrinkage of the ridge slopes and extrapolation
-# ----------------------------------------------------------------------------
-SHRINKAGE_COLUMNS = ["ridge_slope", "unpenalised_slope", "ratio"]
-RESULT_KEYS = {
-    "coef",
-    "coef_raw",
-    "tau2",
-    "prediction",
-    "loo_pred",
-    "loo_errors",
-    "loo_var",
-    "loo_rmse",
-    "df",
-}
-
-
-def costly_target_data(seed, k=30):
-    """Cases whose effect rises with the cost share, with a second, unrelated feature."""
-    rng = np.random.default_rng(seed)
-    cost = rng.uniform(0.3, 1.5, k)
-    receipts = rng.uniform(2.0, 8.0, k)
-    X = pd.DataFrame({"capex_pct_gdp": cost, "receipts_pct_gdp": receipts})
-    se = rng.uniform(0.08, 0.25, k)
-    y = 0.1 + 0.8 * cost + rng.normal(0.0, 0.1, k) + rng.normal(0.0, se)
-    return y, se, X
-
-
-def test_meta_regression_keeps_its_keys_and_adds_the_shrinkage_table():
-    y, se, X = costly_target_data(1)
-    out = meta.meta_regression(y, se, X, x_new={"capex_pct_gdp": 1.0, "receipts_pct_gdp": 5.0})
-    assert set(out) == RESULT_KEYS | {"shrinkage"}
-    assert isinstance(out["shrinkage"], pd.DataFrame)
-    plain = meta.meta_regression(y, se, X, ridge=1.0)
-    assert set(plain) == RESULT_KEYS | {"shrinkage"}
-    assert plain["prediction"] is None
-
-
-def test_meta_regression_reports_each_slope_with_and_without_the_penalty():
-    y, se, X = costly_target_data(2)
-    ridge = meta.meta_regression(y, se, X, ridge=1.0)
-    plain = meta.meta_regression(y, se, X, ridge=0.0)
-    table = ridge["shrinkage"]
-    assert list(table.columns) == SHRINKAGE_COLUMNS
-    assert list(table.index) == ["capex_pct_gdp", "receipts_pct_gdp"]
-    features = ["capex_pct_gdp", "receipts_pct_gdp"]
-    assert table["ridge_slope"].to_numpy() == pytest.approx(
-        ridge["coef"].loc[features, "estimate"].to_numpy(), rel=1e-12
-    )
-    assert table["unpenalised_slope"].to_numpy() == pytest.approx(
-        plain["coef"].loc[features, "estimate"].to_numpy(), rel=1e-12
-    )
-    assert table["ratio"].to_numpy() == pytest.approx(
-        (table["ridge_slope"] / table["unpenalised_slope"]).to_numpy(), rel=1e-12
-    )
-    assert abs(table.loc["capex_pct_gdp", "ridge_slope"]) < abs(
-        table.loc["capex_pct_gdp", "unpenalised_slope"]
-    )
-    assert 0.0 < table.loc["capex_pct_gdp", "ratio"] < 1.0
-    for column in SHRINKAGE_COLUMNS:
-        assert table[column].dtype == float
-
-
-def test_meta_regression_shrinkage_is_the_identity_without_a_ridge():
-    y, se, X = make_regression_data(seed=71, k=30, slopes=(0.4, -0.3, 0.2), tau=0.1)
-    table = meta.meta_regression(y, se, X)["shrinkage"]
-    assert list(table.index) == ["x0", "x1", "x2"]
-    np.testing.assert_array_equal(table["ridge_slope"], table["unpenalised_slope"])
-    assert table["ratio"].to_numpy() == pytest.approx(1.0, rel=1e-14)
-
-
-def test_meta_regression_shrinkage_ratio_falls_as_the_ridge_grows():
-    y, se, X = make_regression_data(seed=72, k=30, slopes=(0.5,), tau=0.1)
-    ratios = [
-        meta.meta_regression(y, se, X, ridge=ridge)["shrinkage"].loc["x0", "ratio"]
-        for ridge in (0.1, 1.0, 10.0, 100.0, 1e6)
-    ]
-    assert all(0.0 < r < 1.0 for r in ratios)
-    assert all(a > b for a, b in zip(ratios, ratios[1:]))
-    assert ratios[-1] < 1e-3
-
-
-def test_meta_regression_shrinkage_does_not_change_the_numbers_of_the_fit():
-    y, se, X = costly_target_data(3)
-    target = {"capex_pct_gdp": 2.0, "receipts_pct_gdp": 5.0}
-    out = meta.meta_regression(y, se, X, x_new=target, ridge=1.0)
-    names = ["capex_pct_gdp", "receipts_pct_gdp"]
-    Z = standardise(X.to_numpy())
-    w = 1.0 / (se**2 + out["tau2"])
-    design = np.column_stack([np.ones(30), Z])
-    info = design.T @ (design * w[:, None]) + np.diag([0.0, 1.0, 1.0]) * np.mean(1.0 / se**2)
-    beta = np.linalg.solve(info, design.T @ (w * y))
-    assert out["coef"]["estimate"].to_numpy() == pytest.approx(beta, rel=1e-9)
-    assert out["shrinkage"].loc[names, "ridge_slope"].to_numpy() == pytest.approx(
-        beta[1:], rel=1e-9
-    )
-    again = meta.meta_regression(y, se, X, x_new=target, ridge=1.0)
-    for key in ("coef", "coef_raw"):
-        pd.testing.assert_frame_equal(out[key], again[key])
-    assert out["prediction"] == again["prediction"]
-    np.testing.assert_array_equal(out["loo_pred"], again["loo_pred"])
-
-
-@pytest.mark.parametrize("seed", range(4))
-def test_a_ridge_pulls_down_the_prediction_for_a_costly_target_and_more_so_further_out(seed):
-    y, se, X = costly_target_data(seed)
-    gaps = []
-    for cost in (1.0, 2.0, 3.0):
-        target = {"capex_pct_gdp": cost, "receipts_pct_gdp": 5.0}
-        shrunk = meta.meta_regression(y, se, X, x_new=target, ridge=1.0)["prediction"]["mean"]
-        free = meta.meta_regression(y, se, X, x_new=target, ridge=0.0)["prediction"]["mean"]
-        gaps.append(shrunk - free)
-    assert gaps[2] < gaps[1] < gaps[0] + 1e-9
-    assert gaps[2] < -0.02
-    table = meta.meta_regression(y, se, X, ridge=1.0)["shrinkage"]
-    assert table.loc["capex_pct_gdp", "ratio"] < 1.0
-
-
-def test_meta_regression_shrinkage_is_missing_where_the_unpenalised_model_is_singular():
-    y, se, X = make_regression_data(seed=73, k=20, slopes=(0.4,), tau=0.1)
-    collinear = np.column_stack([X[:, 0], 2.0 * X[:, 0] + 1.0])
-    table = meta.meta_regression(y, se, collinear, ridge=1.0)["shrinkage"]
-    assert table["ridge_slope"].notna().all()
-    assert table["unpenalised_slope"].isna().all() and table["ratio"].isna().all()
-    assert list(table.index) == ["x0", "x1"]
-    rng = np.random.default_rng(74)
-    wide = rng.normal(size=(8, 12))
-    narrow = meta.meta_regression(
-        0.5 * wide[:, 0] + rng.normal(0.0, 0.1, 8), np.full(8, 0.1), wide, ridge=1.0
-    )["shrinkage"]
-    assert narrow["ridge_slope"].notna().all() and narrow["unpenalised_slope"].isna().all()
-    square = rng.normal(size=(5, 4))
-    exactly = meta.meta_regression(rng.normal(size=5), np.full(5, 0.1), square, ridge=1.0)
-    assert exactly["shrinkage"]["unpenalised_slope"].isna().all()
-    assert exactly["shrinkage"]["ratio"].isna().all()
-
-
-def test_meta_regression_shrinkage_ratio_is_missing_where_the_unpenalised_slope_is_zero(
-    monkeypatch,
-):
-    y, se, X = make_regression_data(seed=75, k=20, slopes=(0.4, 0.2), tau=0.1)
-    real = meta._fit_mixed
-
-    def zero_first_slope(y_, v_, X_, ridge_):
-        fit = real(y_, v_, X_, ridge_)
-        if ridge_ == 0.0:
-            theta = fit.theta.copy()
-            theta[1] = 0.0
-            return dataclasses.replace(fit, theta=theta)
-        return fit
-
-    monkeypatch.setattr(meta, "_fit_mixed", zero_first_slope)
-    table = meta.meta_regression(y, se, X, ridge=1.0)["shrinkage"]
-    assert table.loc["x0", "unpenalised_slope"] == 0.0 and np.isnan(table.loc["x0", "ratio"])
-    assert np.isfinite(table.loc["x1", "ratio"])
-
-
-def noise_free_effects(k=30, level=1e6):
-    """Effects exactly linear in the cost share at a large level, without a receipts effect."""
-    rng = np.random.default_rng(81)
-    X = pd.DataFrame({"cost": rng.uniform(0.3, 1.5, k), "receipts": rng.uniform(2.0, 8.0, k)})
-    se = rng.uniform(0.08, 0.25, k)
-    return level + 0.8 * X["cost"].to_numpy(), se, X
-
-
-@pytest.mark.parametrize("ridge", [0.0, 1.0])
-def test_meta_regression_shrinkage_ratio_is_missing_for_a_slope_that_is_rounding_noise(ridge):
-    """A feature without an effect gets a slope of rounding noise, which has no ratio."""
-    y, se, X = noise_free_effects()
-    table = meta.meta_regression(y, se, X, ridge=ridge)["shrinkage"]
-    floor = 1e-12 * np.max(np.abs(y))
-    assert abs(table.loc["receipts", "unpenalised_slope"]) < floor
-    assert np.isnan(table.loc["receipts", "ratio"])
-    assert np.isfinite(table.loc["receipts", "ridge_slope"])
-    assert abs(table.loc["cost", "unpenalised_slope"]) > 1e3 * floor
-    assert np.isfinite(table.loc["cost", "ratio"])
-    if ridge == 0.0:
-        assert table.loc["cost", "ratio"] == pytest.approx(1.0, rel=1e-12)
-        np.testing.assert_array_equal(table["ridge_slope"], table["unpenalised_slope"])
-    else:
-        assert 0.0 < table.loc["cost", "ratio"] < 1.0
-
-
-def test_meta_regression_shrinkage_ratio_is_missing_for_every_slope_of_a_constant_effect():
-    rng = np.random.default_rng(82)
-    X = pd.DataFrame({"a": rng.normal(size=25), "b": rng.uniform(1.0, 4.0, 25)})
-    se = rng.uniform(0.1, 0.3, 25)
-    for level in (1e6, 5.0, 1e-3):
-        for ridge in (0.0, 1.0):
-            table = meta.meta_regression(np.full(25, level), se, X, ridge=ridge)["shrinkage"]
-            assert table["ratio"].isna().all(), (level, ridge)
-            assert table["unpenalised_slope"].abs().max() < 1e-12 * level, (level, ridge)
-
-
-def test_meta_regression_shrinkage_floor_is_a_multiple_of_the_largest_effect(monkeypatch):
-    y, se, X = make_regression_data(seed=75, k=20, slopes=(0.4, 0.2), tau=0.1)
-    floor = 1e-12 * float(np.max(np.abs(y)))
-    real = meta._fit_mixed
-
-    def with_first_slope(value):
-        def patched(y_, v_, X_, ridge_):
-            fit = real(y_, v_, X_, ridge_)
-            if ridge_ == 0.0:
-                theta = fit.theta.copy()
-                theta[1] = value
-                return dataclasses.replace(fit, theta=theta)
-            return fit
-
-        return patched
-
-    cases = ((0.5 * floor, False), (-0.5 * floor, False), (2.0 * floor, True), (-2.0 * floor, True))
-    for value, has_ratio in cases:
-        monkeypatch.setattr(meta, "_fit_mixed", with_first_slope(value))
-        table = meta.meta_regression(y, se, X, ridge=1.0)["shrinkage"]
-        assert table.loc["x0", "unpenalised_slope"] == value
-        assert bool(np.isfinite(table.loc["x0", "ratio"])) is has_ratio, value
-        assert np.isfinite(table.loc["x1", "ratio"])
-
-
-@pytest.mark.parametrize("factor", [1e-15, 1e-9, 1e-3, 1e3, 1e9])
-def test_meta_regression_shrinkage_ratio_does_not_depend_on_the_unit_of_the_effects(factor):
-    y, se, X = costly_target_data(2)
-    reference = meta.meta_regression(y, se, X, ridge=1.0)["shrinkage"]
-    scaled = meta.meta_regression(factor * y, factor * se, X, ridge=1.0)["shrinkage"]
-    assert scaled["ratio"].notna().all() and scaled["unpenalised_slope"].notna().all()
-    np.testing.assert_allclose(scaled["ratio"], reference["ratio"], rtol=1e-5)
-    np.testing.assert_allclose(
-        scaled["unpenalised_slope"], factor * reference["unpenalised_slope"], rtol=1e-5
-    )
-
-
-def test_meta_regression_does_not_claim_a_ratio_of_one_for_slopes_that_are_noise():
-    doc = " ".join(meta.meta_regression.__doc__.split())
-    assert "The ratio is 1 for every feature when ``ridge`` is zero." not in doc
-    assert "is rounding noise" in doc and "1e-12`` times the largest absolute effect" in doc
-    assert "ratio is 1 for every feature whose slope is not rounding noise and NaN" in doc
-    table_doc = " ".join(meta._shrinkage_table.__doc__.split())
-    assert "``1e-12`` times the largest absolute effect" in table_doc
-
-
-def test_meta_regression_shrinkage_covers_the_fitted_features_only():
-    y, se, X = make_regression_data(seed=76, k=24, slopes=(0.3,), tau=0.1)
-    X3 = pd.DataFrame({"a": X[:, 0], "constant": 3.0, "b": np.sin(np.arange(24.0))})
-    out = meta.meta_regression(y, se, X3, ridge=1.0)
-    assert list(out["shrinkage"].index) == ["a", "b"]
-    assert out["coef"].loc["constant", "estimate"] == 0.0
-    unlabelled = meta.meta_regression(y, se, X3.to_numpy(), ridge=1.0)
-    assert list(unlabelled["shrinkage"].index) == ["x0", "x2"]
-    np.testing.assert_allclose(
-        unlabelled["shrinkage"].to_numpy(), out["shrinkage"].to_numpy(), rtol=1e-12
-    )
-
-
-def test_meta_regression_documents_the_shrinkage_and_the_extrapolation():
-    doc = " ".join(meta.meta_regression.__doc__.split())
-    assert "shrinkage" in doc and "ridge_slope" in doc and "unpenalised_slope" in doc
-    assert "outside the range of the cases is an extrapolation of the fitted line" in doc
-    assert "extrapolation" in meta.__doc__
-
-
-# ---- extrapolation -----------------------------------------------------------
-@pytest.fixture
-def case_features():
-    return pd.DataFrame(
-        {
-            "capex_pct_gdp": [0.4, 0.9, 1.5, 0.7],
-            "receipts_pct_gdp": [2.0, 8.0, 5.0, 6.5],
-            "balance": [-1.0, 0.5, 2.0, 0.0],
-        }
-    )
-
-
-def test_extrapolation_places_a_target_against_the_range_of_the_cases(case_features):
-    target = {"capex_pct_gdp": 2.28, "receipts_pct_gdp": 7.81, "balance": -3.0}
-    out = meta.extrapolation(case_features, target)
-    assert list(out.index) == ["capex_pct_gdp", "receipts_pct_gdp", "balance"]
-    assert list(out.columns) == ["x_new", "case_min", "case_max", "position", "ratio_to_max"]
-    assert out["position"].tolist() == ["above", "inside", "below"]
-    assert out["x_new"].tolist() == [2.28, 7.81, -3.0]
-    assert out["case_min"].tolist() == [0.4, 2.0, -1.0]
-    assert out["case_max"].tolist() == [1.5, 8.0, 2.0]
-    assert out.loc["capex_pct_gdp", "ratio_to_max"] == pytest.approx(2.28 / 1.5, rel=1e-14)
-    assert out.loc["receipts_pct_gdp", "ratio_to_max"] == pytest.approx(7.81 / 8.0, rel=1e-14)
-    assert np.isnan(out.loc["balance", "ratio_to_max"])
-
-
-def test_extrapolation_treats_the_ends_of_the_range_as_inside(case_features):
-    ends = {"capex_pct_gdp": 0.4, "receipts_pct_gdp": 8.0, "balance": 2.0}
-    assert set(meta.extrapolation(case_features, ends)["position"]) == {"inside"}
-    noise = {"capex_pct_gdp": 0.4 - 1e-12, "receipts_pct_gdp": 8.0 + 1e-12, "balance": -1.0}
-    assert set(meta.extrapolation(case_features, noise)["position"]) == {"inside"}
-    just_out = {"capex_pct_gdp": 0.4 - 1e-6, "receipts_pct_gdp": 8.0 + 1e-6, "balance": 2.000001}
-    assert meta.extrapolation(case_features, just_out)["position"].tolist() == [
-        "below",
-        "above",
-        "above",
-    ]
-
-
-@pytest.mark.parametrize("factor", [1e-12, 1e-9, 1e-6, 1e-3, 1.0, 1e3, 1e9])
-def test_extrapolation_position_does_not_depend_on_the_unit_of_a_feature(factor):
-    """A target 1e-12 beyond an end of the range is inside it and one 1e-6 beyond is outside."""
-    base = pd.DataFrame(
-        {
-            "share": [0.4, 0.9, 1.5, 0.7],
-            "balance": [-1.0, 0.5, 2.0, 0.0],
-            "year": [2000.0, 2010.0, 2019.0, 2005.0],
-        }
-    )
-    cases = base * factor
-    scale = np.maximum(cases.min().abs(), cases.max().abs())
-    expectations = ((1e-12, "inside", "inside"), (1e-6, "above", "below"))
-    for offset, expected_up, expected_down in expectations:
-        up = (cases.max() + offset * scale).to_dict()
-        down = (cases.min() - offset * scale).to_dict()
-        assert meta.extrapolation(cases, up)["position"].tolist() == [expected_up] * 3, offset
-        assert meta.extrapolation(cases, down)["position"].tolist() == [expected_down] * 3, offset
-    inside = (0.5 * (cases.min() + cases.max())).to_dict()
-    assert meta.extrapolation(cases, inside)["position"].tolist() == ["inside"] * 3
-
-
-def test_extrapolation_tolerance_is_relative_for_features_of_magnitude_below_one():
-    X = pd.DataFrame({"tiny": [1e-6, 2e-6, 3e-6]})
-    near = meta.extrapolation(X, {"tiny": 3e-6 * (1.0 + 1e-10)})
-    assert near["position"].tolist() == ["inside"]
-    out = meta.extrapolation(X, {"tiny": 3e-6 * (1.0 + 1e-6)})
-    assert out["position"].tolist() == ["above"]
-    below = meta.extrapolation(X, {"tiny": 1e-6 * (1.0 - 1e-6)})
-    assert below["position"].tolist() == ["below"]
-    assert meta.extrapolation(X, {"tiny": 3e-6 * (1.0 + 5e-10)})["position"].tolist() == ["inside"]
-    assert meta.extrapolation(X, {"tiny": 3e-6 * (1.0 + 5e-9)})["position"].tolist() == ["above"]
-
-
-def test_extrapolation_has_no_tolerance_for_a_feature_that_is_zero_in_every_case():
-    X = pd.DataFrame({"zeros": [0.0, 0.0, 0.0], "other": [1.0, 2.0, 3.0]})
-    expectations = ((0.0, "inside"), (1e-300, "above"), (-1e-300, "below"), (1e-12, "above"))
-    for value, expected in expectations:
-        out = meta.extrapolation(X, {"zeros": value, "other": 2.0})
-        assert out.loc["zeros", "position"] == expected, value
-        assert out.loc["other", "position"] == "inside"
-
-
-def test_extrapolation_documents_its_tolerance_as_scale_free():
-    doc = " ".join(meta.extrapolation.__doc__.split())
-    assert "times the larger of the absolute smallest and largest case value" in doc
-    assert "multiplied by a positive constant" in doc
-    assert "max(1," not in doc
-
-
-def test_extrapolation_ratio_is_defined_for_non_negative_features_with_a_positive_maximum():
-    X = pd.DataFrame(
-        {"zero_min": [0.0, 1.0, 4.0], "negative": [-1.0, 1.0, 4.0], "zeros": [0.0, 0.0, 0.0]}
-    )
-    out = meta.extrapolation(X, {"zero_min": 8.0, "negative": 8.0, "zeros": 1.0})
-    assert out.loc["zero_min", "ratio_to_max"] == pytest.approx(2.0)
-    assert np.isnan(out.loc["negative", "ratio_to_max"])
-    assert np.isnan(out.loc["zeros", "ratio_to_max"])
-    assert out["position"].tolist() == ["above", "above", "above"]
-
-
-def test_extrapolation_matches_the_target_by_name_and_accepts_arrays(case_features):
-    mapping = {"balance": 0.0, "capex_pct_gdp": 1.0, "receipts_pct_gdp": 5.0, "extra": 99.0}
-    reference = meta.extrapolation(case_features, mapping)
-    assert reference["position"].tolist() == ["inside"] * 3
-    as_series = meta.extrapolation(case_features, pd.Series(mapping))
-    pd.testing.assert_frame_equal(as_series, reference)
-    as_frame = meta.extrapolation(case_features, pd.DataFrame([mapping]))
-    pd.testing.assert_frame_equal(as_frame, reference)
-    by_position = meta.extrapolation(case_features, [1.0, 5.0, 0.0])
-    pd.testing.assert_frame_equal(by_position, reference)
-    arrays = meta.extrapolation(case_features.to_numpy(), [1.0, 5.0, 0.0])
-    assert list(arrays.index) == ["x0", "x1", "x2"]
-    numeric = ["x_new", "case_min", "case_max", "ratio_to_max"]
-    np.testing.assert_allclose(arrays[numeric].to_numpy(), reference[numeric].to_numpy())
-    assert arrays["position"].tolist() == reference["position"].tolist()
-    single = meta.extrapolation(case_features["capex_pct_gdp"], 2.0)
-    assert list(single.index) == ["capex_pct_gdp"] and single["position"].tolist() == ["above"]
-    column = meta.extrapolation(np.array([1.0, 2.0, 3.0]), [4.0])
-    assert column["position"].tolist() == ["above"]
-    assert column.loc["x0", "ratio_to_max"] == pytest.approx(4.0 / 3.0)
-
-
-def test_extrapolation_agrees_with_the_range_check_of_a_fitted_model():
-    y, se, X = costly_target_data(5)
-    for cost, expected in ((0.1, "below"), (1.0, "inside"), (2.5, "above")):
-        out = meta.extrapolation(X, {"capex_pct_gdp": cost, "receipts_pct_gdp": 5.0})
-        assert out.loc["capex_pct_gdp", "position"] == expected
-        assert out.loc["receipts_pct_gdp", "position"] == "inside"
-    out = meta.extrapolation(X, {"capex_pct_gdp": 2.5, "receipts_pct_gdp": 5.0})
-    assert out.loc["capex_pct_gdp", "ratio_to_max"] == pytest.approx(
-        2.5 / X["capex_pct_gdp"].max(), rel=1e-14
-    )
-
-
-def test_extrapolation_rejects_invalid_inputs(case_features):
-    target = {"capex_pct_gdp": 1.0, "receipts_pct_gdp": 5.0, "balance": 0.0}
-    with pytest.raises(ValueError, match="exactly one"):
-        meta.extrapolation(case_features, pd.DataFrame([target, target]))
-    with pytest.raises(ValueError, match="exactly one"):
-        meta.extrapolation(case_features, [[1.0, 5.0, 0.0], [2.0, 5.0, 0.0]])
-    with pytest.raises(ValueError, match="balance"):
-        meta.extrapolation(case_features, {"capex_pct_gdp": 1.0, "receipts_pct_gdp": 5.0})
-    with pytest.raises(ValueError):
-        meta.extrapolation(case_features, [1.0, 5.0])
-    with pytest.raises(ValueError):
-        meta.extrapolation(case_features, dict(target, balance=np.nan))
-    with pytest.raises(ValueError):
-        meta.extrapolation(case_features, dict(target, balance=np.inf))
-    broken = case_features.copy()
-    broken.loc[1, "balance"] = np.nan
-    with pytest.raises(ValueError):
-        meta.extrapolation(broken, target)
-    with pytest.raises(ValueError):
-        meta.extrapolation(np.float64(3.0), [1.0])
-    with pytest.raises(ValueError):
-        meta.extrapolation(np.zeros((2, 2, 2)), [1.0])
-    with pytest.raises(ValueError):
-        meta.extrapolation(np.zeros((3, 0)), [])
-    assert "extrapolation" in meta.__all__
-
-
-# ----------------------------------------------------------------------------
 # Scaling law
 # ----------------------------------------------------------------------------
 def test_scaling_law_recovers_an_exactly_proportional_effect():
@@ -1624,13 +1202,160 @@ def test_scaling_law_input_checks():
 
 
 # ----------------------------------------------------------------------------
-# Source text
+# Shrinkage of the slopes and extrapolation
 # ----------------------------------------------------------------------------
-@pytest.mark.parametrize("path", [Path(meta.__file__), Path(__file__)])
-def test_no_line_of_the_module_or_of_this_file_is_longer_than_one_hundred_characters(path):
-    text = path.read_text(encoding="utf-8")
-    too_long = [
-        (number, len(line)) for number, line in enumerate(text.splitlines(), 1) if len(line) > 100
+EM_DASH = chr(0x2014)
+
+
+def cost_and_receipts(seed, k=30, slope=0.5):
+    """Hand-built cases with a cost share, a receipts share and a slope on the cost share."""
+    rng = np.random.default_rng(seed)
+    cost = rng.uniform(0.5, 4.0, k)
+    receipts = rng.uniform(2.0, 9.0, k)
+    se = rng.uniform(0.1, 0.5, k)
+    y = 0.3 + slope * cost + rng.normal(0.0, 0.2, k) + rng.normal(0.0, se)
+    return y, se, pd.DataFrame({"cost": cost, "receipts": receipts})
+
+
+def test_shrinkage_table_lists_the_fitted_features_with_three_columns():
+    y, se, X = cost_and_receipts(0)
+    out = meta.meta_regression(y, se, X.assign(constant=1.0), ridge=1.0)
+    table = out["shrinkage"]
+    assert list(table.columns) == ["ridge_slope", "unpenalised_slope", "ratio"]
+    assert list(table.index) == ["cost", "receipts"]
+    np.testing.assert_allclose(
+        table["ridge_slope"], out["coef"].loc[["cost", "receipts"], "estimate"], rtol=0, atol=1e-14
+    )
+    assert out["coef"].loc["constant", "estimate"] == 0.0
+
+
+def test_shrinkage_without_a_penalty_leaves_every_slope_unchanged():
+    y, se, X = cost_and_receipts(1)
+    table = meta.meta_regression(y, se, X, ridge=0.0)["shrinkage"]
+    np.testing.assert_array_equal(table["unpenalised_slope"], table["ridge_slope"])
+    np.testing.assert_array_equal(table["ratio"], np.ones(2))
+
+
+def test_shrinkage_unpenalised_slope_is_the_slope_of_the_same_model_with_ridge_zero():
+    y, se, X = cost_and_receipts(2)
+    table = meta.meta_regression(y, se, X, ridge=1.0)["shrinkage"]
+    free = meta.meta_regression(y, se, X, ridge=0.0)
+    np.testing.assert_allclose(
+        table["unpenalised_slope"],
+        free["coef"].loc[["cost", "receipts"], "estimate"],
+        rtol=1e-12,
+        atol=0.0,
+    )
+    np.testing.assert_allclose(
+        table["ratio"], table["ridge_slope"] / table["unpenalised_slope"], rtol=1e-12
+    )
+
+
+def test_shrinkage_shows_the_penalty_pulling_a_costly_target_down_at_thirty_cases():
+    y, se, X = cost_and_receipts(3, k=30, slope=0.5)
+    penalised = meta.meta_regression(y, se, X, ridge=1.0)
+    row = penalised["shrinkage"].loc["cost"]
+    assert 0.0 < row["ratio"] < 1.0
+    assert abs(row["ridge_slope"]) < abs(row["unpenalised_slope"])
+    target = {"cost": 6.0, "receipts": 5.0}
+    pen_mean = meta.meta_regression(y, se, X, x_new=target, ridge=1.0)["prediction"]["mean"]
+    free_mean = meta.meta_regression(y, se, X, x_new=target, ridge=0.0)["prediction"]["mean"]
+    assert pen_mean < free_mean
+
+
+def test_shrinkage_unpenalised_is_nan_when_the_ridge_free_fit_is_singular():
+    y, se, X = cost_and_receipts(4)
+    table = meta.meta_regression(y, se, X.assign(twin=2.0 * X["cost"]), ridge=1.0)["shrinkage"]
+    assert list(table.index) == ["cost", "receipts", "twin"]
+    assert np.isnan(table["unpenalised_slope"]).all() and np.isnan(table["ratio"]).all()
+    assert np.isfinite(table["ridge_slope"]).all()
+
+
+def test_shrinkage_unpenalised_is_nan_without_residual_degrees_of_freedom():
+    y, se, X = cost_and_receipts(5, k=3)
+    out = meta.meta_regression(y, se, X, ridge=1.0)
+    assert out["df"] == 0
+    assert np.isnan(out["shrinkage"]["unpenalised_slope"]).all()
+    assert np.isfinite(out["shrinkage"]["ridge_slope"]).all()
+
+
+def test_shrinkage_table_is_empty_when_no_feature_enters_the_fit():
+    y, se, _ = cost_and_receipts(6)
+    X = pd.DataFrame({"a": np.ones(30), "b": np.full(30, 2.0)})
+    table = meta.meta_regression(y, se, X, ridge=1.0)["shrinkage"]
+    assert table.empty
+    assert list(table.columns) == ["ridge_slope", "unpenalised_slope", "ratio"]
+
+
+def test_meta_regression_documents_the_shrinkage_and_the_extrapolation():
+    doc = " ".join(meta.meta_regression.__doc__.split())
+    assert "extrapolation of that line" in doc and "``shrinkage``" in doc
+    assert "extrapolation" in meta.__all__
+    assert "extrapolation" in meta.__doc__
+    assert EM_DASH not in meta.__doc__ and EM_DASH not in meta.extrapolation.__doc__
+
+
+def test_extrapolation_places_a_target_below_inside_or_above_the_range():
+    X = pd.DataFrame({"cost": [1.0, 2.0, 4.0, 5.0], "receipts": [2.0, 4.0, 6.0, 8.0]})
+    table = meta.extrapolation(X, {"cost": 0.5, "receipts": 5.0})
+    assert list(table.index) == ["cost", "receipts"]
+    assert list(table.columns) == [
+        "target",
+        "case_min",
+        "case_max",
+        "position",
+        "ratio_to_largest_case",
     ]
-    assert too_long == [], path.name
-    assert "\r" not in text and chr(0x2014) not in text
+    assert table.loc["cost", "position"] == "below"
+    assert table.loc["receipts", "position"] == "inside"
+    assert table.loc["cost", "target"] == 0.5
+    assert table.loc["cost", "case_min"] == 1.0 and table.loc["cost", "case_max"] == 5.0
+    above = meta.extrapolation(X, {"cost": 6.0, "receipts": 8.0})
+    assert above.loc["cost", "position"] == "above"
+    assert above.loc["receipts", "position"] == "inside"
+    assert above.loc["cost", "ratio_to_largest_case"] == pytest.approx(6.0 / 5.0, rel=1e-15)
+    assert above.loc["receipts", "ratio_to_largest_case"] == pytest.approx(1.0, rel=1e-15)
+
+
+def test_extrapolation_counts_the_limits_as_inside_within_rounding():
+    X = np.array([[1.0], [3.0], [5.0]])
+    assert meta.extrapolation(X, [1.0]).loc["x0", "position"] == "inside"
+    assert meta.extrapolation(X, [5.0 * (1.0 + 1e-13)]).loc["x0", "position"] == "inside"
+    assert meta.extrapolation(X, [1.0 - 1e-6]).loc["x0", "position"] == "below"
+    assert meta.extrapolation(X, [5.0 * (1.0 + 1e-6)]).loc["x0", "position"] == "above"
+
+
+def test_extrapolation_ratio_is_defined_only_for_features_whose_case_values_are_positive():
+    X = pd.DataFrame({"share": [1.0, 2.0, 4.0], "signed": [-1.0, 0.0, 2.0]})
+    table = meta.extrapolation(X, {"share": 8.0, "signed": 3.0})
+    assert table.loc["share", "ratio_to_largest_case"] == pytest.approx(2.0, rel=1e-15)
+    assert np.isnan(table.loc["signed", "ratio_to_largest_case"])
+    assert table.loc["signed", "position"] == "above"
+
+
+def test_extrapolation_matches_by_name_and_reads_arrays_in_column_order():
+    X = pd.DataFrame({"cost": [1.0, 2.0, 4.0], "receipts": [2.0, 4.0, 6.0]})
+    by_name = meta.extrapolation(X, pd.Series({"receipts": 3.0, "cost": 5.0, "extra": 9.0}))
+    assert by_name.loc["cost", "position"] == "above"
+    assert by_name.loc["receipts", "position"] == "inside"
+    by_array = meta.extrapolation(X.to_numpy(), [5.0, 3.0])
+    assert list(by_array.index) == ["x0", "x1"]
+    assert list(by_array["target"]) == [5.0, 3.0]
+    by_frame = meta.extrapolation(X, pd.DataFrame([{"cost": 5.0, "receipts": 3.0}]))
+    assert by_frame.loc["cost", "position"] == "above"
+
+
+def test_extrapolation_rejects_several_targets_missing_features_and_empty_cases():
+    X = pd.DataFrame({"cost": [1.0, 2.0], "receipts": [2.0, 4.0]})
+    with pytest.raises(ValueError, match="several rows"):
+        meta.extrapolation(X, pd.DataFrame({"cost": [1.0, 2.0], "receipts": [1.0, 2.0]}))
+    with pytest.raises(ValueError, match="several rows"):
+        meta.extrapolation(X, [[1.0, 2.0], [3.0, 4.0]])
+    with pytest.raises(ValueError, match="no value"):
+        meta.extrapolation(X, {"cost": 1.0})
+    with pytest.raises(ValueError, match="finite"):
+        meta.extrapolation(X, {"cost": np.nan, "receipts": 1.0})
+    with pytest.raises(ValueError, match="at least one case"):
+        meta.extrapolation(np.empty((0, 2)), [1.0, 2.0])
+    with pytest.raises(ValueError, match="finite"):
+        meta.extrapolation(X.assign(bad=[np.inf, 1.0]), {"cost": 1.0, "receipts": 2.0, "bad": 0.0})

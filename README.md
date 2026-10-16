@@ -4,7 +4,7 @@ Working projects of the seminar group at the Faculty of Economics, Kasetsart Uni
 
 | Folder | Question | State |
 | --- | --- | --- |
-| [disney-tourism-thailand](disney-tourism-thailand) | What would a Disney-type theme-park complex in Thailand add to tourism spending, financial returns and national economic value? | Bottom-up appraisal in preparation for the Phase 1 document due 16 October 2026. The historical analysis of Hong Kong and Shanghai is supplementary. See STATUS.md for the plan. |
+| [disney-tourism-thailand](disney-tourism-thailand) | What would a Disney-type theme-park complex in Thailand add to tourism spending, financial returns and national economic value? | Bottom-up appraisal in preparation. The historical analysis of Hong Kong and Shanghai is supplementary and was re-run on the dataset on 16 October 2026. See STATUS.md for the plan. |
 
 The project is work in progress. Results are preliminary until the open items in STATUS.md are closed.
 

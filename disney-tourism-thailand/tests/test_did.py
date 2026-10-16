@@ -1,6 +1,7 @@
 """Tests for dtt.did: DiD, pre-trend test, wild cluster bootstrap and event study.
 
-All data are SIMULATED.  The wild-bootstrap algebra is checked against a brute
+The panels are hand-built (see handmade_panels.py) and the small regressions use
+a seeded noise array.  The wild-bootstrap algebra is checked against a brute
 force implementation that refits the regression for every weight vector.
 """
 import itertools
@@ -10,8 +11,9 @@ import pandas as pd
 import pytest
 from scipy import stats
 
-from dtt import did, simulate
+from dtt import did
 from dtt import stata_compat as sc
+from handmade_panels import study_panel
 
 Y = "receipts_pct_gdp"
 
@@ -27,7 +29,7 @@ def _blocks(df):
 
 def test_noiseless_two_way_model_is_recovered_exactly():
     """With y = unit effect + year effect + tau * treated_post, TWFE returns tau to machine precision."""
-    df, _ = simulate.simulate_panel(seed=3)
+    df, _ = study_panel(noise_seed=3)
     rng = np.random.default_rng(0)
     ue = dict(zip(sorted(df.unit_id.unique()), rng.normal(0, 2, 9)))
     ye = dict(zip(sorted(df.year.unique()), rng.normal(0, 1, df.year.nunique())))
@@ -74,7 +76,7 @@ def test_xtreg_twfe_is_consistent_with_friend_did(sim_parallel):
 
 
 def test_friend_did_detects_a_false_effect_under_differential_trends(sim_trending):
-    """SIMULATED panel with different donor trends: the DiD estimate is far from the true effect."""
+    """Hand-built panel with different donor trends: the DiD estimate is far from the true effect."""
     df, _ = sim_trending
     hk, _, _ = _blocks(df)
     assert abs(did.friend_did(hk).coef - 5.0) > 2.0
@@ -104,7 +106,7 @@ def test_pretrend_matches_manual_regression_and_inference(sim_trending):
     assert r.p_z < r.p_t
     assert r.ci_t[1] - r.ci_t[0] > r.ci_z[1] - r.ci_z[0]
     assert r.n == len(sub) and r.n_clusters == g
-    assert r.coef > 0  # the simulated treated unit trends upward relative to the pool
+    assert r.coef > 0  # the treated unit trends upward relative to the pool
 
 
 def test_pretrend_interaction_is_invariant_to_the_time_origin(sim_trending):
@@ -164,7 +166,7 @@ def test_webb_support_and_enumeration():
 # Wild cluster bootstrap-t
 # ----------------------------------------------------------------------------
 def small_problem(seed=0, g=4, per=9, effect=0.8):
-    """SIMULATED regression y ~ d + z + const with g clusters; d varies at the observation level."""
+    """Regression y ~ d + z + const with g clusters, built from a seeded noise array; d varies at the observation level."""
     rng = np.random.default_rng(seed)
     cluster = np.repeat(np.arange(g), per)
     n = g * per

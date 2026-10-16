@@ -26,15 +26,15 @@ def reference():
 
 @pytest.fixture(scope="session")
 def sim_parallel():
-    """Simulated panel with parallel trends (SIMULATED data)."""
-    from dtt import simulate
+    """Hand-built panel with the structure of the dataset and parallel trends (returns panel and truth)."""
+    from handmade_panels import study_panel
 
-    return simulate.simulate_panel(seed=11, trend_spread=0.0)
+    return study_panel(trend_spread=0.0, noise_seed=11)
 
 
 @pytest.fixture(scope="session")
 def sim_trending():
-    """Simulated panel with heterogeneous donor trends (SIMULATED data)."""
-    from dtt import simulate
+    """Hand-built panel with the structure of the dataset and heterogeneous donor trends (returns panel and truth)."""
+    from handmade_panels import study_panel
 
-    return simulate.simulate_panel(seed=12, trend_spread=0.5)
+    return study_panel(trend_spread=0.5, noise_seed=12)

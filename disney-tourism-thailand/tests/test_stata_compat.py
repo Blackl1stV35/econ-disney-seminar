@@ -1,6 +1,6 @@
 """Tests for dtt.stata_compat (Stata-compatible regress and xtreg, fe).
 
-All data in this file are SIMULATED.  The expected values come from closed
+All data in this file are hand-built fixtures.  The expected values come from closed
 forms or from statsmodels, which is an independent implementation.
 """
 import numpy as np
@@ -13,7 +13,7 @@ from dtt import stata_compat as sc
 
 
 def make_panel(seed=0, g=6, t_lo=10, t_hi=16, p=2):
-    """Unbalanced simulated panel with p regressors and unit effects."""
+    """Small unbalanced panel with p regressors and unit effects."""
     rng = np.random.default_rng(seed)
     sizes = rng.integers(t_lo, t_hi + 1, g)
     unit = np.repeat(np.arange(g), sizes)

@@ -1,6 +1,6 @@
 ﻿# Project status
 
-Last updated: 2026-10-14. This page gives the approved seminar topic, the decisions taken, the team roles, the work plan with dates, the supplementary historical analysis and the open items. Figures marked preliminary are not yet reviewed.
+Last updated: 2026-10-16. This page gives the approved seminar topic, the decisions taken, the team roles, the work plan with dates, the supplementary historical analysis and the open items. Figures marked preliminary are not yet reviewed.
 
 ## 1. Seminar topic (approved 14 October 2026)
 
@@ -72,14 +72,14 @@ The dates after 16 October are estimates. They will be confirmed after the Phase
 Folder: `disney-tourism-thailand`. Question: did the Hong Kong and Shanghai openings change international tourism receipts relative to GDP?
 
 - **Sample:** 44 openings (episodes), 27 feasible, 19 in the primary sample, in 19 economies. The importance route needs at least 20 episodes, so the pre-registered rule chose the ambient route.
-- **Estimator:** the scaling law in cost share (A2) was selected. For the THB 300 billion complex it gives a median of about +US$2.2 billion a year (+0.4 percent of GDP). The 90 percent interval runs from about -US$6.2 to +US$10.5 billion and includes zero.
+- **Estimator:** the scaling law in cost share (A2) is selected by the leave-one-economy-out rule. For the THB 300 billion complex the median effect is +0.40 percentage points of GDP (5 to 95 percent: -1.14 to +1.94). At the 2025 baseline that is +US$2.33 billion a year (-6.55 to +11.17); at the 2019 baseline it is +US$2.19 billion (-6.18 to +10.53). The 90 percent interval for a new study runs from -2.73 to +1.27 percentage points and includes zero. The weighted transport gives -0.73 points with the opposite sign; it is a diagnostic and not the primary route.
 - **Reading:** the data cannot separate the effect from zero. The historical results are not the Thai net benefit.
-- **Open items for this track:** 37 reference values of the original Stata analysis that notebook 01 does not reproduce (1179 of 1216 match); the data notice; the check of the 20 World Bank files against the official API; the final verification and an independent review.
+- **Open items for this track:** 37 of the 1216 reference values of the original Stata analysis do not reproduce on the dataset (1179 match). The differences are in the synthetic-control weights, the balance and placebo statistics and one bootstrap interval endpoint. The data notice for the single-country panel and an independent review remain open.
 
 ## 6. Repository and reproducibility
 
-- All six notebooks run on the dataset in the repository. A full run takes one to two hours on a laptop, almost all of it in notebook 03.
-- The tests run with `python -m pytest -q` from `disney-tourism-thailand` and take about 13 minutes.
+- All six notebooks run on the dataset in the repository. The run of 16 October 2026 took 78 minutes for notebooks 00 to 05, of which notebook 03 took 75 minutes.
+- The tests run with `python -m pytest -q` from `disney-tourism-thailand` and take about 7 minutes.
 - Generated files in `results/` and `figures/` change only through a re-run pull request, as described in CONTRIBUTING.md.
 
 ## 7. Open items
@@ -88,12 +88,19 @@ Folder: `disney-tourism-thailand`. Question: did the Hong Kong and Shanghai open
 - Official calendar-2024 and 2019 airport traffic (AOT) and Chon Buri hotel and occupancy data (TAT) could not be read in this session.
 - Sources conflict on the high-speed rail opening year (2031 from the EEC Office, 2029 from Wikipedia) and on Chon Buri foreign visitors in 2024. The conflicting visitor figure is not used.
 - References: Chan (2004) is verified. Tan, How and Koh is not verified and is not cited. Milman (2010) is cited as a single-author article. The ADB and NESDC values are recorded with their pages.
-- Data notice for `data/raw/disney_did_panel.csv` (origin unknown) and the World Bank attribution.
-- Check of the 20 World Bank files against the official API.
+- The origin of `data/raw/disney_did_panel.csv` is unknown. `DATA_NOTICE.md` gives the World Bank attribution and asks the project owner to state the origin of the panel file.
 ## 8. Working documents
 
 - `seminar/PHASE1_DRAFT.md`: the Phase 1 document in working form, with PENDING markers for the team.
 - `seminar/TEAM_BRIEFS.md`: the aligned brief for each role, with the corrections and the checks.
+
+## 9. Re-run of 16 October 2026
+
+- The notebooks were re-run on the dataset with the code in the pull request "Remove the simulated world from the pipeline". The pipeline has no simulated mode. The simulation generators and the tests that used them are removed. The tests that needed a generated world now use hand-built fixtures in `tests/handmade_panels.py` and `tests/handmade_world.py`.
+- The new results are in `results/` and `figures/`, in the second pull request, which exists only for the re-run and names the commit and the run time, as CONTRIBUTING.md asks.
+- The full test suite passes on the code branch: 1877 passed and 1 skipped. The dataset check (`DTT_RUN_REAL=1`) passed in the run of 16 October 2026.
+- The route rule selects the ambient route. The importance model is not usable, the weighted transport does not beat the uniform transport by the 0.95 margin, the target is supported, and A2 is selected. Section 5 gives the effect.
+- The Haswell and Zen kernels pass. The SkylakeX kernel cannot run on the development computer.
 
 ## How you can help
 

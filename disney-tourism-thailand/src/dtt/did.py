@@ -590,7 +590,7 @@ def boottest_xtreg_fe(
 class EventStudyResult:
     """Event-study coefficients relative to the base period.
 
-    ``table`` has one row per relative year (including the base row, fixed at
+    ``table`` has one row per relative year (including the base row, set to
     zero) with columns ``rel, coef, se, t, p, ci_lo, ci_hi``; confidence
     intervals use ``t(G-1)``.  ``fit`` is the underlying :class:`XtregResult`.
     """

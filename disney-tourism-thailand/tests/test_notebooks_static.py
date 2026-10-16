@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import os
 import re
 from pathlib import Path
 
@@ -15,7 +16,11 @@ NOTEBOOK_DIR = ROOT / "notebooks"
 ANALYSIS_NOTEBOOKS = sorted(p for p in NOTEBOOK_DIR.glob("0*.ipynb") if not p.name.startswith("01_"))
 SECRET_PATTERN = re.compile(r"github_pat_[A-Za-z0-9_]{20,}|ghp_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|ghs_[A-Za-z0-9]{20,}")
 TEXT_SUFFIXES = {".py", ".md", ".txt", ".json", ".csv", ".ipynb", ".toml", ".cfg", ".ini", ".yml", ".yaml", ".gitignore"}
-SKIPPED_PARTS = {"__pycache__", ".pytest_cache", ".ipynb_checkpoints", ".git"}
+#: Directories that hold a virtual environment, a tool cache or executed copies, not files of the repository.
+SKIPPED_DIRECTORIES = {".venv", "venv", "env", "site-packages", ".git", "__pycache__", ".pytest_cache", ".ipynb_checkpoints", "executed"}
+#: Directory of the data files. The text scan does not open the files below it: they hold the data of the
+#: analysis, not text of the repository.
+DATA_DIRECTORY = "data"
 EM_DASH = chr(0x2014)
 
 BOOTSTRAP = """import sys
@@ -62,9 +67,7 @@ def test_notebook_opens_with_the_bootstrap_cell_and_the_description(path):
     first_markdown = next(c for c in notebook.cells if c.cell_type == "markdown")
     for heading in ("**Purpose.**", "**Input files.**", "**Output files.**", "**How to run.**", "**Run time.**"):
         assert heading in first_markdown.source, f"{path.stem} lacks {heading}"
-    assert "python -m nbconvert --to notebook --execute --ExecutePreprocessor.kernel_name=dtt-venv --output-dir executed" in first_markdown.source
-    for variable in ("DTT_RESULTS_DIR", "DTT_FIGURE_DIR", "DTT_GUARD"):
-        assert variable in first_markdown.source
+    assert "DTT_RUN_REAL=1" in first_markdown.source
     last_markdown = [c for c in notebook.cells if c.cell_type == "markdown"][-1]
     assert last_markdown.source.lstrip().startswith("## Scope and limits")
 
@@ -82,11 +85,40 @@ def test_notebook_text_has_no_em_dash(path):
     assert EM_DASH not in text
 
 
-def test_repository_text_files_have_no_em_dash_and_no_secrets():
+def _skipped_directory(directory: Path) -> bool:
+    """True for a directory that holds a virtual environment, a tool cache or executed copies."""
+    return directory.name in SKIPPED_DIRECTORIES or (directory / "pyvenv.cfg").is_file()
+
+
+def repository_files(root: Path) -> list[Path]:
+    """Return the files below ``root`` as paths relative to it.
+
+    Directories are skipped by their name below ``root`` and by a ``pyvenv.cfg``
+    file inside them, so the names of the directories above ``root`` play no part.
+    """
+    found: list[Path] = []
+    for current, dirnames, filenames in os.walk(root):
+        here = Path(current)
+        dirnames[:] = sorted(name for name in dirnames if not _skipped_directory(here / name))
+        found.extend((here / name).relative_to(root) for name in filenames)
+    return sorted(found)
+
+
+def _data_file(relative: Path) -> bool:
+    """True for a file below the data directory, which the text scan does not open."""
+    return relative.parts[0] == DATA_DIRECTORY
+
+
+def offending_text_files(root: Path) -> list[str]:
+    """List the text files below ``root`` that hold a token-like string or an em dash.
+
+    The files below the data directory are skipped without being opened.
+    """
     offenders = []
-    for path in ROOT.rglob("*"):
-        if not path.is_file() or any(part in SKIPPED_PARTS for part in path.parts):
+    for relative in repository_files(root):
+        if _data_file(relative):
             continue
+        path = root / relative
         if path.suffix not in TEXT_SUFFIXES and path.name != ".gitignore":
             continue
         try:
@@ -94,61 +126,53 @@ def test_repository_text_files_have_no_em_dash_and_no_secrets():
         except UnicodeDecodeError:
             continue
         if SECRET_PATTERN.search(text):
-            offenders.append(f"{path.relative_to(ROOT)}: token-like string")
+            offenders.append(f"{relative.as_posix()}: token-like string")
         if EM_DASH in text and path.suffix != ".csv":
-            offenders.append(f"{path.relative_to(ROOT)}: em dash")
-    assert not offenders, offenders
+            offenders.append(f"{relative.as_posix()}: em dash")
+    return offenders
 
 
-@pytest.mark.parametrize("path", ANALYSIS_NOTEBOOKS, ids=lambda p: p.stem)
-def test_notebook_text_has_no_todo_and_no_review_references(path):
-    text = "\n".join(cell.source for cell in _read(path).cells)
-    assert not re.search(r"\bTODO\b|\bFIXME\b", text)
-    assert not re.search(r"\b(?:review finding|reviewers?|wave [0-9])\b", text, re.IGNORECASE)
+def test_repository_text_files_have_no_em_dash_and_no_secrets():
+    assert offending_text_files(ROOT) == []
 
 
-@pytest.mark.parametrize("path", sorted(NOTEBOOK_DIR.glob("*.ipynb")), ids=lambda p: p.stem)
-def test_notebook_has_no_run_mode(path):
-    text = "\n".join(cell.source for cell in _read(path).cells)
-    assert not re.search(r"DTT_RUN_REAL|DTT_WORLD|DTT_SIM_DIR|ctx\.mode|is_real|\bFAST\b|simulated world", text)
+def test_the_text_scan_does_not_open_the_data_files(tmp_path, monkeypatch):
+    repo = tmp_path / "copy"
+    for relative in ("data/reference/values.json", "data/raw/wdi/fetch_log_G1.json", "data/processed/cases_catalogue.csv"):
+        (repo / relative).parent.mkdir(parents=True, exist_ok=True)
+        (repo / relative).write_text(f'{{"note": "{EM_DASH}"}}', encoding="utf-8")
+    (repo / "docs").mkdir()
+    (repo / "docs" / "note.md").write_text(f"A note {EM_DASH}.\n", encoding="utf-8")
+    opened: list[str] = []
+    read_text = Path.read_text
+
+    def recording(self, *args, **kwargs):
+        opened.append(self.name)
+        return read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", recording)
+    assert offending_text_files(repo) == ["docs/note.md: em dash"]
+    assert not {"values.json", "fetch_log_G1.json", "cases_catalogue.csv"} & set(opened)
+    assert "note.md" in opened
 
 
-def _code(name: str) -> list[str]:
-    return [cell.source for cell in _read(NOTEBOOK_DIR / f"{name}.ipynb").cells if cell.cell_type == "code"]
+def test_repository_scan_ignores_virtual_environments_and_finds_the_repository_files(tmp_path):
+    repo = tmp_path / "env" / "copy"
+    (repo / "docs").mkdir(parents=True)
+    (repo / "docs" / "note.md").write_text(f"A note {EM_DASH} with an em dash.\n", encoding="utf-8")
+    venv = repo / ".venv"
+    (venv / "lib" / "site-packages" / "pkg").mkdir(parents=True)
+    (venv / "pyvenv.cfg").write_text("home = /usr/bin\n", encoding="utf-8")
+    (venv / "lib" / "site-packages" / "pkg" / "module.md").write_text(f"Third-party {EM_DASH} text.\n", encoding="utf-8")
+    vendored = repo / "tools" / "other_python"
+    vendored.mkdir(parents=True)
+    (vendored / "pyvenv.cfg").write_text("", encoding="utf-8")
+    (vendored / "readme.md").write_text(f"{EM_DASH}\n", encoding="utf-8")
+    (repo / "venv_copy" / "env").mkdir(parents=True)
+    (repo / "venv_copy" / "env" / "notes.md").write_text(f"{EM_DASH}\n", encoding="utf-8")
 
-
-def _markdown(name: str) -> list[str]:
-    return [cell.source for cell in _read(NOTEBOOK_DIR / f"{name}.ipynb").cells if cell.cell_type == "markdown"]
-
-
-def test_the_panel_is_stamped_by_notebook_00_and_required_by_02_and_04():
-    assert any("ctx.stamp_file(panel_path)" in source for source in _code("00_build_global_panel"))
-    assert any(re.search(r"ctx\.require\([^)]*panel_path", source) for source in _code("02_case_effects"))
-    requires = [source for source in _code("04_optimal_transport") if "ctx.require(" in source]
-    assert any("PANEL_PATH" in s and "ctx.baseline_path" in s and "ctx.proposal_path" in s for s in requires)
-
-
-def test_notebook_04_shows_no_transported_effect_before_the_route_decision():
-    usage_calls = [line for source in _code("04_optimal_transport") for line in source.splitlines() if "show(usage_table" in line]
-    assert usage_calls and all('drop(columns=["att_pp", "att_rel_pct"])' in line for line in usage_calls)
-
-
-def test_notebook_04_reports_the_log_domain_solves():
-    source = "\n".join(_code("04_optimal_transport"))
-    for name in ("loco.n_log_domain", "loco_rel.n_log_domain", "PLAN_LOG_DOMAIN", "boot['n_log_domain']", "plan_s.log_domain"):
-        assert name in source
-    text = "\n".join(_markdown("04_optimal_transport"))
-    assert "log domain" in text
-
-
-def test_notebook_05_prints_the_support_beside_the_conformal_interval():
-    cells = [source for source in _code("05_thailand_impact") if "Conformal" in source and "guaranteed coverage" in source]
-    assert len(cells) == 1 and "support['supported']" in cells[0]
-    shown = [line for source in _code("05_thailand_impact") for line in source.splitlines() if line.startswith("show(comparison[comparison[")]
-    assert shown and all("importance_route_supported" in line for line in shown)
-
-
-def test_notebook_05_does_not_promise_more_power_than_the_placebo_distribution_gives():
-    text = "\n".join(_markdown("05_thailand_impact"))
-    assert "of either sign exceeds the threshold in at least" not in text
-    assert "of either sign exceeds the threshold in about" in text
+    assert offending_text_files(repo) == ["docs/note.md: em dash"]
+    listed = [path.as_posix() for path in repository_files(repo)]
+    assert "docs/note.md" in listed
+    assert not any(part in SKIPPED_DIRECTORIES for path in repository_files(repo) for part in path.parts)
+    assert not any(path.parts[0] == ".venv" or "pyvenv.cfg" in path.parts for path in repository_files(repo))

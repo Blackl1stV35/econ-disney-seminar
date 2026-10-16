@@ -2,48 +2,74 @@
 
 A notebook opens with ``ctx = setup_run("02_case_effects")``.  The context holds
 the paths of the inputs and outputs, the target economy, the scenarios of the
-Thailand proposal, the thermal guard and the seeds, and it saves tables, JSON
-files and figures below the results and figures directories.
+Thailand proposal, the thermal guard and the seeds.  It saves tables, JSON
+files and figures below the results and figures directories, and it reads them
+back, checking them against the stamps described below.
 
-The context always reads the dataset of the repository: the World Bank files in
-``data/raw/wdi``, the cases catalogue and the other files in ``data/processed``.
+The run reads the raw files of the repository and needs the environment variable
+``DTT_RUN_REAL=1``.  Tables, JSON files and figures are written below the results
+and figures directories of the repository, unless the environment variables
+``DTT_RESULTS_DIR`` and ``DTT_FIGURE_DIR`` name other directories.
 
 Environment variables
 ---------------------
+DTT_RUN_REAL
+    ``1`` allows a run on the dataset; any other value does not.
 DTT_RESULTS_DIR, DTT_FIGURE_DIR
-    Override the directories that receive tables and figures; they default to
-    ``results`` and ``figures`` of the repository.
+    Override the directories that receive tables and figures.
 DTT_GUARD
-    ``1`` switches the thermal guard on and ``0`` switches it off; the default is
-    on.
+    ``1`` switches the thermal guard on and ``0`` switches it off; the default is on.
 
 Printed paths
 -------------
-Everything the context prints names a file by a label that does not depend on
-the machine: ``results/<file>`` and ``figures/<file>`` for the output
-directories and a path relative to the repository for other files of the
-repository.  No printed line holds an absolute path, so the output stored in an executed
-notebook does not reveal the folders of the computer that ran it.
+Messages name a file by its path from the repository root.  A file that lies
+outside the repository, which is the case when ``DTT_RESULTS_DIR`` or
+``DTT_FIGURE_DIR`` names another directory, is named by its path from the
+results, figures or raw-data directory, and a file outside all of them by its
+name alone.  No message holds
+an absolute path, so the stored output of an executed notebook carries no
+directory of the machine.
 
-Result stamps
--------------
-Every file written by :meth:`RunContext.save_table`, :meth:`RunContext.save_json`
-and :meth:`RunContext.save_figure` receives a stamp in the JSON file
-``file_stamps.json`` of the results directory.  The stamp holds the SHA-256
-digest of the file, the name of the stage that wrote it and the digests of the
-files that the stage had registered with :meth:`RunContext.require` when it
-wrote the file.  Files are named in the stamp file by the labels above, and the
-stamp file holds no time and no absolute path, so equal runs give equal stamp
-files wherever the directories are.
+Input stamps
+------------
+A stage that records a file writes a stamp, ``<results directory>/stamps/<stage>.json``.
+The stamp lists the files that the stage read (``inputs``) and the files that it
+wrote (``outputs``), each with the SHA-256 digest of its bytes.  An input also
+names the stage that produced the file, or ``null`` for a file that no stage
+produced, such as a raw data file.  Paths in a stamp are relative: the
+directories of the run are named ``results/``, ``figures/``, ``data/processed/``
+and ``data/raw/wdi/`` whether they lie in the repository or outside it, and every
+other path is relative to the repository root.  A stamp
+holds no absolute path and no time, so two runs that read and write the same
+bytes write the same stamp.
 
-:meth:`RunContext.require` checks every file that it is given against its stamp
-and then, through the recorded inputs, the files from which that file was
-computed.  It raises :class:`StaleResultError` when a stamped file differs from
-the digest recorded by its producer, or when a recorded input differs from the
-digest recorded when the file was computed.  A file without a stamp, for
-example a raw data file, is accepted, but its digest is still compared where
-another file recorded it as an input.  Only files that a stage registered with
-``require`` are covered.
+Before a stage reads a file that an earlier stage produced, the context checks
+the file against the stamp of its producer.  The check continues through the
+inputs that the producer recorded and through their producers, so that a change
+at the start of a chain is found by a stage at its end, and so is a stage that
+read a version of a file that its producer no longer records.  A file
+in the results directory that no stamp lists as an output has no known
+producer, and it cannot be read.  A file that no stage produced is recorded
+with its digest; a later check requires that digest, but no producer is checked.
+
+Notebooks write with ``RunContext.save_table``, ``save_json`` and
+``save_figure``, which record their outputs.  They read with ``read_table``,
+``read_json`` and ``require``, which record their inputs.  A file written in
+another way is recorded with ``RunContext.record_output``, a file read in
+another way with ``RunContext.record_input``, and the raw World Bank files of
+:mod:`dtt.panel` with ``RunContext.record_raw_inputs``.  The stamp is written
+each time a file is recorded.
+
+A failed check raises :class:`StampError`, a ``ValueError``.  Its message names
+the file, the producer stage and the two short digests (the first twelve
+hexadecimal digits), or the stamp that is missing.
+
+Public helpers are :func:`file_digest`, :func:`short_digest`, :func:`stamp_path`,
+:func:`read_stamp` and :class:`StampError`.  Methods of :class:`RunContext` are
+``record_input(*paths, producer=None)``, ``record_output(*paths)``,
+``record_raw_inputs()``, ``write_stamp()``, ``stamp_key(path)`` and
+``display_path(path)``; ``require(*names, producer=None)`` also checks the
+stamps.
 """
 
 from __future__ import annotations
@@ -55,7 +81,6 @@ import platform
 import re
 import sys
 import time
-import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
@@ -65,22 +90,32 @@ import numpy as np
 import pandas as pd
 
 __all__ = [
+    "REAL_VARIABLE",
     "SEEDS",
-    "STAMP_FILE",
+    "STAMP_DIRECTORY",
     "RunContext",
-    "StaleResultError",
+    "StampError",
     "apply_style",
-    "check_requirements",
+    "file_digest",
     "find_root",
+    "read_stamp",
+    "resolve_mode",
     "setup_run",
+    "short_digest",
+    "stamp_path",
 ]
 
+REAL_VARIABLE = "DTT_RUN_REAL"
 RESULTS_VARIABLE = "DTT_RESULTS_DIR"
 FIGURES_VARIABLE = "DTT_FIGURE_DIR"
 GUARD_VARIABLE = "DTT_GUARD"
 
-#: Name of the stamp file in the results directory.
-STAMP_FILE = "file_stamps.json"
+#: Name of the directory below the results directory that holds the stamps.
+STAMP_DIRECTORY = "stamps"
+#: Version of the layout of a stamp file.
+STAMP_FORMAT = 1
+#: Number of hexadecimal digits of a digest that messages show.
+SHORT_DIGEST_LENGTH = 12
 
 #: Named seeds of the analysis; every run context holds its own copy.
 SEEDS: Mapping[str, int] = MappingProxyType(
@@ -95,26 +130,13 @@ SEEDS: Mapping[str, int] = MappingProxyType(
     }
 )
 
-#: Packages whose minimum versions in ``requirements.txt`` are enforced by :func:`setup_run`.
-CHECKED_PACKAGES = ("numpy", "pandas", "scipy", "scikit-learn", "statsmodels", "matplotlib", "psutil")
+#: Episodes of the dataset catalogue with a known dollar cost, with and without the derived costs file.
+_KNOWN_COSTS_WITH_FILE = 28
+_KNOWN_COSTS_WITHOUT_FILE = 12
+_EPISODE_COUNT = 44
 
-#: Seconds between two calls that reach the thermal guard.
-GUARD_MIN_INTERVAL_SECONDS = 10.0
-#: Longest wait of the thermal guard for CPU load alone, in seconds.
-GUARD_CPU_WAIT_SECONDS = 300.0
-
-_STAMP_FORMAT = 1
-_DIGEST_BLOCK = 1 << 20
-_REPLACE_ATTEMPTS = 5
-_LOAD_READER_NAMES = {"_OtherProcessesLoad": "system load without this program and its child processes"}
-
-
-class StaleResultError(RuntimeError):
-    """A result file is not what its producer wrote, or was computed from files that have changed.
-
-    The message names every file concerned together with the stage that
-    produced it and lists the stages to run again.
-    """
+_STAGE_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+_RESULTS_AREA = "results"
 
 
 def _flag(env: Mapping[str, str], name: str, default: bool) -> bool:
@@ -127,171 +149,10 @@ def _flag(env: Mapping[str, str], name: str, default: bool) -> bool:
     return raw == "1"
 
 
-def _relative_to(path: Path, base: Path) -> str | None:
-    """Return the POSIX path of ``path`` relative to ``base``, ``""`` for ``base`` itself, or None if it lies elsewhere."""
-    try:
-        relative = Path(path).resolve().relative_to(Path(base).resolve())
-    except ValueError:
-        return None
-    text = relative.as_posix()
-    return "" if text == "." else text
-
-
-def _number_text(value: Any) -> str:
-    """Return a number in the shortest decimal form, or ``unknown`` for anything that is not a number."""
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        return "unknown"
-    return f"{value:g}"
-
-
-def _under_root(path: Path, root: Path) -> str:
-    """Return ``path`` relative to the repository root, or only its file name if it lies outside."""
-    relative = _relative_to(path, root)
-    return path.name if relative is None else (relative or ".")
-
-
-def _sha256_file(path: Path) -> str:
-    """Return the SHA-256 digest of the content of a file as 64 lowercase hexadecimal digits."""
-    digest = hashlib.sha256()
-    with Path(path).open("rb") as handle:
-        for block in iter(lambda: handle.read(_DIGEST_BLOCK), b""):
-            digest.update(block)
-    return digest.hexdigest()
-
-
-def _write_text(path: Path, text: str) -> None:
-    """Write UTF-8 text with line feeds as the only line ending, whatever the operating system."""
-    with Path(path).open("w", encoding="utf-8", newline="\n") as handle:
-        handle.write(text)
-
-
-def _write_text_atomic(path: Path, text: str) -> None:
-    """Write a text file in one step: the content goes to a temporary file that then replaces ``path``."""
-    temporary = path.with_name(f".{path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp")
-    try:
-        _write_text(temporary, text)
-        for attempt in range(_REPLACE_ATTEMPTS):
-            try:
-                os.replace(temporary, path)
-                return
-            except PermissionError:
-                if attempt == _REPLACE_ATTEMPTS - 1:
-                    raise
-                time.sleep(0.05 * (attempt + 1))
-    finally:
-        try:
-            temporary.unlink()
-        except OSError:
-            pass
-
-
-def _load_stamps(path: Path, label: str) -> dict[str, dict[str, Any]]:
-    """Read the stamp file.
-
-    Parameters
-    ----------
-    path : pathlib.Path
-        The stamp file; a missing file gives an empty record.
-    label : str
-        Name of the file in messages.
-
-    Returns
-    -------
-    dict
-        File label to a dict with ``sha256`` (str), ``stage`` (str) and
-        ``inputs`` (dict of file label to digest).
-
-    Raises
-    ------
-    ValueError
-        If the file cannot be read or does not have the layout that
-        :func:`_store_stamp` writes.
-    """
-    if not path.is_file():
-        return {}
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        files = data["files"]
-        if data["format"] != _STAMP_FORMAT or not isinstance(files, dict):
-            raise ValueError("unknown layout")
-        for entry in files.values():
-            inputs = entry["inputs"]
-            valid = isinstance(entry["sha256"], str) and isinstance(entry["stage"], str) and isinstance(inputs, dict)
-            if not valid or not all(isinstance(k, str) and isinstance(v, str) for k, v in inputs.items()):
-                raise ValueError("unknown layout")
-    except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
-        raise ValueError(f"the stamp file {label} cannot be used ({type(exc).__name__}); delete it to continue without stamps") from exc
-    return files
-
-
-def _store_stamp(path: Path, label: str, key: str, entry: Mapping[str, Any]) -> None:
-    """Add or replace the stamp of one file in the stamp file.
-
-    The file is written with sorted keys and without any time, so equal stamps
-    give equal bytes.
-    """
-    files = _load_stamps(path, label)
-    files[key] = dict(entry)
-    text = json.dumps({"format": _STAMP_FORMAT, "files": files}, indent=2, sort_keys=True) + "\n"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    _write_text_atomic(path, text)
-
-
-def _release(version: str) -> tuple[int, ...]:
-    """Return the leading numeric release of a version string, for example ``(2, 5, 3)`` for ``"2.5.3"``."""
-    match = re.match(r"\d+(?:\.\d+)*", version.strip())
-    return tuple(int(part) for part in match.group(0).split(".")) if match else ()
-
-
-def check_requirements(root: str | Path, packages: tuple[str, ...] = CHECKED_PACKAGES) -> None:
-    """Check that the installed packages meet the minimum versions of ``requirements.txt``.
-
-    Parameters
-    ----------
-    root : str or pathlib.Path
-        Repository root.  Nothing is checked when it holds no ``requirements.txt``.
-    packages : tuple of str, optional
-        Names of the packages to check; a package without a line of the form
-        ``name>=version`` in the file is not checked.
-
-    Raises
-    ------
-    RuntimeError
-        Naming every package that is missing or older than the file requires,
-        the Python interpreter in use and the way to select the environment of
-        the project for a notebook run.
-    """
-    path = Path(root) / "requirements.txt"
-    if not path.is_file():
-        return
-    import importlib.metadata as md
-
-    minimum: dict[str, str] = {}
-    for line in path.read_text(encoding="utf-8").splitlines():
-        match = re.match(r"\s*([A-Za-z0-9_.\-]+)\s*>=\s*(\d[0-9A-Za-z.]*)", line)
-        if match and match.group(1).lower() in packages:
-            minimum[match.group(1).lower()] = match.group(2)
-    problems = []
-    for name in packages:
-        wanted = minimum.get(name)
-        if wanted is None:
-            continue
-        try:
-            found = md.version(name)
-        except md.PackageNotFoundError:
-            problems.append(f"{name} is not installed (requirements.txt asks for {wanted} or later)")
-            continue
-        if _release(found) < _release(wanted):
-            problems.append(f"{name} {found} is older than the {wanted} that requirements.txt asks for")
-    if problems:
-        raise RuntimeError(
-            "The Python environment does not meet requirements.txt: "
-            + "; ".join(problems)
-            + f". Interpreter in use: {sys.executable}. Install the packages of requirements.txt in the environment of the project "
-            "and run the notebook with the kernel of that environment, for example "
-            "python -m ipykernel install --user --name dtt and then jupyter nbconvert --execute "
-            "--ExecutePreprocessor.kernel_name=dtt."
-        )
+def _inside(path: Path, parent: Path) -> bool:
+    """Return True if ``path`` is ``parent`` or lies below it."""
+    path, parent = path.resolve(), parent.resolve()
+    return path == parent or parent in path.parents
 
 
 def find_root(start: str | Path | None = None) -> Path:
@@ -319,6 +180,298 @@ def find_root(start: str | Path | None = None) -> Path:
     raise FileNotFoundError(f"repository root not found from {here}")
 
 
+def resolve_mode(env: Mapping[str, str] | None = None) -> str:
+    """Return the run mode, which is always ``"real"`` when the run is allowed.
+
+    Parameters
+    ----------
+    env : mapping, optional
+        Environment to read; ``os.environ`` by default.
+
+    Returns
+    -------
+    str
+        ``"real"``, returned when ``DTT_RUN_REAL`` is ``1``.
+
+    Raises
+    ------
+    RuntimeError
+        If the run is requested without ``DTT_RUN_REAL=1``.
+    """
+    env = os.environ if env is None else env
+    if str(env.get(REAL_VARIABLE, "")).strip() == "1":
+        return "real"
+    raise RuntimeError(f"Set {REAL_VARIABLE}=1 to run the notebooks on the dataset.")
+
+
+# ----------------------------------------------------------------------------
+# Input stamps
+# ----------------------------------------------------------------------------
+def file_digest(path: str | Path) -> str:
+    """Return the SHA-256 digest of a file as 64 hexadecimal digits.
+
+    Parameters
+    ----------
+    path : str or pathlib.Path
+        File to read; it is read in blocks of one mebibyte.
+
+    Returns
+    -------
+    str
+        Lower-case hexadecimal digest of the bytes of the file.
+    """
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def short_digest(digest: str | None) -> str:
+    """Return the first twelve hexadecimal digits of a digest, or ``"none"`` when there is none."""
+    return "none" if not digest else str(digest)[:SHORT_DIGEST_LENGTH]
+
+
+def stamp_path(results_dir: str | Path, stage: str) -> Path:
+    """Return the path of the stamp file of a stage: ``<results_dir>/stamps/<stage>.json``."""
+    return Path(results_dir) / STAMP_DIRECTORY / f"{stage}.json"
+
+
+def _parse_stamp(file: Path) -> dict[str, Any] | None:
+    """Read a stamp file; return None if it cannot be read or does not have the layout of a stamp."""
+    try:
+        stamp = json.loads(file.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(stamp, dict) or stamp.get("format") != STAMP_FORMAT or stamp.get("stage") != file.stem:
+        return None
+    for table in ("inputs", "outputs"):
+        records = stamp.get(table)
+        if not isinstance(records, dict):
+            return None
+        for record in records.values():
+            if not isinstance(record, dict) or not isinstance(record.get("sha256"), str):
+                return None
+    return stamp
+
+
+def read_stamp(results_dir: str | Path, stage: str) -> dict[str, Any] | None:
+    """Read the stamp of a stage.
+
+    Parameters
+    ----------
+    results_dir : str or pathlib.Path
+        Results directory of the run.
+    stage : str
+        Name of the stage.
+
+    Returns
+    -------
+    dict or None
+        The stamp with the keys ``format``, ``stage``, ``inputs`` and
+        ``outputs``, or None when the stage has no stamp file.
+
+    Raises
+    ------
+    ValueError
+        If the stamp file exists but does not have the layout of a stamp.
+    """
+    file = stamp_path(results_dir, stage)
+    if not file.is_file():
+        return None
+    stamp = _parse_stamp(file)
+    if stamp is None:
+        raise ValueError(f"{STAMP_DIRECTORY}/{file.name} is not a valid stamp file")
+    return stamp
+
+
+def _stamp_message(
+    kind: str, path: str, stage: str | None, consumer: str | None, expected: str | None, found: str | None
+) -> str:
+    """Return the text of a :class:`StampError`; see that class for the meaning of the fields."""
+    if kind == "changed":
+        return (
+            f"{path} was changed after the stage {stage} wrote it: the stamp of {stage} records digest "
+            f"{short_digest(expected)}, but the file has digest {short_digest(found)}. Run {stage} again."
+        )
+    if kind == "stale":
+        return (
+            f"The stage {consumer} read {path} with digest {short_digest(found)}, but the stage {stage}, which "
+            f"produced it, records digest {short_digest(expected)}. Run {consumer} again."
+        )
+    if kind == "input_changed":
+        return (
+            f"{path} was changed after the stage {consumer} read it: the stamp of {consumer} records digest "
+            f"{short_digest(expected)}, but the file has digest {short_digest(found)}. Run {consumer} again."
+        )
+    if kind == "missing_stamp":
+        return (
+            f"The stamp {STAMP_DIRECTORY}/{stage}.json of the stage {stage}, which produced {path}, is missing or "
+            f"unreadable, so the file cannot be checked (file digest {short_digest(found)}). Run {stage} again."
+        )
+    if kind == "unlisted":
+        return (
+            f"The stamp of the stage {stage} does not list {path} as an output (file digest {short_digest(found)}). "
+            f"Run {stage} again."
+        )
+    if kind == "unknown_producer":
+        return (
+            f"{path} lies in the results directory, but no stamp in {STAMP_DIRECTORY}/ lists it as an output "
+            f"(file digest {short_digest(found)}). Run the stage that writes it again."
+        )
+    if kind == "missing_file":
+        return f"{path} is listed in the stamp of the stage {stage or consumer} but does not exist. Run that stage again."
+    raise ValueError(f"unknown stamp error kind {kind!r}")
+
+
+class StampError(ValueError):
+    """A file does not match the stamp of the stage that produced it, or that stamp is missing.
+
+    Attributes
+    ----------
+    kind : str
+        ``"changed"``: the file differs from the digest its producer recorded.
+        ``"stale"``: a stage read a version of the file that its producer no
+        longer records.  ``"input_changed"``: a file that no stage produced
+        differs from the digest a stage recorded when it read it.
+        ``"missing_stamp"``: the stamp of the producer named for the file is
+        missing or unreadable.  ``"unlisted"``: the stamp of the named producer
+        does not list the file as an output.  ``"unknown_producer"``: the file
+        lies in the results directory and no stamp lists it.  ``"missing_file"``:
+        a file that a stamp lists does not exist.
+    path : str
+        Relative path of the file, as written in the stamps.
+    stage : str or None
+        The producer stage, when one is known.
+    consumer : str or None
+        The stage that read the file.
+    expected, found : str or None
+        Full digests.  For ``"changed"`` and ``"input_changed"``, the digest in
+        the stamp and the digest of the file.  For ``"stale"``, the digest that
+        the producer records and the digest that the consumer read.  For the
+        other kinds, the digest the consumer recorded, if any, and the digest of
+        the file, if it exists.
+    """
+
+    def __init__(
+        self,
+        kind: str,
+        path: str,
+        stage: str | None = None,
+        consumer: str | None = None,
+        expected: str | None = None,
+        found: str | None = None,
+    ) -> None:
+        super().__init__(_stamp_message(kind, path, stage, consumer, expected, found))
+        self.kind = kind
+        self.path = path
+        self.stage = stage
+        self.consumer = consumer
+        self.expected = expected
+        self.found = found
+
+
+class _StampChecker:
+    """Check files against the stamps of the stages that produced them.
+
+    A checker reads the stamps of a results directory once, except the stamp of
+    the running stage, and hashes every file at most once, so it serves one
+    round of checks.
+    """
+
+    def __init__(self, stamp_dir: Path, locate: Callable[[str], Path], exclude: str) -> None:
+        self._locate = locate
+        self._stamps: dict[str, dict[str, Any]] = {}
+        self._digests: dict[str, str | None] = {}
+        self._done: set[str] = set()
+        if stamp_dir.is_dir():
+            for file in sorted(stamp_dir.glob("*.json")):
+                if file.stem == exclude:
+                    continue
+                stamp = _parse_stamp(file)
+                if stamp is not None:
+                    self._stamps[file.stem] = stamp
+
+    def digest(self, key: str) -> str | None:
+        """Return the digest of the file with this stamp path, or None if the file does not exist."""
+        if key not in self._digests:
+            path = self._locate(key)
+            self._digests[key] = file_digest(path) if path.is_file() else None
+        return self._digests[key]
+
+    def verify(
+        self,
+        key: str,
+        *,
+        recorded: str | None = None,
+        hint: str | None = None,
+        declared: str | None = None,
+        consumer: str | None = None,
+    ) -> str | None:
+        """Check one file and, through the inputs of its producer, the chain behind it.
+
+        Parameters
+        ----------
+        key : str
+            Stamp path of the file.
+        recorded : str, optional
+            Digest that the consumer recorded when it read the file.
+        hint : str, optional
+            Producer that an earlier stamp recorded for the file.
+        declared : str, optional
+            Producer that the caller requires; it takes precedence over ``hint``.
+        consumer : str, optional
+            Stage that reads the file, for the messages.
+
+        Returns
+        -------
+        str or None
+            The producer stage, or None for a file that no stage produced.
+
+        Raises
+        ------
+        StampError
+            If the file or a file behind it does not match the stamps.
+        """
+        found = self.digest(key)
+        named = declared or hint
+        if found is None:
+            raise StampError("missing_file", key, stage=named, consumer=consumer, expected=recorded)
+        owners = [
+            (stage, self._stamps[stage]["outputs"][key]["sha256"])
+            for stage in sorted(self._stamps)
+            if key in self._stamps[stage]["outputs"]
+        ]
+        if named is not None:
+            if named not in self._stamps:
+                raise StampError("missing_stamp", key, stage=named, consumer=consumer, expected=recorded, found=found)
+            owners = [owner for owner in owners if owner[0] == named]
+            if not owners:
+                raise StampError("unlisted", key, stage=named, consumer=consumer, expected=recorded, found=found)
+        if not owners:
+            if key.startswith(_RESULTS_AREA + "/"):
+                raise StampError("unknown_producer", key, consumer=consumer, expected=recorded, found=found)
+            if recorded is not None and recorded != found:
+                raise StampError("input_changed", key, consumer=consumer, expected=recorded, found=found)
+            return None
+        matching = [owner for owner in owners if owner[1] == found]
+        stage, expected = (matching or owners)[0]
+        if found != expected:
+            raise StampError("changed", key, stage=stage, consumer=consumer, expected=expected, found=found)
+        if recorded is not None and recorded != expected:
+            raise StampError("stale", key, stage=stage, consumer=consumer, expected=expected, found=recorded)
+        self._verify_inputs_of(stage)
+        return stage
+
+    def _verify_inputs_of(self, stage: str) -> None:
+        """Check every input recorded in the stamp of ``stage``, once per checker."""
+        if stage in self._done:
+            return
+        self._done.add(stage)
+        for key, record in sorted(self._stamps[stage]["inputs"].items()):
+            self.verify(key, recorded=record["sha256"], hint=record.get("producer"), consumer=stage)
+
+
 class _ThrottledGuard:
     """Call a guard at most once per ``min_interval`` seconds."""
 
@@ -332,44 +485,15 @@ class _ThrottledGuard:
 
     def __call__(self) -> None:
         self.calls += 1
-        now = self._clock()
-        if self._last is not None and now - self._last < self._min_interval:
+        started = self._clock()
+        if self._last is not None and started - self._last < self._min_interval:
             return
         self._guard()
         self.passed += 1
         self._last = self._clock()
 
 
-def _build_guard(results_dir: Path) -> tuple[Any, _ThrottledGuard]:
-    """Create the thermal guard of a run and the throttled callable that the notebooks use.
-
-    Parameters
-    ----------
-    results_dir : pathlib.Path
-        Directory that receives ``thermal_log.csv``.
-
-    Returns
-    -------
-    guard : dtt.thermal.ThermalGuard
-        The guard.  It reads the temperature through the probes of
-        :mod:`dtt.thermal`, reads the load of the machine without this program
-        and its child processes, waits for CPU load for at most
-        ``GUARD_CPU_WAIT_SECONDS`` and prints a line at the start and at the end
-        of every wait.
-    throttled : callable
-        Calls the guard at most once per ``GUARD_MIN_INTERVAL_SECONDS``.
-    """
-    from dtt.thermal import ThermalGuard
-
-    guard = ThermalGuard(
-        log_path=results_dir / "thermal_log.csv",
-        max_cpu_wait_seconds=GUARD_CPU_WAIT_SECONDS,
-        verbose=True,
-    )
-    return guard, _ThrottledGuard(guard, min_interval=GUARD_MIN_INTERVAL_SECONDS)
-
-
-@dataclass(repr=False)
+@dataclass
 class RunContext:
     """Paths, settings and helpers of one notebook run.
 
@@ -377,6 +501,8 @@ class RunContext:
     ----------
     stage : str
         Name of the notebook.
+    mode : str
+        Always ``"real"``, the mode of the run on the dataset.
     root : pathlib.Path
         Repository root.
     raw_dir : pathlib.Path
@@ -401,16 +527,14 @@ class RunContext:
     seeds : dict of str to int
         Named seeds.
     figure_log : list of dict
-        One row per figure saved by this context, the content of the figure
-        inventory; saving a figure again replaces its row.
-    guard_object : dtt.thermal.ThermalGuard or None
-        The guard behind ``guard``; None when the guard is off.
-    inputs_registered : dict of str to str
-        Label and SHA-256 digest of every file passed to :meth:`require`; these
-        are the inputs recorded in the stamp of each file written afterwards.
+        One row per figure saved by this run; saving a figure again under the same
+        name replaces its row.
+    guard_object : object or None
+        The thermal guard that ``guard`` calls.
     """
 
     stage: str
+    mode: str
     root: Path
     raw_dir: Path
     catalogue_path: Path
@@ -427,11 +551,13 @@ class RunContext:
     seeds: dict[str, int] = field(default_factory=lambda: dict(SEEDS))
     figure_log: list[dict[str, Any]] = field(default_factory=list)
     guard_object: Any = None
-    inputs_registered: dict[str, str] = field(default_factory=dict, repr=False, compare=False)
+    _inputs: dict[str, dict[str, Any]] = field(default_factory=dict, init=False, repr=False, compare=False)
+    _outputs: dict[str, str] = field(default_factory=dict, init=False, repr=False, compare=False)
 
-    def __repr__(self) -> str:
-        """Return the stage; the paths of the context are left out because they are absolute."""
-        return f"RunContext(stage={self.stage!r})"
+    @property
+    def is_real(self) -> bool:
+        """True for a run on the dataset."""
+        return self.mode == "real"
 
     def primary_scenario(self) -> dict[str, Any]:
         """Return the proposal scenario that is flagged as primary."""
@@ -441,274 +567,320 @@ class RunContext:
         return dict(self.proposal["scenarios"][0])
 
     # ------------------------------------------------------------------
-    # Labels of files
+    # Paths
     # ------------------------------------------------------------------
-    def _label_bases(self) -> list[tuple[str | None, Path]]:
-        """Directories that give files their labels, in the order in which they are tried."""
-        return [("results", self.results_dir), ("figures", self.figures_dir), (None, self.root)]
-
-    def _label(self, path: str | Path) -> str | None:
-        """Return the machine-independent label of a file, or None if it lies in none of the known directories."""
-        for prefix, base in self._label_bases():
-            relative = _relative_to(Path(path), base)
-            if relative is None:
-                continue
-            if prefix is None:
-                return relative or "."
-            return f"{prefix}/{relative}" if relative else prefix
-        return None
-
-    def _display(self, path: str | Path) -> str:
-        """Return the text that names a file in printed lines: its label, or its file name if it has none."""
-        label = self._label(path)
-        return Path(path).name if label is None else label
-
-    def _path_of(self, label: str) -> Path:
-        """Return the path that a label stands for."""
-        head, _, rest = label.partition("/")
-        if head == "results":
-            base = self.results_dir
-        elif head == "figures":
-            base = self.figures_dir
-        else:
-            return self.root / label
-        return base / rest if rest else base
-
-    # ------------------------------------------------------------------
-    # Stamps
-    # ------------------------------------------------------------------
-    def _stamp_path(self) -> Path:
-        """Return the path of the stamp file."""
-        return self.results_dir / STAMP_FILE
-
-    def _check_stamp_file(self) -> None:
-        """Raise ``ValueError`` if the stamp file exists and cannot be used, before a file is written."""
-        _load_stamps(self._stamp_path(), self._display(self._stamp_path()))
-
-    def _stamp(self, path: Path) -> None:
-        """Record the stamp of a file that this stage has just written."""
-        label = self._label(path)
-        if label is None:
-            return
-        entry = {
-            "sha256": _sha256_file(path),
-            "stage": self.stage,
-            "inputs": dict(sorted(self.inputs_registered.items())),
-        }
-        stamp_path = self._stamp_path()
-        _store_stamp(stamp_path, self._display(stamp_path), label, entry)
-
-    def stamp_file(self, path: str | Path) -> Path:
-        """Stamp a file that the stage wrote without :meth:`save_table`, :meth:`save_json` or :meth:`save_figure`.
+    def display_path(self, path: str | Path) -> str:
+        """Return the path as the messages of the run print it.
 
         Parameters
         ----------
         path : str or pathlib.Path
-            An existing file below the results or figures directory or below the
-            repository.
+            Any path.
 
         Returns
         -------
-        pathlib.Path
-            The path of the file.
+        str
+            The path from the repository root when the file lies in the
+            repository; otherwise the path from the results, figures or raw-data
+            directory of the run, whichever contains it first in that order; and
+            the file name alone when no directory of the run contains it.  The
+            separator is always ``/``.
+        """
+        resolved = Path(path).resolve()
+        for base in (self.root, self.results_dir, self.figures_dir, self.raw_dir):
+            if _inside(resolved, base):
+                return resolved.relative_to(base.resolve()).as_posix()
+        return resolved.name
+
+    def _where(self, path: Path, outside: str) -> str:
+        """Return a location for ``describe``: the repository-relative path, or ``outside`` for other locations."""
+        resolved = Path(path).resolve()
+        if _inside(resolved, self.root):
+            return resolved.relative_to(self.root.resolve()).as_posix() or "."
+        return outside
+
+    def _areas(self) -> list[tuple[str, Path]]:
+        """Directories of the run with the prefix that names them in a stamp."""
+        return [
+            (_RESULTS_AREA, self.results_dir),
+            ("figures", self.figures_dir),
+            ("data/processed", self.processed_dir),
+            ("data/raw/wdi", self.raw_dir),
+        ]
+
+    def stamp_key(self, path: str | Path) -> str:
+        """Return the relative path under which a stamp names a file.
+
+        Parameters
+        ----------
+        path : str or pathlib.Path
+            File of the run.
+
+        Returns
+        -------
+        str
+            ``results/...``, ``figures/...``, ``data/processed/...`` or
+            ``data/raw/wdi/...`` for a file below the corresponding directory of
+            the run (the innermost directory wins), and otherwise the path from the
+            repository root.  The separator is always ``/``.
 
         Raises
         ------
-        FileNotFoundError
-            If the file does not exist.
         ValueError
-            If the file lies outside the directories above.
+            If the file lies outside the repository and the directories of the
+            run, or lies in the repository at a place that the name of one of the
+            directories of the run would also describe.
         """
-        path = Path(path)
-        if not path.is_file():
-            raise FileNotFoundError(f"{self._display(path)} not found")
-        if self._label(path) is None:
-            raise ValueError(f"{path.name} lies outside the results, figures and repository directories and cannot be stamped")
-        self._stamp(path)
-        return path
+        resolved = Path(path).resolve()
+        best: tuple[str, Path] | None = None
+        for prefix, base in self._areas():
+            base = base.resolve()
+            if _inside(resolved, base) and (best is None or len(base.parts) > len(best[1].parts)):
+                best = (prefix, base)
+        if best is not None:
+            return f"{best[0]}/{resolved.relative_to(best[1]).as_posix()}"
+        if _inside(resolved, self.root):
+            key = resolved.relative_to(self.root.resolve()).as_posix()
+            if any(key.startswith(prefix + "/") for prefix, _ in self._areas()):
+                raise ValueError(
+                    f"{key} cannot be told apart from a file in the {key.split('/')[0]} directory of this run, "
+                    "which lies elsewhere"
+                )
+            return key
+        raise ValueError(f"{resolved.name} lies outside the repository and the directories of this run")
 
-    def _digest_of(self, label: str, cache: dict[str, str | None]) -> str | None:
-        """Return the digest of the file with this label now, or None if it does not exist."""
-        if label not in cache:
-            path = self._path_of(label)
-            cache[label] = _sha256_file(path) if path.is_file() else None
-        return cache[label]
+    def _locate(self, key: str) -> Path:
+        """Return the path of the file that a stamp names ``key``."""
+        for prefix, base in sorted(self._areas(), key=lambda area: -len(area[0])):
+            if key.startswith(prefix + "/"):
+                return base / key[len(prefix) + 1 :]
+        return self.root / key
 
-    def _verify(
-        self,
-        label: str,
-        stamps: Mapping[str, Mapping[str, Any]],
-        digests: dict[str, str | None],
-        done: set[str],
-        problems: list[tuple[str, str]],
-    ) -> None:
-        """Check one file against its stamp and, through the recorded inputs, the files it was computed from.
-
-        Each problem found is appended to ``problems`` as a message and the
-        name of the stage that has to run again: the producer of a file that
-        was changed or removed, and the producer of a file that was computed
-        from an input that has changed since.  A file is checked once.
-        """
-        if label in done:
-            return
-        done.add(label)
-        entry = stamps.get(label)
-        if entry is None:
-            return
-        stage = entry["stage"]
-        current = self._digest_of(label, digests)
-        if current is None:
-            problems.append((f"{label} was written by stage {stage} and no longer exists", stage))
-        elif current != entry["sha256"]:
-            problems.append((f"{label} was written by stage {stage} and its content has changed since", stage))
-        for input_label, recorded in entry["inputs"].items():
-            self._verify(input_label, stamps, digests, done, problems)
-            now = self._digest_of(input_label, digests)
-            if now == recorded:
-                continue
-            source = stamps.get(input_label)
-            if source is not None and (now is None or now != source["sha256"]):
-                continue
-            head = f"{label} (stage {stage}) was computed from"
-            if now is None:
-                problems.append((f"{head} {input_label}, which no longer exists", stage))
-            elif source is None:
-                problems.append((f"{head} {input_label}, which has changed since", stage))
-            else:
-                problems.append((f"{head} an earlier version of {input_label}, which stage {source['stage']} has written again since", stage))
-
-    # ------------------------------------------------------------------
-    # Tables, JSON files and figures
-    # ------------------------------------------------------------------
     def table_path(self, name: str) -> Path:
         """Return the path of a table below the results directory."""
         return self.results_dir / (name if Path(name).suffix else f"{name}.csv")
 
-    def _json_path(self, name: str) -> Path:
-        """Return the path of a JSON file below the results directory."""
-        return self.results_dir / (name if Path(name).suffix else f"{name}.json")
+    # ------------------------------------------------------------------
+    # Stamps
+    # ------------------------------------------------------------------
+    def _checker(self) -> _StampChecker:
+        """Return a checker of the stamps of the other stages of this run."""
+        return _StampChecker(self.results_dir / STAMP_DIRECTORY, self._locate, exclude=self.stage)
 
-    def save_table(self, df: pd.DataFrame, name: str, index: bool = False) -> Path:
-        """Write a table to the results directory, stamp it and return its path.
+    def record_input(self, *paths: str | Path | None, producer: str | None = None) -> list[str]:
+        """Check files against their producers' stamps and record them as inputs of this stage.
 
-        The file is a CSV file with line feeds as line endings.  The returned
-        path is absolute; the printed line names the file by its label.
+        Parameters
+        ----------
+        *paths : str, pathlib.Path or None
+            Files that the stage reads.  None is skipped, and so is a file that
+            this stage has already written in this run.
+        producer : str, optional
+            Stage that must have written the files.
+
+        Returns
+        -------
+        list of str
+            The stamp paths of the files that were recorded.
+
+        Raises
+        ------
+        FileNotFoundError
+            If a file does not exist.
+        StampError
+            If a file does not match the stamp of its producer, directly or
+            through the inputs the producer recorded, or the stamp of the producer
+            is missing.  Nothing is recorded for the files after the failing one.
+        ValueError
+            If a file lies outside the repository and the directories of the run.
         """
-        self._check_stamp_file()
-        path = self.table_path(name)
+        checker: _StampChecker | None = None
+        recorded: list[str] = []
+        for item in paths:
+            if item is None:
+                continue
+            path = Path(item)
+            key = self.stamp_key(path)
+            if key in self._outputs:
+                continue
+            if not path.is_file():
+                raise FileNotFoundError(f"{self.display_path(path)} not found")
+            checker = checker or self._checker()
+            origin = checker.verify(key, declared=producer, consumer=self.stage)
+            self._inputs[key] = {"producer": origin, "sha256": checker.digest(key)}
+            recorded.append(key)
+        if recorded:
+            self.write_stamp()
+        return recorded
+
+    def record_output(self, *paths: str | Path) -> list[str]:
+        """Record files that this stage wrote and write the stamp.
+
+        Parameters
+        ----------
+        *paths : str or pathlib.Path
+            Files that the stage has written; their digests are computed when the call is made.  A
+            file that the stage had read is recorded as an output only.
+
+        Returns
+        -------
+        list of str
+            The stamp paths of the files.
+
+        Raises
+        ------
+        FileNotFoundError
+            If a file does not exist.
+        ValueError
+            If a file lies outside the repository and the directories of the run.
+        """
+        keys = []
+        for item in paths:
+            path = Path(item)
+            key = self.stamp_key(path)
+            if not path.is_file():
+                raise FileNotFoundError(f"{self.display_path(path)} not found")
+            self._inputs.pop(key, None)
+            self._outputs[key] = file_digest(path)
+            keys.append(key)
+        if keys:
+            self.write_stamp()
+        return keys
+
+    def record_raw_inputs(self) -> list[str]:
+        """Record the twenty indicator files and the metadata file that :mod:`dtt.panel` reads.
+
+        Returns
+        -------
+        list of str
+            The stamp paths of the files that were recorded.
+        """
+        from dtt import panel as panel_mod
+
+        names = [panel_mod.wdi_filename(group, code) for group in panel_mod.GROUPS for code in panel_mod.INDICATORS]
+        return self.record_input(*(self.raw_dir / name for name in [*names, "country_metadata.csv"]))
+
+    def write_stamp(self) -> Path:
+        """Write the stamp of this stage and return its path.
+
+        The stamp lists the inputs and outputs recorded in this run.  It is
+        written to a temporary file that then replaces the old stamp, so that a
+        stamp is never half written.
+
+        Raises
+        ------
+        ValueError
+            If a recorded path is absolute or leaves the directory of the run.
+        """
+        inputs = {key: dict(record) for key, record in sorted(self._inputs.items())}
+        outputs = {key: {"sha256": digest} for key, digest in sorted(self._outputs.items())}
+        for key in (*inputs, *outputs):
+            if key.startswith("/") or ".." in key.split("/") or re.match(r"^[A-Za-z]:", key):
+                raise ValueError(f"a stamp holds relative paths only, not {key!r}")
+        payload = {"format": STAMP_FORMAT, "stage": self.stage, "inputs": inputs, "outputs": outputs}
+        path = stamp_path(self.results_dir, self.stage)
         path.parent.mkdir(parents=True, exist_ok=True)
-        df.to_csv(path, index=index, lineterminator="\n")
-        self._stamp(path)
-        print(f"Table saved: {self._display(path)}")
+        temporary = path.with_name(path.name + ".tmp")
+        temporary.write_bytes((json.dumps(payload, indent=2, sort_keys=True) + "\n").encode("utf-8"))
+        os.replace(temporary, path)
+        return path
+
+    # ------------------------------------------------------------------
+    # Tables, JSON files and figures
+    # ------------------------------------------------------------------
+    def save_table(self, df: pd.DataFrame, name: str, index: bool = False) -> Path:
+        """Write a table to the results directory, record it in the stamp and return its path."""
+        path = self.table_path(name)
+        self.stamp_key(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        df.to_csv(path, index=index)
+        self.record_output(path)
+        print(f"Table saved: {self.display_path(path)}")
         return path
 
     def read_table(self, name: str, **kwargs: Any) -> pd.DataFrame:
-        """Read a table from the results directory.
+        """Read a table from the results directory after checking it against its producer's stamp.
+
+        Floating-point numbers are read with ``float_precision="round_trip"``, so
+        that a table written by one notebook is read back bit for bit; the
+        keyword arguments can override it.
 
         Parameters
         ----------
         name : str
-            Table name, with ``.csv`` added when it has no suffix.
+            Table name; ``.csv`` is added when the name has no extension.
         **kwargs
-            Passed to :func:`pandas.read_csv`.  Unless the caller sets
-            ``float_precision``, or selects an engine other than the C engine,
-            numbers are parsed with ``float_precision="round_trip"``, which
-            returns exactly the floating point numbers that were written.
+            Passed to :func:`pandas.read_csv`.
 
         Raises
         ------
         FileNotFoundError
             If the table has not been written by an earlier notebook.
+        StampError
+            If the table, or a file behind it, does not match the stamps.
         """
         path = self.table_path(name)
         if not path.is_file():
-            raise FileNotFoundError(f"{self._display(path)} not found; run the notebook that writes it first")
-        if kwargs.get("engine") in (None, "c"):
-            kwargs.setdefault("float_precision", "round_trip")
+            raise FileNotFoundError(f"{self.display_path(path)} not found; run the notebook that writes it first")
+        self.record_input(path)
+        if "float_precision" not in kwargs and kwargs.get("engine") in (None, "c"):
+            kwargs["float_precision"] = "round_trip"
         return pd.read_csv(path, **kwargs)
 
-    def require(self, *names: str | Path) -> None:
-        """Check that earlier notebooks have written the named files and that they are unchanged.
-
-        Each file must exist.  A file with a stamp must have the digest that its
-        producer recorded, and every input that the stamp records must have the
-        digest that it had when the file was computed; the check continues
-        through the stamps of those inputs.  A file without a stamp is accepted.
-        The digests of the files are registered as the inputs of every file that
-        this stage writes afterwards.
+    def require(self, *names: str, producer: str | None = None) -> None:
+        """Check that earlier notebooks have written the named tables and that their stamps match.
 
         Parameters
         ----------
-        *names : str or pathlib.Path
-            Names of files below the results directory, written as for
-            :meth:`table_path` (``.csv`` is added when there is no suffix), or
-            paths of files elsewhere, for example in the processed data
-            directory.
+        *names : str
+            Table or JSON file names in the results directory.
+        producer : str, optional
+            Stage that must have written the files.
 
         Raises
         ------
         FileNotFoundError
             Naming every missing file.
-        StaleResultError
-            Naming every file that was changed after its producer wrote it or
-            that was computed from a file that has changed since, with the stage
-            of each, and the stages to run again.
-        ValueError
-            If the stamp file cannot be read.
+        StampError
+            If a file does not match the stamp of its producer (see
+            :meth:`record_input`).
         """
         paths = [self.table_path(n) for n in names]
-        missing = [self._display(p) for p in paths if not p.is_file()]
+        missing = [self.display_path(p) for p in paths if not p.is_file()]
         if missing:
             raise FileNotFoundError("missing results of earlier notebooks: " + ", ".join(missing))
-        stamps = _load_stamps(self._stamp_path(), self._display(self._stamp_path()))
-        labels = [label for label in (self._label(p) for p in paths) if label is not None]
-        digests: dict[str, str | None] = {}
-        done: set[str] = set()
-        problems: list[tuple[str, str]] = []
-        for label in labels:
-            self._verify(label, stamps, digests, done, problems)
-        if problems:
-            messages = list(dict.fromkeys(m for m, _ in problems))
-            stages = sorted({s for _, s in problems})
-            raise StaleResultError(
-                "results of earlier notebooks are not what their producers wrote or are out of date:\n"
-                + "\n".join(f"  - {m}" for m in messages)
-                + "\nRun the notebooks again, in order, starting with the first of these: "
-                + ", ".join(stages)
-                + "."
-            )
-        for label in labels:
-            self.inputs_registered[label] = str(self._digest_of(label, digests))
+        self.record_input(*paths, producer=producer)
 
     def save_json(self, obj: Any, name: str) -> Path:
-        """Write a JSON file with line feeds as line endings to the results directory, stamp it and return its path."""
-        self._check_stamp_file()
-        path = self._json_path(name)
+        """Write a JSON file to the results directory, record it in the stamp and return its path."""
+        path = self.results_dir / (name if Path(name).suffix else f"{name}.json")
+        self.stamp_key(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        _write_text(path, json.dumps(_clean_for_json(obj), indent=2, sort_keys=True, allow_nan=False))
-        self._stamp(path)
-        print(f"JSON saved: {self._display(path)}")
+        path.write_text(json.dumps(_clean_for_json(obj), indent=2, sort_keys=True, allow_nan=False), encoding="utf-8")
+        self.record_output(path)
+        print(f"JSON saved: {self.display_path(path)}")
         return path
 
     def read_json(self, name: str) -> Any:
-        """Read a JSON file from the results directory."""
-        path = self._json_path(name)
+        """Read a JSON file from the results directory after checking it against its producer's stamp."""
+        path = self.results_dir / (name if Path(name).suffix else f"{name}.json")
         if not path.is_file():
-            raise FileNotFoundError(f"{self._display(path)} not found; run the notebook that writes it first")
+            raise FileNotFoundError(f"{self.display_path(path)} not found; run the notebook that writes it first")
+        self.record_input(path)
         return json.loads(path.read_text(encoding="utf-8"))
 
     def save_figure(self, fig: Any, name: str, show: bool = True) -> Path:
-        """Save a matplotlib figure to the figures directory and stamp it.
+        """Save a matplotlib figure to the figures directory.
 
         The figure inventory of the stage (panels, axis labels, legend entries)
         is rewritten to ``figure_inventory_<stage>.csv`` in the results
-        directory.  It holds one row per figure file: saving a figure under a
-        name that is already in the inventory replaces its row.
+        directory.  Saving a figure under a name that the inventory already holds
+        replaces its row, so that running a cell again leaves one row per figure.
         """
         import matplotlib.pyplot as plt
 
-        self._check_stamp_file()
         path = self.figures_dir / name
+        self.stamp_key(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         axes = [a for a in fig.axes if a.get_visible()]
         row = {
@@ -719,109 +891,28 @@ class RunContext:
             "legend entries": sum(len(a.get_legend().get_texts()) for a in axes if a.get_legend() is not None)
             + sum(len(legend.get_texts()) for legend in fig.legends),
         }
-        for position, previous in enumerate(self.figure_log):
-            if previous["file"] == name:
+        for position, existing in enumerate(self.figure_log):
+            if existing["file"] == name:
                 self.figure_log[position] = row
                 break
         else:
             self.figure_log.append(row)
         fig.savefig(path, dpi=160, bbox_inches="tight", facecolor="white")
-        self._stamp(path)
         if show:
             plt.show()
         plt.close(fig)
         inventory = self.results_dir / f"figure_inventory_{self.stage}.csv"
         inventory.parent.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame(self.figure_log).to_csv(inventory, index=False, lineterminator="\n")
-        self._stamp(inventory)
-        print(f"Figure saved: {self._display(path)}")
+        pd.DataFrame(self.figure_log).to_csv(inventory, index=False)
+        self.record_output(path, inventory)
+        print(f"Figure saved: {self.display_path(path)}")
         return path
 
-    # ------------------------------------------------------------------
-    # Report of the run
-    # ------------------------------------------------------------------
-    def guard_summary(self, show: bool = False) -> dict[str, Any]:
-        """Return the totals of the thermal guard over the run so far.
-
-        Parameters
-        ----------
-        show : bool, default False
-            Print one line with the totals.
-
-        Returns
-        -------
-        dict
-            ``active`` (whether a guard exists), ``calls`` (calls of ``ctx.guard``)
-            and ``passed`` (calls that reached the thermal guard), and the
-            totals of :meth:`dtt.thermal.ThermalGuard.summary`: ``checks``,
-            ``waits``, ``waited_seconds``, ``cpu_timeouts`` (waits for CPU load
-            that ended at the longest allowed time), ``max_temperature_c`` and
-            ``temperature_source``.  Without a guard the counts are zero and
-            the temperature entries are None.
-        """
-        summary: dict[str, Any] = {
-            "active": self.guard_object is not None,
-            "calls": 0,
-            "passed": 0,
-            "checks": 0,
-            "waits": 0,
-            "waited_seconds": 0.0,
-            "cpu_timeouts": 0,
-            "max_temperature_c": None,
-            "temperature_source": None,
-        }
-        if self.guard_object is not None:
-            summary.update(self.guard_object.summary())
-        if isinstance(self.guard, _ThrottledGuard):
-            summary["calls"] = self.guard.calls
-            summary["passed"] = self.guard.passed
-        if show:
-            if not summary["active"]:
-                print("Thermal guard: off.")
-            else:
-                peak = summary["max_temperature_c"]
-                peak_text = "not read" if peak is None else f"{peak:.1f} C ({summary['temperature_source']})"
-                print(
-                    f"Thermal guard: {summary['checks']} checks, {summary['waits']} waits "
-                    f"({summary['waited_seconds']:.1f} seconds waited), {summary['cpu_timeouts']} CPU timeouts, "
-                    f"highest temperature {peak_text}."
-                )
-        return summary
-
-    def _thermal_line(self, readings: Mapping[str, Any] | None) -> str:
-        """Return the line that tells whether a temperature reading exists and which load reader the guard uses."""
-        if readings is None:
-            reading = "not checked"
-            available: bool | None = None
-        elif readings.get("temperature_c") is None:
-            reading = "not available on this machine"
-            available = False
-        else:
-            reading = "available"
-            available = True
-        guard = self.guard_object
-        if guard is None:
-            return f"Thermal guard: off; temperature reading: {reading}; load reader: none."
-        reader = getattr(guard, "_read_cpu", None)
-        kind = type(reader).__name__
-        name = _LOAD_READER_NAMES.get(kind) or f"custom function {getattr(reader, '__name__', kind)}"
-        max_temp = _number_text(getattr(guard, "max_temp_c", None))
-        max_cpu = _number_text(getattr(guard, "max_cpu_percent", None))
-        cpu_wait = _number_text(getattr(guard, "max_cpu_wait_seconds", None))
-        if available:
-            policy = f", the guard waits while it exceeds {max_temp} C"
-        elif available is False:
-            policy = f", the guard waits while the load exceeds {max_cpu} percent, for at most {cpu_wait} seconds per wait"
-        else:
-            policy = ""
-        return f"Thermal guard: on; temperature reading: {reading}{policy}; load reader: {name}."
-
     def describe(self) -> None:
-        """Print the stage, package versions, the dataset files, the output directories, the thermal guard and the machine headroom.
+        """Print the stage, locations, package versions and the machine headroom.
 
-        Paths are printed as labels, never as absolute paths.  One line states
-        whether a temperature reading is available on this machine and which
-        load reader the thermal guard uses.
+        Locations inside the repository are printed from the repository root;
+        locations outside it are described in words.
         """
         import importlib.metadata as md
 
@@ -834,31 +925,29 @@ class RunContext:
             except md.PackageNotFoundError:
                 versions.append(f"{pkg} missing")
         print(", ".join(versions))
-        print(f"Raw files:   {self._display(self.raw_dir)}")
-        print(f"Catalogue:   {self._display(self.catalogue_path)}")
-        print(f"Results:     {self._display(self.results_dir)}")
-        print(f"Figures:     {self._display(self.figures_dir)}")
-        target = self.target_name if self.target_iso3 in self.target_name else f"{self.target_name} ({self.target_iso3})"
-        print(f"Target:      {target}")
-        print("Seeds:       " + ", ".join(f"{name} {value}" for name, value in self.seeds.items()))
-        readings: Mapping[str, Any] | None = None
+        print(f"Raw files:   {self._where(self.raw_dir, 'the raw-data directory, outside the repository')}")
+        print(f"Catalogue:   {self._where(self.catalogue_path, 'the cases catalogue, outside the repository')}")
+        print(f"Results:     {self._where(self.results_dir, 'the results directory of the run, outside the repository')}")
+        print(f"Figures:     {self._where(self.figures_dir, 'the figures directory of the run, outside the repository')}")
+        print(f"Target:      {self.target_name} ({self.target_iso3}); thermal guard {'on' if self.guard else 'off'}")
         try:
             from dtt.thermal import headroom
 
-            readings = headroom()
+            h = headroom()
+            procs = h.get("claude_processes")
+            count = procs.get("count") if isinstance(procs, Mapping) else procs
 
             def show(value: Any, template: str) -> str:
                 return "unavailable" if value is None else template.format(value)
 
             print(
-                f"Headroom: CPU {show(readings.get('cpu_percent'), '{:.0f}%')}, "
-                f"memory available {show(readings.get('mem_available_gb'), '{:.1f} GB')}, "
-                f"temperature {show(readings.get('temperature_c'), '{:.0f} C')}"
+                f"Headroom: CPU {show(h.get('cpu_percent'), '{:.0f}%')}, "
+                f"memory available {show(h.get('mem_available_gb'), '{:.1f} GB')}, "
+                f"temperature {show(h.get('temperature_c'), '{:.0f} C')}, "
+                f"Claude-related processes {show(count, '{}')}"
             )
         except Exception as exc:  # pragma: no cover - reporting only
-            readings = None
             print(f"Headroom: not available ({type(exc).__name__})")
-        print(self._thermal_line(readings))
 
 
 def _clean_for_json(obj: Any) -> Any:
@@ -915,41 +1004,57 @@ def apply_style() -> None:
 
 def setup_run(
     stage: str,
+    mode: str | None = None,
     root: str | Path | None = None,
     env: Mapping[str, str] | None = None,
+    guard_options: Mapping[str, Any] | None = None,
 ) -> RunContext:
     """Create the run context of a notebook.
 
     Parameters
     ----------
     stage : str
-        Name of the notebook, used in file names of the figure inventory and
-        as the producer named in the stamps of the files it writes.
+        Name of the notebook, used in the file names of the figure inventory and
+        of the stamp.  It starts with a letter or digit and holds only letters,
+        digits, dots, underscores and hyphens.
+    mode : {"real"}, optional
+        The only mode of the notebooks.  The run still needs ``DTT_RUN_REAL=1``.
     root : str or pathlib.Path, optional
         Repository root; found from the current directory by default.
     env : mapping, optional
         Environment to read; ``os.environ`` by default.
+    guard_options : mapping, optional
+        Keyword arguments of :class:`dtt.thermal.ThermalGuard`, for example
+        readers that replace the sensors.  The log file is always
+        ``results/thermal_log.csv`` unless ``log_path`` is given here.
 
     Returns
     -------
     RunContext
-        The context.  It reads the proposal file and checks that the other input
-        files of the dataset exist.
+        The context.  The run reads only the proposal file here and checks that
+        the other input files exist.
 
     Raises
     ------
     RuntimeError
-        If an installed package is older than ``requirements.txt`` asks for (see
-        :func:`check_requirements`).
+        If the run is requested without ``DTT_RUN_REAL=1``.
     ValueError
-        If ``DTT_GUARD`` has an invalid value.
+        If ``stage``, ``mode`` or a switch variable has an invalid value.
     FileNotFoundError
-        If an input file of the dataset is missing.
+        If an input file of the run is missing.  The file of derived dollar
+        costs ``data/processed/cases_investment_fx.csv`` is required: without it
+        the episodes with a known cost fall from 28 to 12 of 44.
     """
+    if not isinstance(stage, str) or _STAGE_PATTERN.fullmatch(stage) is None:
+        raise ValueError(
+            f"stage must start with a letter or digit and hold only letters, digits, dots, underscores and hyphens, not {stage!r}"
+        )
     env = os.environ if env is None else env
+    if mode is not None and mode != "real":
+        raise ValueError("mode must be 'real', the only mode of the notebooks")
+    mode = resolve_mode(env)
     seeds = dict(SEEDS)
     root_path = find_root(root)
-    check_requirements(root_path)
     if str(root_path / "src") not in sys.path:
         sys.path.insert(0, str(root_path / "src"))
 
@@ -963,11 +1068,15 @@ def setup_run(
     figures_dir = Path(env.get(FIGURES_VARIABLE) or root_path / "figures")
     target_iso3, target_name = "THA", "Thailand"
     required = [raw_dir / "country_metadata.csv", catalogue_path, investment_fx_path, baseline_path, proposal_path]
-    missing = [p for p in required if not p.is_file()]
+    missing = [p.relative_to(root_path).as_posix() for p in required if not p.is_file()]
     if missing:
-        message = "input files missing: " + ", ".join(_under_root(p, root_path) for p in missing)
-        if investment_fx_path in missing:
-            message += f". The file {investment_fx_path.name} holds the derived dollar costs of the cases"
+        message = "input files missing: " + ", ".join(missing)
+        if investment_fx_path.relative_to(root_path).as_posix() in missing:
+            message += (
+                f". The file {investment_fx_path.relative_to(root_path).as_posix()} holds the derived dollar costs "
+                f"of the cases; without it the episodes with a known cost fall from {_KNOWN_COSTS_WITH_FILE} to "
+                f"{_KNOWN_COSTS_WITHOUT_FILE} of {_EPISODE_COUNT}"
+            )
         raise FileNotFoundError(message)
     guard_on = _flag(env, GUARD_VARIABLE, True)
 
@@ -979,11 +1088,17 @@ def setup_run(
     guard: Callable[[], None] | None = None
     guard_object = None
     if guard_on:
-        guard_object, guard = _build_guard(results_dir)
+        from dtt.thermal import ThermalGuard
+
+        options = dict(guard_options or {})
+        options.setdefault("log_path", results_dir / "thermal_log.csv")
+        guard_object = ThermalGuard(**options)
+        guard = _ThrottledGuard(guard_object, min_interval=10.0)
 
     apply_style()
     return RunContext(
         stage=stage,
+        mode=mode,
         root=root_path,
         raw_dir=raw_dir,
         catalogue_path=catalogue_path,

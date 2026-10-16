@@ -17,9 +17,10 @@ bayes_normal_hierarchical
     Bayesian normal hierarchical model with the posterior of the between-case
     standard deviation evaluated on a grid.
 meta_regression
-    Mixed-effects weighted regression of case effects on case features.
+    Mixed-effects weighted regression of case effects on case features, with the
+    shrinkage of the standardised slopes that the ridge penalty causes.
 extrapolation
-    Position of a new case against the range of the case features.
+    Position of a target's features against the range of the case features.
 scaling_law
     Weighted regression of case effects through the origin on a size measure.
 """
@@ -47,13 +48,8 @@ __all__ = [
 ]
 
 _SUMMARY_QUANTILES = (0.05, 0.25, 0.50, 0.75, 0.95)
+_RANGE_TOLERANCE = 1e-9
 _SUMMARY_COLUMNS = ("mean", "sd", "q5", "q25", "q50", "q75", "q95")
-# A slope whose absolute value is at most this multiple of the largest absolute effect is
-# rounding noise and has no meaningful ratio to another slope.
-_SLOPE_FLOOR = 1e-12
-# Relative tolerance of the range check of a new case: a multiple of the larger absolute
-# end of the range of the cases, so that the position does not change with the unit.
-_RANGE_TOL = 1e-9
 _SINGULAR_DESIGN = (
     "The regression has a singular design (collinear features or too few cases for the "
     "number of features); use a positive ridge or fewer features."
@@ -562,7 +558,7 @@ def hksj_interval(
     effect of a new case uses the variance ``var + tau2`` and the Student
     quantile at ``k - 2`` degrees of freedom; for ``k = 2`` it has no degrees of
     freedom, its limits are NaN and a warning is issued.  The REML estimate of
-    ``tau2`` enters both intervals as a fixed value: its sampling uncertainty is
+    ``tau2`` enters both intervals as a known value: its sampling uncertainty is
     not propagated.
 
     Parameters
@@ -975,6 +971,64 @@ def _fit_mixed(y: np.ndarray, v: np.ndarray, X: np.ndarray, ridge: float) -> _Mi
     return _MixedFit(center=center, scale=scale, keep=keep, theta=theta, cov=cov, tau2=tau2)
 
 
+def _shrinkage_table(
+    y: np.ndarray,
+    v: np.ndarray,
+    Xm: np.ndarray,
+    fit: _MixedFit,
+    names: list[str],
+    ridge: float,
+) -> pd.DataFrame:
+    """Standardised slopes with the requested ridge weight and without it.
+
+    The unpenalised slopes come from the same model with the ridge weight set to
+    zero.  Their quotient with the penalised slopes is the factor by which the
+    penalty shrinks each slope: one when the penalty leaves the slope unchanged,
+    and between zero and one when it moves the slope towards zero.
+
+    Parameters
+    ----------
+    y : ndarray, shape (k,)
+        Case effects.
+    v : ndarray, shape (k,)
+        Squared standard errors.
+    Xm : ndarray, shape (k, p)
+        Case features as used by the fit.
+    fit : _MixedFit
+        Fit with the requested ridge weight.
+    names : list of str
+        Names of the features, one per column of ``Xm``.
+    ridge : float
+        Ridge weight of ``fit``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per feature that enters the fit, indexed by name, with the
+        columns ``ridge_slope``, ``unpenalised_slope`` and ``ratio``.  The
+        unpenalised slope is NaN when the unpenalised fit is singular or leaves no
+        residual degree of freedom; the ratio is NaN when the unpenalised slope
+        is zero or missing.
+    """
+    fitted = [name for name, kept in zip(names, fit.keep) if kept]
+    ridge_slope = np.asarray(fit.theta[1:], dtype=float)
+    if ridge == 0.0:
+        unpenalised = ridge_slope.copy()
+    elif y.size < fit.n_coef + 1:
+        unpenalised = np.full(ridge_slope.size, np.nan)
+    else:
+        try:
+            unpenalised = np.asarray(_fit_mixed(y, v, Xm, 0.0).theta[1:], dtype=float)
+        except ValueError:
+            unpenalised = np.full(ridge_slope.size, np.nan)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        ratio = np.where(unpenalised != 0.0, ridge_slope / unpenalised, np.nan)
+    return pd.DataFrame(
+        {"ridge_slope": ridge_slope, "unpenalised_slope": unpenalised, "ratio": ratio},
+        index=pd.Index(fitted, dtype=object),
+    )
+
+
 def meta_regression(
     tau_hat: ArrayLike,
     se: ArrayLike,
@@ -1007,13 +1061,13 @@ def meta_regression(
     errors refit the whole model, including standardisation and ``tau2``,
     without case ``i`` and predict case ``i``.
 
-    The ridge penalty shrinks the standardised slopes towards zero, and the
-    prediction for a case whose features lie outside the range of the cases is
-    an extrapolation of the fitted line, so the shrinkage of a slope moves the
-    prediction further the further the new case lies from the feature means.
-    ``shrinkage`` reports each slope with and without the penalty, and
-    :func:`extrapolation` reports where a new case lies against the range of the
-    cases.
+    The fitted function is a line in the features, so a new case with a feature
+    outside the range of the cases is an extrapolation of that line, and its
+    prediction assumes that the slope holds beyond the range.  The ridge penalty
+    pulls the standardised slopes towards zero; the ``shrinkage`` entry of the
+    result reports the penalised and unpenalised slopes side by side, and
+    :func:`extrapolation` gives the position of a new case against the range of
+    the cases.
 
     Parameters
     ----------
@@ -1052,15 +1106,13 @@ def meta_regression(
         with ``tau2`` from the refit without the case; ``loo_rmse`` the root
         mean square of ``loo_errors``; ``df`` the degrees of freedom
         ``k - p - 1`` of the Student quantile; ``shrinkage`` a DataFrame indexed
-        by the fitted features (those that are not constant) with the columns
-        ``ridge_slope`` (the standardised slope of this fit),
-        ``unpenalised_slope`` (the standardised slope of the same model with
-        ``ridge=0``, NaN when that model is singular or has no residual degree
-        of freedom) and ``ratio`` (``ridge_slope`` over ``unpenalised_slope``,
-        NaN where the unpenalised slope is NaN or is rounding noise, that is, its
-        absolute value is at most ``1e-12`` times the largest absolute effect).
-        When ``ridge`` is zero the two slopes are equal, so the ratio is 1 for
-        every feature whose slope is not rounding noise and NaN for the others.
+        by the features that enter the fit, with the columns ``ridge_slope`` (the
+        standardised slope of ``coef``), ``unpenalised_slope`` (the same slope
+        from the model with ridge zero, NaN when that fit is singular or leaves
+        no residual degree of freedom) and ``ratio`` (the quotient of the two:
+        one when the penalty leaves the slope unchanged, between zero and one
+        when it shrinks the slope towards zero, NaN when the unpenalised slope is
+        zero or missing).
 
     Raises
     ------
@@ -1105,7 +1157,6 @@ def meta_regression(
     est_raw[kept] = raw_theta
     se_raw[kept] = raw_se
     coef_raw = pd.DataFrame({"estimate": est_raw, "se": se_raw}, index=terms)
-    shrinkage = _shrinkage_table(y, v, Xm, ridge, fit, names)
 
     prediction: dict[str, Any] | None = None
     if x_new is not None:
@@ -1133,6 +1184,7 @@ def meta_regression(
         loo_pred[i] = float((sub.design(Xm[i : i + 1]) @ sub.theta)[0])
         loo_tau2[i] = sub.tau2
     loo_errors = y - loo_pred
+    shrinkage = _shrinkage_table(y, v, Xm, fit, names, ridge)
     return {
         "coef": coef,
         "coef_raw": coef_raw,
@@ -1147,123 +1199,67 @@ def meta_regression(
     }
 
 
-def _shrinkage_table(
-    y: np.ndarray, v: np.ndarray, X: np.ndarray, ridge: float, fit: _MixedFit, names: list[str]
-) -> pd.DataFrame:
-    """Standardised slopes with and without the ridge penalty.
-
-    Parameters
-    ----------
-    y : ndarray, shape (k,)
-        Case effects.
-    v : ndarray, shape (k,)
-        Squared standard errors.
-    X : ndarray, shape (k, p)
-        Case features.
-    ridge : float
-        Ridge weight of the fit in ``fit``.
-    fit : _MixedFit
-        The fit with weight ``ridge``.
-    names : list of str
-        Feature names.
-
-    Returns
-    -------
-    pandas.DataFrame
-        Indexed by the features that enter the fit, with the columns
-        ``ridge_slope``, ``unpenalised_slope`` and ``ratio``.  The unpenalised
-        slope is NaN when the model with ``ridge=0`` is singular or has no
-        residual degree of freedom; the ratio is NaN where the unpenalised slope
-        is NaN or its absolute value is at most ``1e-12`` times the largest
-        absolute effect.
-    """
-    ridge_slope = np.asarray(fit.theta[1:], dtype=float)
-    plain = np.full(ridge_slope.size, np.nan)
-    if ridge == 0.0:
-        plain = ridge_slope.copy()
-    elif y.size >= fit.n_coef + 1:
-        try:
-            plain = np.asarray(_fit_mixed(y, v, X, 0.0).theta[1:], dtype=float)
-        except (ValueError, np.linalg.LinAlgError):
-            pass
-    ratio = np.full(ridge_slope.size, np.nan)
-    floor = _SLOPE_FLOOR * float(np.max(np.abs(y)))
-    usable = np.isfinite(plain) & (np.abs(plain) > floor)
-    ratio[usable] = ridge_slope[usable] / plain[usable]
-    index = [name for name, flag in zip(names, fit.keep) if flag]
-    return pd.DataFrame(
-        {"ridge_slope": ridge_slope, "unpenalised_slope": plain, "ratio": ratio}, index=index
-    )
-
-
 def extrapolation(X: ArrayLike | pd.DataFrame, x_new: Any) -> pd.DataFrame:
-    """Position of a new case against the range of the case features.
+    """Position of a target's features against the range of the case features.
 
-    A prediction for a case whose feature lies outside the range of the cases is
-    an extrapolation of the fitted line, and the ridge penalty on the slope
-    changes such a prediction more than one inside the range.
+    A regression line on the features is extended beyond the cases when a
+    feature of the target lies outside their range, so the prediction for the
+    target is then an extrapolation whose error grows with the distance from the
+    cases.  For each feature this function reports the value of the target, the
+    smallest and the largest value among the cases, whether the target lies
+    ``below``, ``inside`` or ``above`` that range, and, for a feature whose case
+    values are all positive, the ratio of the target value to the largest case
+    value.  A target value that equals a limit of the range counts as inside;
+    the comparison uses a relative tolerance of 1e-9 of the limit.
 
     Parameters
     ----------
     X : array_like or DataFrame, shape (k, p)
-        Case features, one row per case.
+        Case features, one row per case.  The column names of a DataFrame label
+        the rows of the result; other inputs are labelled ``x0``, ``x1`` and so on.
     x_new : array_like, Series, DataFrame or mapping
-        Features of one new case.  A mapping, a Series with string labels and a
-        DataFrame are matched to the columns of ``X`` by name (further names are
-        ignored); any other input is read in the column order of ``X``.
+        Features of one target, matched to the columns of ``X`` by name as in
+        :func:`meta_regression`.  More than one row is not accepted.
 
     Returns
     -------
     pandas.DataFrame
-        One row per feature of ``X`` with the columns ``x_new`` (the value of the
-        new case), ``case_min`` and ``case_max`` (the range of the cases),
-        ``position`` (``below`` when the value is under the smallest case value,
-        ``above`` when it is over the largest, ``inside`` otherwise) and
-        ``ratio_to_max`` (the value over the largest case value for a feature
-        that is non-negative in every case and positive in at least one; NaN for
-        any other feature).  The position allows a tolerance of ``1e-9`` times
-        the larger of the absolute smallest and largest case value of the
-        feature, so it does not change when a feature is multiplied by a positive
-        constant.  A feature that is zero in every case has no tolerance.
+        One row per feature, indexed by name, with the columns ``target``,
+        ``case_min``, ``case_max``, ``position`` (``below``, ``inside`` or
+        ``above``) and ``ratio_to_largest_case`` (NaN for a feature whose case
+        values are not all positive).
 
     Raises
     ------
     ValueError
-        If ``X`` or ``x_new`` is not finite or has the wrong shape, ``x_new`` is
-        missing a feature, or ``x_new`` describes more than one case.
+        If ``X`` has no case, its features are not finite or have repeated
+        names, ``x_new`` has no value for a feature, has more than one row, or
+        holds a value that is not finite.
     """
-    if isinstance(X, pd.Series):
-        X = X.to_frame()
-    if isinstance(X, pd.DataFrame):
-        n_cases = X.shape[0]
-    else:
-        raw = np.asarray(X, dtype=float)
-        if raw.ndim not in (1, 2):
-            raise ValueError("X must be a two-dimensional array with one row per case.")
-        n_cases = raw.shape[0]
-    names, cases = _prepare_design(X, n_cases)
-    new, _ = _align_new_cases(x_new, names)
-    if new.shape[0] != 1:
-        raise ValueError("x_new must describe exactly one new case.")
-    target = new[0]
-    low = cases.min(axis=0)
-    high = cases.max(axis=0)
-    tol = _RANGE_TOL * np.maximum(np.abs(low), np.abs(high))
-    below = target < low - tol
-    above = target > high + tol
-    position = np.where(below, "below", np.where(above, "above", "inside"))
-    ratio = np.full(len(names), np.nan)
-    positive = (low >= 0.0) & (high > 0.0)
-    ratio[positive] = target[positive] / high[positive]
+    shape = np.shape(X)
+    if len(shape) == 0 or shape[0] < 1:
+        raise ValueError("X must have at least one case.")
+    names, Xm = _prepare_design(X, int(shape[0]))
+    xn, _ = _align_new_cases(x_new, names)
+    if xn.shape[0] != 1:
+        raise ValueError("extrapolation describes one target; x_new has several rows.")
+    target = xn[0]
+    lo = Xm.min(axis=0)
+    hi = Xm.max(axis=0)
+    tol = _RANGE_TOLERANCE * np.maximum(np.abs(lo), np.abs(hi))
+    position = np.where(target < lo - tol, "below", np.where(target > hi + tol, "above", "inside"))
+    positive = np.all(Xm > 0.0, axis=0)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        ratio = np.where(positive, target / hi, np.nan)
     return pd.DataFrame(
         {
-            "x_new": target,
-            "case_min": low,
-            "case_max": high,
-            "position": position.tolist(),
-            "ratio_to_max": ratio,
+            "target": target,
+            "case_min": lo,
+            "case_max": hi,
+            "position": position,
+            "ratio_to_largest_case": ratio,
         },
-        index=names,
+        index=pd.Index(names, dtype=object),
     )
 
 

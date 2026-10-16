@@ -1,7 +1,7 @@
 """Tests for dtt.panel: loading and validation of raw files, panel construction, coverage, storage.
 
-All data are simulated by dtt.simulate_global. Single cells, rows and files of a simulated
-world are then edited to create the situations under test.
+All data come from the hand-built world of tests/handmade_world.py. Single cells, rows and
+files of the hand-built world are then edited to create the situations under test.
 """
 import csv
 import sys
@@ -31,21 +31,20 @@ from dtt.panel import (  # noqa: E402
     wdi_filename,
     write_panel,
 )
-from dtt.simulate_global import simulate_global_world  # noqa: E402
+from handmade_world import build_handmade_world  # noqa: E402
 
-N_ECON = 60
+N_ECON = 24
 FIRST_YEAR = 1995
 LAST_YEAR = 2024
 N_YEARS = LAST_YEAR - FIRST_YEAR + 1
 SMALL_ECON = 24
-SMALL_CASES = 3
 CODE_OF = {variable: code for code, variable in INDICATORS.items()}
 BASE = {"receipts_usd": 1.0e9, "arrivals": 2.0e6, "gdp_usd": 5.0e10, "pop": 1.0e7, "air_pax": 3.0e6}
 
 
 @pytest.fixture(scope="module")
 def world(tmp_path_factory):
-    return simulate_global_world(tmp_path_factory.mktemp("world"), n_econ=N_ECON, seed=1)
+    return build_handmade_world(tmp_path_factory.mktemp("world"))
 
 
 @pytest.fixture(scope="module")
@@ -55,12 +54,12 @@ def panel(world) -> pd.DataFrame:
 
 @pytest.fixture
 def small(tmp_path) -> Path:
-    """A fresh 24-economy synthetic test world; the economies SA00 to SA05 form group G1, SA06 to SA11 group G2, and so on."""
-    return simulate_global_world(tmp_path / "raw", n_econ=SMALL_ECON, n_cases=SMALL_CASES, seed=1).raw_dir
+    """A fresh copy of the hand-built world; the economies SA00 to SA05 form group G1, SA06 to SA11 group G2, and so on."""
+    return build_handmade_world(tmp_path / "raw").raw_dir
 
 
 # ----------------------------------------------------------------------------
-# Helpers that edit the files of a synthetic test world
+# Helpers that edit the files of the hand-built world
 # ----------------------------------------------------------------------------
 def set_cells(raw: Path, changes: dict) -> None:
     """Overwrite single cells; ``changes`` maps (variable, iso3, year) to a number or None (empty cell)."""
