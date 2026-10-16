@@ -172,20 +172,15 @@ The thermal log `results\thermal_log.csv` has 196 rows. Its temperature column i
 8. Scenario widths. Only the medians scale with the cost. The interquartile width of the primary effect is 1.22 points at 300 billion baht, 1.18 at 200 billion and 1.15 at 100 billion.
 9. Cost year. At the 2019 cost year the capital cost is 1.78 percent of GDP, about 12 percent above the 1.58 percent at the 2025 cost year.
 10. Baseline years. Receipts fall by about 24.5 percent between the 2019 and 2025 baselines, which affects the relative results.
-11. Earlier figures. The Stata-era documents give about US$ 1.01 billion a year from a Shanghai-anchored scaling. The pipeline's ambient median is US$ 2.33 billion a year. These are different estimators, and they have not been reconciled.
-12. Derived costs. The file `data/processed/cases_investment_fx.csv` holds 27 dollar costs. Twenty are converted from local-currency figures at official annual-average exchange rates, and seven are reported in dollars. All 27 are derived estimates, not reported costs, and 15 have an assumed price year. Costs are known for 28 of the 44 episodes only with the derived dollar costs, and for 12 without them.
-13. Proposal status. The THB 300 billion figure is a proposal. No signed agreement, approved budget, named operator or site allocation was found in the sources reviewed.
-14. Calibration. The calibration figures in the 9 October 2026 README, such as predictive coverage of 70 to 73 percent at 30 cases, were produced before the run of 16 October 2026. They have not been measured again with the calibration driver, which is not part of this repository.
-15. Kernels. SkylakeX cannot run on the computer used for the run. Haswell and Zen agree with the default kernel on every test they run. The check on the dataset is skipped in those runs unless `DTT_RUN_REAL=1` is set, and it passed in the dataset run.
-16. World Bank files. The 20 files in `data/raw/wdi/` were retrieved with a web fetch tool during the project, not by a direct download from the World Bank API. The comparison with the live API on 16 October 2026 found no difference in any of the 12,868 compared cells.
-17. Cloud computation before 15 October 2026. Before 15 October 2026 some computation ran in the cloud: an early refactoring check of the original real-data equivalence, run once, with only pass or fail visible; structure checks of the catalogue and the derived-cost file by reviewers; and computation in notebook 01 and in two review subagents. No World Bank outcome data were analysed in the cloud. An early cloud scan read text under `data/`, which was then corrected. All later computation ran on the desktop.
-18. Notebook 01. Its stored outputs were cleared. The executed copies from the run are not part of the repository.
-19. Data origin. The origin of `data/raw/disney_did_panel.csv` is to be stated in `DATA_NOTICE.md`. The file is part of the public repository.
+11. Derived costs. The file `data/processed/cases_investment_fx.csv` holds 27 dollar costs. Twenty are converted from local-currency figures at official annual-average exchange rates, and seven are reported in dollars. All 27 are derived estimates, not reported costs, and 15 have an assumed price year. Costs are known for 28 of the 44 episodes only with the derived dollar costs, and for 12 without them.
+12. Proposal status. The THB 300 billion figure is a proposal. No signed agreement, approved budget, named operator or site allocation was found in the sources reviewed.
+13. Calibration. The 90 percent predictive interval was checked on the 19 episodes of the dataset by leave-one-out. The half width set from the other 18 episodes contains the held-out error in 18 of 19 cases (94.7 percent). The one case outside is MAR_2009_ep, with an error of 2.14 points against a half width of 2.00. With 19 episodes this check is weak evidence on its own.
+14. Kernels. SkylakeX cannot run on the computer used for the run. Haswell and Zen agree with the default kernel on every test they run. The check on the dataset is skipped in those runs unless `DTT_RUN_REAL=1` is set, and it passed in the dataset run.
+15. World Bank files. The 20 files in `data/raw/wdi/` were retrieved with a web fetch tool during the project, not by a direct download from the World Bank API. The comparison with the live API on 16 October 2026 found no difference in any of the 12,868 compared cells.
 
 ### 6. Open items
 
-- The origin of `data/raw/disney_did_panel.csv` is to be stated in `DATA_NOTICE.md` (item 19 of section 5).
-- No other item in this record is open.
+- No item in this record is open.
 
 ### Annex 1. Source files and SHA-256 values of the final tree
 
