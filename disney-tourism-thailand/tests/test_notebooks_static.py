@@ -176,3 +176,13 @@ def test_repository_scan_ignores_virtual_environments_and_finds_the_repository_f
     assert "docs/note.md" in listed
     assert not any(part in SKIPPED_DIRECTORIES for path in repository_files(repo) for part in path.parts)
     assert not any(path.parts[0] == ".venv" or "pyvenv.cfg" in path.parts for path in repository_files(repo))
+
+
+def test_notebook_05_keeps_the_placebo_nulls_unscaled_and_saves_the_a2_new_study_interval():
+    nb = _read(NOTEBOOK_DIR / "05_thailand_impact.ipynb")
+    code = "\n".join("".join(cell.source) for cell in nb.cells if cell.cell_type == "code")
+    # The A2 errors and the new-study interval are written, and the placebo null is not multiplied by a receipts ratio.
+    assert '"ambient_loeo_errors"' in code and '"ambient_new_study"' in code
+    assert "transport.loco_interval(" in code and 'loeo_errors["error_A2"]' in code
+    assert "rescale_null_pp(" not in code and "NULL_FACTOR" not in code
+    assert "saved_loeo_errors" in code and "saved_new_study" in code
