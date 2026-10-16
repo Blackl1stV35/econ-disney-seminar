@@ -69,12 +69,13 @@ The dates after 16 October are estimates. They will be confirmed after the Phase
 
 ## 5. Supplementary: historical analysis (preliminary)
 
-Folder: `disney-tourism-thailand`. Question: did the Hong Kong and Shanghai openings change international tourism receipts relative to GDP?
+Folder: `disney-tourism-thailand`. Question: did the Hong Kong and Shanghai openings change international tourism receipts relative to GDP, and what do the openings point to for a complex of the proposed size? The full closure record is `seminar/SUPPLEMENT_CLOSURE_RECORD.md`. Appendix A of the Phase 1 document contains the same text.
 
 - **Sample:** 44 openings (episodes), 27 feasible, 19 in the primary sample, in 19 economies. The importance route needs at least 20 episodes, so the pre-registered rule chose the ambient route.
-- **Estimator:** the scaling law in cost share (A2) is selected by the leave-one-economy-out rule. For the THB 300 billion complex the median effect is +0.40 percentage points of GDP (5 to 95 percent: -1.14 to +1.94). At the 2025 baseline that is +US$2.33 billion a year (-6.55 to +11.17); at the 2019 baseline it is +US$2.19 billion (-6.18 to +10.53). The 90 percent interval for a new study runs from -2.73 to +1.27 percentage points and includes zero. The weighted transport gives -0.73 points with the opposite sign; it is a diagnostic and not the primary route.
+- **Estimator:** the scaling law in cost share (A2) is selected by the leave-one-economy-out rule. For the THB 300 billion complex the median effect is +0.40 percentage points of GDP (5 to 95 percent: -1.14 to +1.94). At the 2025 baseline that is +US$2.33 billion a year (-6.55 to +11.17); at the 2019 baseline it is +US$2.19 billion (-6.18 to +10.53). The 90 percent interval for a new study runs from -2.73 to +1.27 percentage points and includes zero.
+- **Transport diagnostic:** the importance-weighted optimal transport gives -0.73 points, with a bootstrap band of -1.28 to -0.19. Its validation fails the 0.95 limit against the uniform-weight transport (ratio 1.009), and its importance model is not usable. It is a diagnostic, not an effect.
 - **Reading:** the data cannot separate the effect from zero. The historical results are not the Thai net benefit.
-- **Open items for this track:** 37 of the 1216 reference values of the original Stata analysis do not reproduce on the dataset (1179 match). The differences are in the synthetic-control weights, the balance and placebo statistics and one bootstrap interval endpoint. The data notice for the single-country panel and an independent review remain open.
+- **Open items for this track:** section 6 of the closure record, and the later phases listed there.
 
 ## 6. Repository and reproducibility
 
