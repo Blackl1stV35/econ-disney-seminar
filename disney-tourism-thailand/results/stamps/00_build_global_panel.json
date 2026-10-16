@@ -1,0 +1,110 @@
+{
+  "format": 1,
+  "inputs": {
+    "data/raw/wdi/country_metadata.csv": {
+      "producer": null,
+      "sha256": "319d8c248ba5386c110be64ee2915d7b11a892f5d90ae1b1f9df97f8bab3e1e6"
+    },
+    "data/raw/wdi/wdi_G1_IS.AIR.PSGR.csv": {
+      "producer": null,
+      "sha256": "7b0815d0d813e1ec50a38a876aba1e2a381653eb545c3f5f3a2209efa07e8e3f"
+    },
+    "data/raw/wdi/wdi_G1_NY.GDP.MKTP.CD.csv": {
+      "producer": null,
+      "sha256": "7d435f99b7fe4673a639769e2e060a3cd4f2f699714b2063db50b4adf6c201de"
+    },
+    "data/raw/wdi/wdi_G1_SP.POP.TOTL.csv": {
+      "producer": null,
+      "sha256": "8812e42d470e39b8ca664179d88f20afaf41f1a67d05eca929c1cf0e99d85bbc"
+    },
+    "data/raw/wdi/wdi_G1_ST.INT.ARVL.csv": {
+      "producer": null,
+      "sha256": "09c776e55878f46fada16dd431f1cb066ad863e5a84650d90bbcf07b32440500"
+    },
+    "data/raw/wdi/wdi_G1_ST.INT.RCPT.CD.csv": {
+      "producer": null,
+      "sha256": "24df255f656c78f2ccc413aa45083deabebbcba300334e44c9f0ee628ef747f3"
+    },
+    "data/raw/wdi/wdi_G2_IS.AIR.PSGR.csv": {
+      "producer": null,
+      "sha256": "5c24f1f46b8958382101e5819455f08db27560c60600a1469b4a460a0cf086e2"
+    },
+    "data/raw/wdi/wdi_G2_NY.GDP.MKTP.CD.csv": {
+      "producer": null,
+      "sha256": "543bfe7d3c62727bf8935ad619813b0b1f5283edf5f0c593efcf4a2b4524f6ad"
+    },
+    "data/raw/wdi/wdi_G2_SP.POP.TOTL.csv": {
+      "producer": null,
+      "sha256": "67d02d94fff68ba6e5f646a7484c34c46bad0e20d853d96fa4d040b13f6bd88b"
+    },
+    "data/raw/wdi/wdi_G2_ST.INT.ARVL.csv": {
+      "producer": null,
+      "sha256": "8effd8fbd7ae171b43fca0d464f58ff205f7c8959776ff21ba986b54c70d2dca"
+    },
+    "data/raw/wdi/wdi_G2_ST.INT.RCPT.CD.csv": {
+      "producer": null,
+      "sha256": "5ef445907bfc509bf1d2f7257fc70b3cd6d483e6e554cbea64a9def999f5d06b"
+    },
+    "data/raw/wdi/wdi_G3_IS.AIR.PSGR.csv": {
+      "producer": null,
+      "sha256": "54dca09a19b896dd6c35d9558cfadcf796c5c2a30c239b83a5bffdf3db04e16b"
+    },
+    "data/raw/wdi/wdi_G3_NY.GDP.MKTP.CD.csv": {
+      "producer": null,
+      "sha256": "5e2ea5e9ed1c624601195252c4a86d5e934cc93a13b8efd72766dcd70c5dfe9e"
+    },
+    "data/raw/wdi/wdi_G3_SP.POP.TOTL.csv": {
+      "producer": null,
+      "sha256": "c4e13a5c9c30cd76549666cec51787fa3369b8ff81d953304d5ac6ad69316d9b"
+    },
+    "data/raw/wdi/wdi_G3_ST.INT.ARVL.csv": {
+      "producer": null,
+      "sha256": "74793ff52e334f21e55efec1fd71c1a14a964a423486bd324a26ed8f856e0b5a"
+    },
+    "data/raw/wdi/wdi_G3_ST.INT.RCPT.CD.csv": {
+      "producer": null,
+      "sha256": "486221b593ce4e6ba47fa5c6f315b7e6ff7311709e5cd9589ed806834c791df6"
+    },
+    "data/raw/wdi/wdi_G4_IS.AIR.PSGR.csv": {
+      "producer": null,
+      "sha256": "fc48adec44929bde9f299ec1d229271264c1cf4bf9c69318f4f8e41fea1ee615"
+    },
+    "data/raw/wdi/wdi_G4_NY.GDP.MKTP.CD.csv": {
+      "producer": null,
+      "sha256": "953b1d536bf38a8131a2673fe47500d365f3f39fa2cc9b15f4f234c3722a227b"
+    },
+    "data/raw/wdi/wdi_G4_SP.POP.TOTL.csv": {
+      "producer": null,
+      "sha256": "625122da7d288112e274f0991d1b4cf9f7e6b7823b4b4c28a8e68fcb4ee18ec0"
+    },
+    "data/raw/wdi/wdi_G4_ST.INT.ARVL.csv": {
+      "producer": null,
+      "sha256": "1166dd6909561f5a865cdd15ab77bd5c27df23c5d6f60d54ca8d1bb8d3fdc555"
+    },
+    "data/raw/wdi/wdi_G4_ST.INT.RCPT.CD.csv": {
+      "producer": null,
+      "sha256": "737994c36b7379a31ac98129aec1dff98dadb434d051e2d29fd6baa18dc89d30"
+    }
+  },
+  "outputs": {
+    "data/processed/global_panel.csv": {
+      "sha256": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7"
+    },
+    "figures/outcome_by_year.png": {
+      "sha256": "4e0a9fa14996974188c63b31ecdb2b8a6e41c71bb5d2775f1e23bd25aa0fdcd2"
+    },
+    "figures/outcome_coverage_heatmap.png": {
+      "sha256": "21a574a06df293667ae6e6070f9e6f4e4f104b3c24f7a7b55a489770cdb92fb6"
+    },
+    "results/donor_eligibility.csv": {
+      "sha256": "ef8a8ffc1c79bec948e905bc6db36d16d592979c04b5876dbf66f42b75c47cf7"
+    },
+    "results/figure_inventory_00_build_global_panel.csv": {
+      "sha256": "c3a211b19b46f9d1f1bee5ba78f986b621f363ea26c137d0389c3e10631708e9"
+    },
+    "results/panel_coverage.csv": {
+      "sha256": "00d8ead60bcca0b9855db01d0681869ee099184a57a74d133e45fc9f1d341515"
+    }
+  },
+  "stage": "00_build_global_panel"
+}

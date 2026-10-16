@@ -1,0 +1,3 @@
+measure,episodes_with_cost,episodes_in_primary_sample,slope,intercept,correlation
+capex_pct_gdp,24,17,0.5167461905414237,-0.03623763874818503,0.7528257699238291
+capex_first_pct_gdp,23,16,0.21187315113172722,1.259889448162546,0.24524598279128
