@@ -263,7 +263,6 @@ def test_secondary_relay_figures_stay_unconfirmed_until_the_primary_source_is_fe
     relay_rows = [
         "chonburi_tourists_jan_nov_2024",
         "chonburi_foreign_visitors_jan_nov_2024",
-        "tat_spend_per_trip_all_nationalities_2023",
         "tat_spend_per_trip_middle_eastern_2023",
         "tat_spend_per_day_uae_2023",
     ]
@@ -271,6 +270,14 @@ def test_secondary_relay_figures_stay_unconfirmed_until_the_primary_source_is_fe
     for name in relay_rows:
         assert pd.notna(table.loc[name, "value"]), name
         assert table.loc[name, "status"].startswith("unconfirmed"), name
+
+
+def test_tat_spend_per_trip_is_a_secondary_sourced_value_that_the_model_does_not_use():
+    table = ap.load_inputs(INPUTS)
+    name = "tat_spend_per_trip_all_nationalities_2023"
+    assert table.loc[name, "status"].startswith("sourced (secondary")
+    assert table.loc[name, "value"] == pytest.approx(50900.0)
+    assert name not in ap.GRID_NAMES and name not in ap.SOURCED_NAMES
 
 
 def test_chon_buri_occupancy_is_a_sourced_value_that_the_base_case_can_use():
