@@ -1,0 +1,7 @@
+Re-run of the dataset chain on 16 October 2026 (UTC+7)
+Code commit: 0197a1f (notebook 05 and its static test). Inputs commit: 15a5ff1. Results commit: a811b0b.
+Environment: project virtual environment (disney-tourism-thailand/.venv), built from requirements.txt with POT 0.9.7.post1; interpreter in python_version.txt; packages in pip_freeze.txt.
+Command: DTT_RUN_REAL=1, default kernel, notebooks 00 to 05 executed in order with nbconvert.
+Outcome: all six notebooks completed (exit 0). Start 21:13:13, end 22:19:51 (UTC+7). Timings in timings.txt.
+Stamps: the stamp of each notebook was written during this run and checked by the next one.
+Outputs of notebooks 00 to 04 are unchanged in content. Notebook 05 wrote ambient_new_study.json and ambient_loeo_errors.csv.

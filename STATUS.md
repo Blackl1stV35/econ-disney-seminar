@@ -72,27 +72,27 @@ The dates after 16 October are estimates. They will be confirmed after the Phase
 Folder: `disney-tourism-thailand`. Question: did the Hong Kong and Shanghai openings change international tourism receipts relative to GDP, and what do the openings point to for a complex of the proposed size? The full closure record is `seminar/SUPPLEMENT_CLOSURE_RECORD.md`. Appendix A of the Phase 1 document contains the same text.
 
 - **Sample:** 44 openings (episodes), 27 feasible, 19 in the primary sample, in 19 economies. The importance route needs at least 20 episodes, so the pre-registered rule chose the ambient route.
-- **Estimator:** the scaling law in cost share (A2) is selected by the leave-one-economy-out rule. For the THB 300 billion complex the median effect is +0.40 percentage points of GDP (5 to 95 percent: -1.14 to +1.94). At the 2025 baseline that is +US$2.33 billion a year (-6.55 to +11.17); at the 2019 baseline it is +US$2.19 billion (-6.18 to +10.53). The 90 percent interval for a new study runs from -2.73 to +1.27 percentage points and includes zero.
+- **Estimator:** the scaling law in cost share (A2) is selected by the leave-one-economy-out rule. For the THB 300 billion complex the median effect is +0.40 percentage points of GDP (5 to 95 percent: -1.14 to +1.94). At the 2025 baseline that is +US$2.33 billion a year (-6.55 to +11.17); at the 2019 baseline it is +US$2.19 billion (-6.18 to +10.53). The 90 percent interval for a new study, built on the errors of A2, runs from -1.52 to +2.33 percentage points and includes zero. The weighted-transport interval, a diagnostic, runs from -2.73 to +1.27.
 - **Transport diagnostic:** the importance-weighted optimal transport gives -0.73 points, with a bootstrap band of -1.28 to -0.19. Its validation fails the 0.95 limit against the uniform-weight transport (ratio 1.009), and its importance model is not usable. It is a diagnostic, not an effect.
 - **Reading:** the data cannot separate the effect from zero. The historical results are not the Thai net benefit.
 - **Open items for this track:** section 6 of the closure record.
 
 ## 6. Repository and reproducibility
 
-- All six notebooks run on the dataset in the repository. The run of 16 October 2026 took 78 minutes for notebooks 00 to 05, of which notebook 03 took 75 minutes.
+- All six notebooks run on the dataset in the repository. The first run of 16 October 2026 took 78 minutes for notebooks 00 to 05, of which notebook 03 took 75 minutes. The re-run of the same day took 3997 seconds, of which notebook 03 took 3778 seconds.
 - The tests run with `python -m pytest -q` from `disney-tourism-thailand` and take about 7 minutes.
 - Generated files in `results/` and `figures/` change only through a re-run pull request, as described in CONTRIBUTING.md.
 
 ## 7. Open items
 
-- Thai inputs (inputs.csv, 131 rows): 82 sourced. Of these, 43 come from Thai data sources, and the rest are guidance values, illustrative examples and comparators outside Thailand. 14 are unconfirmed (candidate or secondary values, flagged and not used by the model). 9 are pending or blank, each with a stated reason. 9 are team decisions, 7 are claims or proposal figures, 4 are derived, and 6 are proxies or generalized values. The model reads the sourced names, the proposal capital cost and the labelled assumptions table, and no other input.
+- Thai inputs (inputs.csv, 131 rows): 87 sourced. Of these, 44 come from Thai data sources, and the rest are guidance values, illustrative examples and comparators outside Thailand. 9 are unconfirmed (candidate or secondary values, flagged and not used by the model). 8 are pending or blank, each with a stated reason. 1 is dropped from use (the Bank of Thailand receipts row). 9 are team decisions, 7 are claims or proposal figures, 4 are derived, and 6 are proxies or generalized values. The model reads the sourced names, the proposal capital cost and the labelled assumptions table, and no other input.
 - Team decisions confirmed by the leader on 14 October 2026, recorded as labelled assumptions: WACC 8 percent base (10 and 7 percent in the low and high cases); project life 20 years base (20 and 25 years in the low and high cases); attendance 7.5 million; incremental share 30 percent; displacement 30 percent; domestic retention 50 percent; spending-per-visit placeholders of 5,000, 10,000 and 20,000 THB; occupancy ceiling 85 percent base. None is a sourced value. The observed 80.42 percent would remove all base headroom and is reported as the alternative.
-- Still open within the confirmed decisions: the basis for spending per visit. The per-trip figures (TAT 50,900 THB; MoTS 48,580 THB) are not per park visit, so the placeholders are not yet sourced.
+- Open decision: the basis for spending per visit. The per-trip figures (TAT 50,900 THB; MoTS 48,580 THB) are not per park visit. A candidate is Oriental Land's Tokyo Disney Resort per-guest merchandise and food and beverage sales for FY3/2026 (8,796 yen together, excluding attractions and shows). Converting it needs a Bank of Thailand yen rate, which was not found. The base and the low and high cases need the leader's decision before the placeholders are replaced.
 - Operating costs include depreciation, by the leader's decision. The overlap with capital cost is kept; the anchors have not been restated.
 - Sources conflict on the high-speed rail opening year (2031 from the EEC Office; 2029 in the Wikipedia infobox and 2030 in its later status entry; not used). Chon Buri foreign visitors in 2024 are 11,689,827 (TAT workbook); the figure of 28,156,302 is a Thai plus foreign total and is not used.
-- U-Tapao has no sourced calendar 2024 or calendar 2019 figure, because AOT does not operate it. The table uses the operator's budget-year figures (370,210 for 2024; 1,665,004 for 2019) as labelled proxies.
+- U-Tapao has no sourced calendar 2019 figure, because AOT does not operate it. The calendar 2024 figure is the derived 384,881 passengers from the Ministry open-data file, and the draft uses it. The operator's budget-year figures are labelled comparators: 370,210 for October 2023 to September 2024 (sourced), and 1,665,004 for 2019 (proxy).
 - References: Chan (2004) is verified. Plaza (2006) is read in full from the attached copy and is cited without a link. Tan, How and Koh is not verified and is not cited. Milman (2010) is removed: its full text is paywalled, and its author list conflicts (one author in the publisher's author section; three in the citation line and the UCF STARS record). Abadie (2021), Burgan and Mules (2001), Cameron and Miller (2015) and Dwyer et al. (2000) are removed as paywalled and unread.
-- Changes not yet committed: the model, input and assumption tables, tests, the benchmark note, the Phase 1 draft and this status page. Commit after the leader's go-ahead.
+- The changes of 16 October 2026 are committed in four commits: code `0197a1f`, inputs `15a5ff1`, the re-run results `a811b0b`, and the record and documents that follow them. The decisions are listed in section 6 of `seminar/SOURCING_LOG_2026-10-16.md`.
 - The origin of `data/raw/disney_did_panel.csv` is unknown. `DATA_NOTICE.md` gives the World Bank attribution and asks the project owner to state the origin of the panel file.
 
 ## 8. Working documents
@@ -103,8 +103,8 @@ Folder: `disney-tourism-thailand`. Question: did the Hong Kong and Shanghai open
 ## 9. Re-run of 16 October 2026
 
 - The notebooks were re-run on the dataset with the code in the pull request "Remove the simulated world from the pipeline". The pipeline has no simulated mode. The simulation generators and the tests that used them are removed. The tests that needed a generated world now use hand-built fixtures in `tests/handmade_panels.py` and `tests/handmade_world.py`.
-- The new results are in `results/` and `figures/`, in the second pull request, which exists only for the re-run and names the commit and the run time, as CONTRIBUTING.md asks.
-- The full test suite passes on the code branch: 1877 passed and 1 skipped. The dataset check (`DTT_RUN_REAL=1`) passed in the run of 16 October 2026.
+- The re-run of 16 October 2026 (the second re-run) changed the notebook 05 outputs: the interval for a new study is built on the A2 errors, and the placebo nulls are used without rescaling. Its results are in `results/`, its record is in `seminar/provenance/rerun_2026-10-16/`, and the commit message names the code commit and the run time.
+- The full test suite passes on the code of the re-run: 1879 passed and 1 skipped. The dataset check (`DTT_RUN_REAL=1`) passed in the first run of 16 October 2026.
 - The route rule selects the ambient route. The importance model is not usable, the weighted transport does not beat the uniform transport by the 0.95 margin, the target is supported, and A2 is selected. Section 5 gives the effect.
 - The Haswell and Zen kernels pass. The SkylakeX kernel cannot run on the development computer.
 

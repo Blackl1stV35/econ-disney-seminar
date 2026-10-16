@@ -4,19 +4,19 @@ Date of record: 16 October 2026 (UTC+7).
 
 Repository: `econ-disney-seminar` (public), folder `disney-tourism-thailand`.
 
-Code commit `b6bb77f`. Results commit `e206a5b`. Both commits are in the history of `main`.
+Code commit `0197a1f` (notebook 05 and its test), inputs commit `15a5ff1`, results commit `a811b0b`. These commits are in the history of `main`. The first run that this record reported, of code commit `b6bb77f` and results commit `e206a5b`, is superseded by the re-run described in section 2.
 
 ## 1. Status
 
-The analysis runs on the dataset only. The clean run of 16 October 2026 completed every step, except the SkylakeX kernel, which cannot run on the computer used for the run. The route rule selects the ambient route, and the primary estimator is A2. The primary effect for the proposal of 300 billion baht has a median of 0.40 percentage points of GDP, with a 5 to 95 percent range from -1.14 to 1.94 points. At the 2025 baseline that is 2.33 billion US dollars a year (range -6.55 to 11.17 billion). The weighted transport gives a point estimate of -0.73 points, with the opposite sign. Both are reported.
+The analysis runs on the dataset only. The clean run of 16 October 2026 completed every step, except the SkylakeX kernel, which cannot run on the computer used for the run. The route rule selects the ambient route, and the primary estimator is A2. The primary effect for the proposal of 300 billion baht has a median of 0.40 percentage points of GDP, with a 5 to 95 percent range from -1.14 to 1.94 points. At the 2025 baseline that is 2.33 billion US dollars a year (range -6.55 to 11.17 billion). The weighted transport gives a point estimate of -0.73 points, with the opposite sign. Both are reported. This record reflects the re-run of 16 October 2026, which uses the A2 interval for a new study and the placebo nulls without rescaling. The primary effect and the transport results are unchanged by it; the interval for a new study and the detection figures change.
 
 ## 2. Run provenance
 
-- Run record: the status, summary, manifest, package list, interpreter version, World Bank check and test totals of the run are in `seminar/provenance/run_2026-10-16/`. The run started at 08:12:45 and finished at 10:01:05 on 16 October 2026 (UTC+7).
-- Code of the run: the pipeline files of commit `b6bb77f` are identical to the files that ran. The notebooks ran with `DTT_RUN_REAL=1`. The notebook times were 00 11.6 s, 01 23.6 s, 02 36.0 s, 03 4511.4 s, 04 55.9 s and 05 28.0 s, 4711.5 s in total.
-- Manifest: `manifest_sha256.csv` was taken at 08:13, before the first step, and lists 160 files. Its entries for `results_20261016\`, `figures_20261016\` and `executed_20261016\` are outputs of an earlier run. They are not part of the final tree.
-- Text changes after the manifest was taken in `README.md` (World Bank status, kernel statement, result section and thermal sentence), the first markdown cell of notebooks 00 to 05 (run-time paragraph only), and the heading list in `tests/test_notebooks_static.py`. No code cell changed after the manifest was taken.
-- Python 3.12.8 (MSC v.1942, 64-bit) on Windows 11 Home. Package versions from `pip_freeze.txt`: cvxpy 1.9.3, matplotlib 3.11.2, numpy 2.5.4, pandas 3.0.6, POT 0.9.7.post1, pytest 9.1.1, scikit-learn 1.9.1, scipy 1.18.1, statsmodels 0.15.0.
+- Run record: the status, summary, manifest, package list, interpreter version, World Bank check and test totals of the first run are in `seminar/provenance/run_2026-10-16/`. That run started at 08:12:45 and finished at 10:01:05 on 16 October 2026 (UTC+7). The re-run that this record reports started at 21:13:13 and finished at 22:19:51 on 16 October 2026 (UTC+7). Its package list, interpreter version, timings and final test totals are in `seminar/provenance/rerun_2026-10-16/`.
+- Code of the run: the pipeline files of commit `0197a1f` are identical to the files that ran, because the code was committed after the re-run without changes. The notebooks ran with `DTT_RUN_REAL=1` on the project virtual environment, with the default kernel. The notebook times of the re-run were 00 19 s, 01 34 s, 02 52 s, 03 3778 s, 04 69 s and 05 45 s, 3997 s in total. The outputs of notebooks 00 to 04 are unchanged in content; notebook 05 writes the two new outputs. The first run, of commit `b6bb77f`, took 4711.5 s; its notebook times were 00 11.6 s, 01 23.6 s, 02 36.0 s, 03 4511.4 s, 04 55.9 s and 05 28.0 s.
+- Manifest of the first run: `manifest_sha256.csv` was taken at 08:13, before the first step, and lists 160 files. Its entries for `results_20261016\`, `figures_20261016\` and `executed_20261016\` are outputs of an earlier run. They are not part of the final tree.
+- For the first run, text changes after the manifest was taken in `README.md` (World Bank status, kernel statement, result section and thermal sentence), the first markdown cell of notebooks 00 to 05 (run-time paragraph only), and the heading list in `tests/test_notebooks_static.py`. No code cell changed after the manifest was taken.
+- Python 3.12.8 (MSC v.1942, 64-bit) on Windows 11 Home. Package versions from `pip_freeze.txt`: cvxpy 1.9.3, matplotlib 3.11.2, numpy 2.5.4, pandas 3.0.6, POT 0.9.7.post1, pytest 9.1.1, scikit-learn 1.9.1, scipy 1.18.1, statsmodels 0.15.0. The re-run used the same versions in the project virtual environment, which was built from `requirements.txt` with POT 0.9.7.post1.
 
 ## 3. Results of the run
 
@@ -32,12 +32,14 @@ Scenario complex_total (proposal of THB 300 billion, cost year 2025, 1.58 percen
 - Primary effect, percentage points of GDP: median 0.40, 5 to 95 percent -1.14 to 1.94, 25 to 75 percent -0.21 to 1.01.
 - Primary effect, US$ billion a year: 2.33 at the 2025 baseline (-6.55 to 11.17) and 2.19 at the 2019 baseline (-6.18 to 10.53).
 - Primary effect, percent of the counterfactual receipts: median 9.96, 5 to 95 percent -69.87 to 89.43.
-- 90 percent interval for a new study: -2.73 to 1.27 points (half width 2.00, from 19 cases). Minimum detectable effect at alpha 0.05 and power 0.8: 5.56 points (normal approximation 6.21). Detection probability over the effect draws: 0.066.
+- 90 percent interval for a new study, from the leave-one-economy-out errors of the primary estimator A2: -1.52 to 2.33 points, centred on the point prediction of 0.40 (half width 1.92, from 19 cases). The weighted-transport interval of notebook 04, a diagnostic, is -2.73 to 1.27 points (half width 2.00). Minimum detectable effect at alpha 0.05 and power 0.8, with the placebo null used without rescaling: 2.00 points (normal approximation 2.23). Detection probability over the effect draws: 0.19.
 - Weighted transport, a diagnostic and not the primary route: point estimate -0.73 points. Sensitivity median -0.71 points, 5 to 95 percent -1.28 to -0.19.
 - Scenarios of 200 billion and 100 billion baht: primary medians 0.27 and 0.13 points.
 - The government claim of about 1 percent of GDP a year (February 2026, no study cited) appears only as a reference scale.
 
 ## 4. Verification
+
+The rows for the first run (code commit `b6bb77f`) were not repeated for the re-run, except where a row says so. The last row is the full suite on the code of the re-run.
 
 | Run | Result |
 |---|---|
@@ -46,12 +48,14 @@ Scenario complex_total (proposal of THB 300 billion, cost year 2025, 1.58 percen
 | pytest with OpenBLAS kernel Haswell (`pytest_Haswell.log`) | 1795 passed, 1 skipped |
 | pytest with OpenBLAS kernel Zen (`pytest_Zen.log`) | 1795 passed, 1 skipped |
 | pytest with OpenBLAS kernel SkylakeX (`pytest_SkylakeX.log`) | Process stopped with an illegal instruction, exit code -1073741795, after 25.8 seconds |
-| Dataset chain, notebooks 00 to 05 in order (`dataset_chain.log`) | Exit 0, 4711.5 seconds |
+| Dataset chain, notebooks 00 to 05 in order, first run (`dataset_chain.log`) | Exit 0, 4711.5 seconds |
+| Dataset chain, notebooks 00 to 05 in order, re-run of 16 October 2026 (`chain.log`) | Exit 0, 3997 seconds |
 | Notebook 01, comparison with the reference values | 1179 of 1216 pass; 37 differ |
 | World Bank check against the live API (`wdi.log`) | 96 economies, 12,868 compared cells, 12,868 equal, 0 different, 0 present in only one source, 1,532 empty in both |
-| Code commit `b6bb77f`, full suite including the appraisal tests | 1877 passed, 1 skipped |
+| Code commit `b6bb77f`, full suite including the appraisal tests, first run | 1877 passed, 1 skipped |
+| Code commit `0197a1f` with inputs commit `15a5ff1`, full suite of the re-run (`pytest_final.log`) | 1879 passed, 1 skipped |
 
-The thermal log `results\thermal_log.csv` has 196 rows. Its temperature column is empty in every row, so no CPU temperature was recorded. Every row shows the action `ok`, and the guard relied on the CPU load.
+The thermal log `results\thermal_log.csv` of the re-run has 763 rows. Its temperature column is empty in every row, so no CPU temperature was recorded. Every row shows the action `ok`, and the guard relied on the CPU load. The first run's log had 196 rows with the same pattern.
 
 ## 5. Limitations and disclosures
 
@@ -59,17 +63,16 @@ The thermal log `results\thermal_log.csv` has 196 rows. Its temperature column i
 2. Close choice of estimator. The selection of A2 over A1 is flagged as close, because its RMSE ratio of 0.913 lies within 0.05 of the limit of 0.95.
 3. A predictor with lower error is not used. The nearest-neighbour predictor nn3 has an LOEO RMSE of 0.903, below 1.038 for A2 and 1.015 for the weighted transport. The rule does not use it, and it is reported here.
 4. Sign disagreement. The primary median is +0.40 points of GDP, and the weighted transport point estimate is -0.73 points. The weighted transport value is the same at the 200 billion and the 300 billion baht scenarios, so the disagreement holds at every cost level in the scenario table.
-5. Precision. The predictive interval includes zero. The 90 percent interval for a new study is about 4 points wide, and the minimum detectable effect of 5.56 points is far above the point estimate. The detection probability at the headline is 0.066, which is not the power at the minimum detectable effect.
-6. Predictive interval source. The predictive interval is built from the leave-one-economy-out errors of the weighted transport rule (`ot_weighted`), not from the errors of the primary estimator A2.
-7. Placebo noise. The absolute null distribution has its placebo noise scaled by a factor of 2.79, equal to the target receipts share of 12.15 percent divided by the source share of 4.36 percent of GDP. The relative null is not rescaled.
-8. Scenario widths. Only the medians scale with the cost. The interquartile width of the primary effect is 1.22 points at 300 billion baht, 1.18 at 200 billion and 1.15 at 100 billion.
-9. Cost year. At the 2019 cost year the capital cost is 1.78 percent of GDP, about 12 percent above the 1.58 percent at the 2025 cost year.
-10. Baseline years. Receipts fall by about 24.5 percent between the 2019 and 2025 baselines, which affects the relative results.
-11. Derived costs. The file `data/processed/cases_investment_fx.csv` holds 27 dollar costs. Twenty are converted from local-currency figures at official annual-average exchange rates, and seven are reported in dollars. All 27 are derived estimates, not reported costs, and 15 have an assumed price year. Costs are known for 28 of the 44 episodes only with the derived dollar costs, and for 12 without them.
-12. Proposal status. The THB 300 billion figure is a proposal. No signed agreement, approved budget, named operator or site allocation was found in the sources reviewed.
-13. Calibration. The 90 percent predictive interval was checked on the 19 episodes of the dataset by leave-one-out. The half width set from the other 18 episodes contains the held-out error in 18 of 19 cases (94.7 percent). The one case outside is MAR_2009_ep, with an error of 2.14 points against a half width of 2.00. With 19 episodes this check is weak evidence on its own.
-14. Kernels. SkylakeX cannot run on the computer used for the run. Haswell and Zen agree with the default kernel on every test they run. The check on the dataset is skipped in those runs unless `DTT_RUN_REAL=1` is set, and it passed in the dataset run.
-15. World Bank files. The 20 files in `data/raw/wdi/` were retrieved with a web fetch tool during the project, not by a direct download from the World Bank API. The comparison with the live API on 16 October 2026 found no difference in any of the 12,868 compared cells.
+5. Precision. The predictive interval includes zero. The 90 percent interval for a new study, from the errors of A2, is -1.52 to 2.33 points, about 3.9 points wide. The minimum detectable effect of 2.00 points is about five times the point estimate of 0.40. The detection probability at the headline is 0.19, which is not the power at the minimum detectable effect.
+6. Placebo noise. The placebo nulls are used without rescaling. The placebo effects come from the source economies, whose receipts share is 4.36 percent of GDP, against 12.15 percent for the target. If placebo noise grows with the receipts share, the detection threshold and the minimum detectable effect understate the noise at the target.
+7. Scenario widths. Only the medians scale with the cost. The interquartile width of the primary effect is 1.22 points at 300 billion baht, 1.18 at 200 billion and 1.15 at 100 billion.
+8. Cost year. At the 2019 cost year the capital cost is 1.78 percent of GDP, about 12 percent above the 1.58 percent at the 2025 cost year.
+9. Baseline years. Receipts fall by about 24.5 percent between the 2019 and 2025 baselines, which affects the relative results.
+10. Derived costs. The file `data/processed/cases_investment_fx.csv` holds 27 dollar costs. Twenty are converted from local-currency figures at official annual-average exchange rates, and seven are reported in dollars. All 27 are derived estimates, not reported costs, and 15 have an assumed price year. Costs are known for 28 of the 44 episodes only with the derived dollar costs, and for 12 without them.
+11. Proposal status. The THB 300 billion figure is a proposal. No signed agreement, approved budget, named operator or site allocation was found in the sources reviewed.
+12. Calibration. The 90 percent interval of A2 was checked on the 19 episodes of the dataset by leave-one-out. The half width set from the other 18 episodes contains the held-out error in 18 of 19 cases (94.7 percent). The one case outside is MAR_2009_ep, with an error of 2.78 points against a half width of 1.92. With 19 episodes this check is weak evidence on its own.
+13. Kernels. SkylakeX cannot run on the computer used for the run. Haswell and Zen agree with the default kernel on every test they run. The check on the dataset is skipped in those runs unless `DTT_RUN_REAL=1` is set, and it passed in the dataset run.
+14. World Bank files. The 20 files in `data/raw/wdi/` were retrieved with a web fetch tool during the project, not by a direct download from the World Bank API. The comparison with the live API on 16 October 2026 found no difference in any of the 12,868 compared cells.
 
 ## 6. Open items
 
@@ -77,7 +80,7 @@ The thermal log `results\thermal_log.csv` has 196 rows. Its temperature column i
 
 ## Annex 1. Source files and SHA-256 values of the final tree
 
-Values are the SHA-256 of the committed content of each file in commit `e206a5b`, folder `disney-tourism-thailand`, as listed by `git ls-tree -r`. Paths are relative to the folder `disney-tourism-thailand`.
+Values are the SHA-256 of the committed content of each file in commit `a811b0b`, folder `disney-tourism-thailand`, as listed by `git ls-tree -r`. Paths are relative to the folder `disney-tourism-thailand`.
 
 | File | SHA-256 |
 |---|---|
@@ -85,8 +88,8 @@ Values are the SHA-256 of the committed content of each file in commit `e206a5b`
 | `.gitignore` | `652a83d3587e05bc17d24ba840792bd508393a5929f5824db856968d504548d7` |
 | `DATA_NOTICE.md` | `8b59d675e36a7dc49f1c11d5053a13d2f796482d686d9b083ed531caa49b2d6e` |
 | `README.md` | `2ad63fa76a5073b7a26bc410c2d3bd9e2e4ec061dbafdc05a8064f716724d4bc` |
-| `data/appraisal/assumptions.csv` | `13cec58794aff901572c0a438d3e6767d5fb37cd5e0a34e8d3eb37db497ab52d` |
-| `data/appraisal/inputs.csv` | `ae5b8194e35870c92652aaf23fe64d6b35f2c131b7f66164483a9405a4f51bcc` |
+| `data/appraisal/assumptions.csv` | `65dffd1b284565e57cde589e6799166d43fdfefff0300749c174653aad9568b5` |
+| `data/appraisal/inputs.csv` | `c3ed3817939f80f6700cf6bafa03f13bb9dcdb2d92de93d9970c05567d50ac3e` |
 | `data/processed/cases_catalogue.csv` | `cd3d24b78aa8f1ca380bdd24e89bfdf9ecd8d687c30a375ce78c69ad6a068b91` |
 | `data/processed/cases_investment_fx.csv` | `5567ea28efd9511a7b999ec558923ac78daa8a7738ab5a28c16c35c6658258f7` |
 | `data/processed/thailand_baseline.csv` | `2a5b4d28baea34fd6a37ba54a73c8aade4d29ad55868cec2c59f81817d6ab534` |
@@ -119,7 +122,7 @@ Values are the SHA-256 of the committed content of each file in commit `e206a5b`
 | `data/raw/wdi/wdi_G4_ST.INT.RCPT.CD.csv` | `737994c36b7379a31ac98129aec1dff98dadb434d051e2d29fd6baa18dc89d30` |
 | `data/reference/replication_reference_values.json` | `7b0c792437d210aa49ffe7cd4733dea27d5cdb722745cfad6fb789dc7f7107a4` |
 | `docs/cases_catalogue_notes.md` | `0232abdc88f6d81add7b944df5429c2392d0e998e8cc1b693e2ce714b792e542` |
-| `docs/causal_benchmark_search.md` | `0182e2d3d83e10c991cbf39468dbff298b8eb0ebc8eb2ad5bc18c6110b3ed73e` |
+| `docs/causal_benchmark_search.md` | `3798f920a3378343ee7788bce45067ac8996786a073e7d42efaff3f98549da22` |
 | `docs/investment_fx_notes.md` | `8dfd07f22de3be5b45031a4f1c7108dafc14a754a4dea8bf5f0cc2c3ef174cab` |
 | `docs/thailand_baseline_notes.md` | `df676ec2caa067232ba8ea7c5761e2650c850b57038e6e16867b30413e9b4d3b` |
 | `figures/case_effect_vs_capex.png` | `18c3d03f96d73dabad42538c6560c4e5684b2a4faa1007fc16cf5286e34690a9` |
@@ -151,9 +154,11 @@ Values are the SHA-256 of the committed content of each file in commit `e206a5b`
 | `notebooks/02_case_effects.ipynb` | `93d5483a62038f60a3f7c9bec3e47114fdcf77df43e4543522588a6a34285b1d` |
 | `notebooks/03_feature_importance.ipynb` | `3d492e6ffcf14139e19fcef85276bf14e89ee3d3934dd272372407c631ea5d6a` |
 | `notebooks/04_optimal_transport.ipynb` | `2dd8b6e22b19ee3ec791e32326debc8da9fc1b78e4141be688f3051ae7fc265f` |
-| `notebooks/05_thailand_impact.ipynb` | `d4dae773e2a9dfddee40ab63018259ddf5eef61af22ff2a0cfa329694f8d2bb6` |
+| `notebooks/05_thailand_impact.ipynb` | `39adef7db4cc8d5c40336a77ae4ae2fe8654a8b40c72a0b8825eb89455428ce0` |
 | `requirements.txt` | `d10ee69f9aaf3dcff762b6e1df489d51aafb4d7738d3bd0d50ae49f0281449bd` |
 | `results/ambient_loeo.csv` | `d6ce302f2bc71e10f68d0c3c33d0d1bba7edad5a80555d849ff3f7c2b5803059` |
+| `results/ambient_loeo_errors.csv` | `89fd590cb56b01613a6c5ff21fc92b9bddcd227c4b9cb8ead892526116cf4d1c` |
+| `results/ambient_new_study.json` | `52d697a6b4b88909351b4fa87b65cca4b23345babb4d5948698e30444674b42b` |
 | `results/case_effects.csv` | `489a4d07127eb78e1ff9ec75c27dfbdffa3aadbfa001b15f26084b7bb2ad70bd` |
 | `results/case_effects_robustness.csv` | `0788caee2f9bb4d7758426bc70a26d62c3b46d14de6324b4e8a80c06eaefb067` |
 | `results/case_features.csv` | `c94fa5cff06e1532891925cfe47328397e749dc5a429110e3b7f37185d8e51ec` |
@@ -186,14 +191,14 @@ Values are the SHA-256 of the committed content of each file in commit `e206a5b`
 | `results/stamps/02_case_effects.json` | `c8995d389fbdc6857e4b54af8694822a0bb9beb14cfc921305fe66628d775b3a` |
 | `results/stamps/03_feature_importance.json` | `25fcecd6f8a53f7bfec9ea796c879df25fbf27a1f0015ab12d9f9fe5f41e3584` |
 | `results/stamps/04_optimal_transport.json` | `75bbcbf3d18b1e72eb04e7bbb51c216a42a2e2a23d17e93df386315e6f8dac66` |
-| `results/stamps/05_thailand_impact.json` | `ca3767a20d6d6b1e6f58b382e07aed6304be78330bbd0323c98e891b7fc577c2` |
-| `results/thailand_detection.csv` | `1a48f6607d2fa027a0d53e502c82ddb9fece5123bc4cf4baffbd0408eb42af71` |
+| `results/stamps/05_thailand_impact.json` | `6a70ef48b995ad1d78301439013d96c060d33db9ae20485f4097b801f4cb563b` |
+| `results/thailand_detection.csv` | `e2c8a63960c0c40698323b15bb3a7f6b4204426bc09fe31df800bc18f75db81a` |
 | `results/thailand_impact.csv` | `33d4e59038f44a4f0bf7f5cf933a787cdf7330f76f6e4f24fdc2e5a0ea316e00` |
 | `results/thailand_scenario_draws.csv` | `63af966fccbbd179ac90a0173699f0b43b8cc89e6e9b8e657af139fbb4ada686` |
 | `results/thailand_scenario_null_draws.csv` | `2a9fe6263944c82826f1be91e4774251d16b6a85e1710c3baae68c3a16b6f7b0` |
 | `results/thailand_scenario_usage.csv` | `7b5a7a6a6a4a1e0d7c0aab18fb9313b9cbcf656935431acc7416eb8d1ba579c4` |
 | `results/thailand_scenarios.csv` | `efc2bc397545ff1ca11c23b4c75889c8ff610fd27aec3dac3c3eb21e91540bf3` |
-| `results/thailand_summary.json` | `40d36f9a3e771f5e1b8399de24dc04aa65893184eed233ea0dee8efc6be84b4d` |
+| `results/thailand_summary.json` | `b1da49df38fdec408947cda987125373bc15e7b79b7debe530f3374d6f3fe83f` |
 | `results/thailand_target_cloud.csv` | `12d551bf826bf0f6ed90c2a5f35b542dfa3da7dd3980a2071de39f1ee46bbc7e` |
 | `results/thailand_transport.json` | `9c5ffa0d7ba09252dcca0b201ce23f6eaadcec568d727dfbb4bfee6ff77e70f8` |
 | `results/thailand_transport_draws.csv` | `1f26c87cda697821cf8f3284b5bd8229ee11724e1133911107d814aa9139b013` |
@@ -220,14 +225,14 @@ Values are the SHA-256 of the committed content of each file in commit `e206a5b`
 | `tests/conftest.py` | `d9f9b3ccdacfe4ccda6f2962f0895322838a414e21382dc3817bb31882cdb912` |
 | `tests/handmade_panels.py` | `896e03eea13cf43c5ea30517b0fb0df780fd2bd736cec1998d1f86001e04e247` |
 | `tests/handmade_world.py` | `d6019eaae092979d69fe1a386fb809966ca99b6b21317d6210a24df74eb7154b` |
-| `tests/test_appraisal.py` | `ae4a5ba8d01dc37ba9e3be307acd4b77c0ee3323e8aad97d6b5dd0480467c700` |
+| `tests/test_appraisal.py` | `0e212368d90a4306a3c1817f2eaf5f9a07a3f659adf2ba45cfdc0b80cc9fc175` |
 | `tests/test_cases.py` | `2866b7ea4638394ccf746c0c05c0ced56f84b22c1962ed6d632d440a77effdf6` |
 | `tests/test_did.py` | `f6a521e4540297471a07a4b0fdfc173154365fb6b813f14fbde61cda7254c780` |
 | `tests/test_effects.py` | `51e07f359ef6022a63a1943d02c8c99c80ed7df96aa35beac0668a197e820bbf` |
 | `tests/test_impact.py` | `f364ec3ea28d223538c2d2b883c74f7ff7a098ef086e66d34d27e5e0c69658cf` |
 | `tests/test_importance.py` | `588713a0ab978188c68cf65ce415954b117c74566fb0346f69298181a66888f1` |
 | `tests/test_meta.py` | `8aa967d38709cdcd792ee7d165f272e2cc416a0da6f5b7f078a312bbf3d890d3` |
-| `tests/test_notebooks_static.py` | `16e68f5c256b4899557176e41fb496dc33ee934367acb6e624ff025ade9abc8e` |
+| `tests/test_notebooks_static.py` | `29f9db1589869b5fc2de663a0e7cfa2152b7b84375a015b162dfcbc91f476855` |
 | `tests/test_panel.py` | `932402cb360cde2c685b250759597f7f1f532535db6556287e29a6670243e465` |
 | `tests/test_replication.py` | `e6b98fa4b74a11b64231c8686ad78b84fe08ed0d60b99f83793cbf386200bda2` |
 | `tests/test_scm.py` | `f3e1a669417889eb085b2c07d14931a27fb2d27d1fb2ec8fb38fac0aecfed603` |
@@ -237,4 +242,3 @@ Values are the SHA-256 of the committed content of each file in commit `e206a5b`
 | `tests/test_transport.py` | `3057f6015bffc45e4168eb8771c7aed32b6708dcf82c1c014f5aca13186569a0` |
 | `tests/test_verify_wdi_files.py` | `d3104d0c7ad7ec44d1e1ab5472ffc7a6419901a20486616cbb84da52a3ef5739` |
 | `tests/test_workflow.py` | `63a2fc5505b68accb79061ce10c0c79defa94a3a864eebf91422a3bfb2de9a72` |
-

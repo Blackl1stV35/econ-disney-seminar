@@ -916,3 +916,17 @@ The table's claim figures are repeated in press reports. The reports are seconda
   24. A24 WebSearch TH short query, allowed government domains -> refused: the turn's WebSearch budget (200 calls, shared by all agents) was used up. No workaround used; not retried.
   25. A25 Operator and open-data checks -> no Disney statement or operator report found; no open-data series exists for a projection, so the open-data API step does not apply.
 
+## 6. Decisions of 16 October 2026
+
+Each decision below was approved by the owner of the project on 16 October 2026 and is applied in the input table (commit `15a5ff1`) unless the entry says otherwise.
+
+- **tat_spend_per_trip_all_nationalities_2023** (50,900 THB per trip): sourced from a secondary source, the Government Public Relations Department's relay of the 2023 TAT survey. The primary TAT document was not reached. Per trip, not per park visit; not used by the model.
+- **ocean_park_attendance_fy2018_19** (5.7 million): sourced from a secondary source, the search summary of the FY2018/19 results announcement. The operator's page returned HTTP 403.
+- **ocean_park_total_operating_expenses_fy2018_19_hkd_m** (HK$ 1,543.9 million): sourced from the primary annual report, as recorded in section 2 above. The input row, which had said not located, is corrected to the resolved value.
+- **lotte_world_adult_ticket_2026_krw** (67,000 won): sourced from a news report of the price rise effective 1 April 2026. The visitor guide's 62,000 won is not used, and the official price table was not read.
+- **shanghai_disneyland_attendance_2019_million** (11.21 million): used as reported in the TEA and AECOM Theme Index 2019 (11,210,000 for 2019). The reporting period is not stated on the copy read.
+- **intl_tourism_receipts_bot_thb_bn_2019_2025** (1,400 THB bn, candidate): dropped from use. The Bank of Thailand series was not reached, and the secondary article gives 1.4 trillion baht for both 2024 and 2025. The sourced Ministry of Tourism and Sports receipts rows for 2024 and 2025 are used instead.
+- **utapao_passengers_calendar_2024** (384,881, derived): kept as the calendar-year figure used in the draft. The budget-year figure of 370,210 (1 October 2023 to 30 September 2024) is a sourced comparator. The 2019 budget-year figure of 1,665,004 is a labelled proxy.
+- **chonburi_foreign_visitors_jan_nov_2024** (11,689,827): the foreign-visitor measure is the one used. The total of 28,156,302 (Thai plus foreign) is not used.
+- **The nine team-decision reference rows** (section 4 above): confirmed. The team values are unchanged, and each published reference is recorded in section 4.
+- **spend_per_visit_thb** (team placeholders of 5,000, 10,000 and 20,000 THB): pending the leader's decision on the base and the low and high cases. The candidate is Oriental Land's Tokyo Disney Resort per-guest sales for FY3/2026 (merchandise 5,227 yen and food and beverage 3,569 yen, 8,796 yen together, excluding attractions and shows). Both components are corroborated by a secondary report; the primary PDF was not opened. Conversion to THB needs a Bank of Thailand yen rate, which was not found. Third-party rates from mid-2026 put the yen at about 20.5 THB per 100 yen.

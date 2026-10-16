@@ -1,0 +1,2 @@
+Full suite on the code of the re-run (commit 0197a1f with inputs commit 15a5ff1), run from disney-tourism-thailand with python -m pytest -q
+1879 passed, 1 skipped in 390.98s (0:06:30)
