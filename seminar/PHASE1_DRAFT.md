@@ -2,6 +2,8 @@
 
 Submission deadline: 16 October 2026.
 
+Public repository: https://github.com/Blackl1stV35/econ-disney-seminar
+
 ## 1. Title
 
 An Exploratory Appraisal of a Proposed Disney-Type Theme-Park Complex in Thailand: A Bottom-Up Scenario Analysis.
@@ -43,7 +45,7 @@ An Exploratory Appraisal of a Proposed Disney-Type Theme-Park Complex in Thailan
 
 **(b) Theme-park and single-attraction evidence.** Plaza (2006) estimates the effect of the Guggenheim Museum Bilbao on overnight stays, jobs and the return on investment. The published article reports 61,742 additional overnight stays a month from a single-series time-series model with no control group, so it supports context rather than a causal transfer. Published estimates for other attractions are reviewed in the causal benchmark note and are not transferred to Thailand (section 7.6).
 
-**(c) Historical cases.** Hong Kong Disneyland and Shanghai Disney Resort are the closest cases. Their evidence is used for calibration ranges and as context, not as a transfer coefficient (section 7.6). Chan (2004) studies residents' perceptions of Hong Kong Disneyland and its impacts. The thesis reports two telephone surveys of 1,060 respondents and is verified against the PolyU repository record. A second case study, of Universal Studios Singapore by Tan, How and Koh, could not be verified and is not cited in this draft.
+**(c) Historical cases.** Hong Kong Disneyland and Shanghai Disney Resort are the closest cases. Their evidence is used for calibration ranges and as context, not as a transfer coefficient (section 7.6). Chan (2004) studies residents' perceptions of Hong Kong Disneyland and its impacts. The thesis reports two telephone surveys of 1,060 respondents and is verified against the PolyU repository record. Two Henderson studies cover Southeast Asian destinations. Henderson (2012) studies the development and regulation of casinos in Singapore. It reports visitor arrivals of 11.6 million and a 50 percent rise in tourism receipts, and it notes that the 2010 upturn cannot be attributed solely to the integrated resorts, because the 2008 and 2009 uncertainties also exerted a strong influence. Henderson et al. (2013) review LEGOLAND Malaysia, the first LEGOLAND in Asia, which opened in Johor in 2012. The article states that its findings rest on public-domain material and two visits to the park. It reports that Universal Studios Singapore had about 3.4 million visitors in its first year (TEA/AECOM, 2012), that management expected one million visitors a year in the early years (Malaysia Today, 2008), and that the General Manager said full recovery of the investment usually takes 15 to 20 years (Lee, 2012). These are press-sourced statements. They are used as context and are not inputs to the model.
 
 **Gap.** The literature provides single-attraction, macroeconomic and appraisal-standard evidence, but no bottom-up model for a Thai complex that follows the national appraisal guidance. This study fills that gap.
 
@@ -85,23 +87,12 @@ The project is supported as a basis for decisions if H3 holds at the 7 percent s
 - The output is a set of scenario ranges, not confidence intervals.
 - The Hong Kong Disneyland and Ocean Park anchors rest on press reports and secondary copies; the operators' primary documents were not read.
 
-## 10. Timeline and responsibilities
-
-| Date | Task | Owner |
-| --- | --- | --- |
-| 14 Oct | Reframed topic with objectives to the professor | Peem, chow |
-| 14 to 15 Oct | Literature sections (a) to (c) | Tai, chow |
-| 15 Oct | Research question section | tap |
-| 15 Oct | Hypothesis section | chow |
-| 15 Oct | Method section | LINK, with Peem |
-| 15 Oct | Integration and consistency check | chow, Peem |
-| 16 Oct | Submission of the Phase 1 document | Peem |
-| After 16 Oct (estimate) | Sourcing of Thai inputs, model build, scenarios, stress tests, final report | Team, Peem |
-
-## 11. References
+## 10. References
 
 - Asian Development Bank. (2017). *Guidelines for the economic analysis of projects*. Manila: ADB. https://www.adb.org/sites/default/files/institutional-document/32256/economic-analysis-projects.pdf. DOI: http://dx.doi.org/10.22617/TIM178607-2
 - Chan, E. (2004). *Residents' perceptions towards Hong Kong Disneyland and its impacts* [MPhil thesis]. The Hong Kong Polytechnic University. http://hdl.handle.net/10397/85415
+- Henderson, J. C. (2012). Developing and regulating casinos: The case of Singapore. *Tourism and Hospitality Research*, 12(3), 139-146. https://doi.org/10.1177/1467358412467642
+- Henderson, J. C., Chua, P. T., Liu, H. J., & Ngiam, J. (2013). Theme parks in Southeast Asia: A case study of LEGOLAND Malaysia. *Asia Pacific Journal of Innovation in Hospitality and Tourism*, 2(2), 227-242.
 - National Economic and Social Development Council. (2024). *Guide to public investment project appraisal* (July 2024 edition). https://www.nesdc.go.th/wp-content/uploads/2025/05/article_20241009124821.pdf
 - Plaza, B. (2006). The return on investment of the Guggenheim Museum Bilbao. *International Journal of Urban and Regional Research*, 30(2), 452-467.
 
