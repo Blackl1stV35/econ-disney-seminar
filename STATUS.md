@@ -60,8 +60,8 @@ Work is coordinated through GitHub Issues, using the template "Task", as describ
 | 15 Oct | Method outline, scenario grid and break-even definition | LINK, with Peem | Method section |
 | 15 Oct | Integrate the sections and check consistency | chow, Peem | Draft |
 | 16 Oct | Submit the Phase 1 seminar document | Peem | Submitted |
-| From 19 Oct (estimate) | Source the Thai inputs: segment mix, attendance ramp, spending, capex, operating costs, tax rates, discount rate and shadow parameters from NESDC (2024) | Team | Input table with a source for every value |
-| From 19 Oct (estimate) | Build the appraisal model in `disney-tourism-thailand`, with tests for the three ledgers, the scenario switch and break-even | Peem, with an agent | Model, notebook and tests. A skeleton with 24 tests and an input table is in place. The NESDC values are sourced; project life, the financial cost of capital and the other Thai inputs are pending |
+| From 19 Oct (estimate) | Source the Thai inputs: segment mix, attendance ramp, spending, capex, operating costs, tax rates, discount rate and shadow parameters from NESDC (2024) | Team | Input table: 58 sourced values, 29 unconfirmed, 13 blank (see section 7) |
+| From 19 Oct (estimate) | Build the appraisal model in `disney-tourism-thailand`, with tests for the three ledgers, the scenario switch and break-even | Peem, with an agent | Model with labelled cases, the NESDC sensitivity table and tests; the appraisal and notebook tests pass. The NESDC values are sourced; WACC and project life are team recommendations, and the other team decisions are labelled |
 | From 26 Oct (estimate) | Stress tests following ADB (2017), sensitivity on displacement and incremental share, limitations and decision gates | Team | Results |
 | November (estimate) | Final report and presentation | Team | Final report |
 
@@ -84,11 +84,16 @@ Folder: `disney-tourism-thailand`. Question: did the Hong Kong and Shanghai open
 
 ## 7. Open items
 
-- Thai inputs: 17 values are sourced, 56 are pending. The base case cannot run until each pending input is sourced or shown as a labelled assumption. The infrastructure cap is in the model; testing it needs the demand inputs.
-- Official calendar-2024 and 2019 airport traffic (AOT) and Chon Buri hotel and occupancy data (TAT) could not be read in this session.
-- Sources conflict on the high-speed rail opening year (2031 from the EEC Office, 2029 from Wikipedia) and on Chon Buri foreign visitors in 2024. The conflicting visitor figure is not used.
-- References: Chan (2004) is verified. Tan, How and Koh is not verified and is not cited. Milman (2010) is cited as a single-author article. The ADB and NESDC values are recorded with their pages.
+- Thai inputs (inputs.csv, 127 rows): 58 sourced; 29 unconfirmed (candidate or secondary values, flagged and not used by the model); 13 blank, each with a stated reason (not found, withdrawn, conflicting, a text row, or multi-value). Nine team decisions, five labelled proxies and three derived values fill other rows, so the model reads them only through the labelled assumptions table.
+- Team decisions confirmed by the leader on 14 October 2026, recorded as labelled assumptions: WACC 8 percent base (10 and 7 percent in the low and high cases); project life 20 years base (20 and 25 years in the low and high cases); attendance 7.5 million; incremental share 30 percent; displacement 30 percent; domestic retention 50 percent; spending-per-visit placeholders of 5,000, 10,000 and 20,000 THB; occupancy ceiling 85 percent base. None is a sourced value. The observed 80.42 percent would remove all base headroom and is reported as the alternative.
+- Still open within the confirmed decisions: the basis for spending per visit. The per-trip figures (TAT 50,900 THB; MoTS 48,580 THB) are not per park visit, so the placeholders are not yet sourced.
+- Operating costs include depreciation, by the leader's decision. The overlap with capital cost is kept; the anchors have not been restated.
+- Sources conflict on the high-speed rail opening year (2031 from the EEC Office; 2029 in the Wikipedia infobox and 2030 in its later status entry; not used). Chon Buri foreign visitors in 2024 are 11,689,827 (TAT workbook); the figure of 28,156,302 is a Thai plus foreign total and is not used.
+- U-Tapao has no sourced calendar 2024 or calendar 2019 figure, because AOT does not operate it. The table uses the operator's budget-year figures (370,210 for 2024; 1,665,004 for 2019) as labelled proxies.
+- References: Chan (2004) is verified. Plaza (2006) is read in full from the attached copy and is cited without a link. Tan, How and Koh is not verified and is not cited. Milman (2010) is removed: its full text is paywalled, and its author list conflicts (one author in the publisher's author section; three in the citation line and the UCF STARS record). Abadie (2021), Burgan and Mules (2001), Cameron and Miller (2015) and Dwyer et al. (2000) are removed as paywalled and unread.
+- Changes not yet committed: the model, input and assumption tables, tests, the benchmark note, the Phase 1 draft and this status page. Commit after the leader's go-ahead.
 - The origin of `data/raw/disney_did_panel.csv` is unknown. `DATA_NOTICE.md` gives the World Bank attribution and asks the project owner to state the origin of the panel file.
+
 ## 8. Working documents
 
 - `seminar/PHASE1_DRAFT.md`: the Phase 1 document in working form, with PENDING markers for the team.
