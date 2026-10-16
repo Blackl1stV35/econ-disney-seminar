@@ -1,0 +1,12 @@
+{
+  "centre": 0.40457897101860424,
+  "estimator": "A2",
+  "guaranteed_level": 0.9,
+  "half_width": 1.9210330911022924,
+  "level": 0.9,
+  "lower": -1.516454120083688,
+  "n": 19,
+  "outcome": "att_pp",
+  "rank": 18,
+  "upper": 2.3256120621208964
+}

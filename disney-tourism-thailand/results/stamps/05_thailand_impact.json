@@ -68,6 +68,12 @@
     "results/ambient_loeo.csv": {
       "sha256": "3bac946f876b88f58106795700d45fef74e951d608e80c9e562369ed1ffd6b19"
     },
+    "results/ambient_loeo_errors.csv": {
+      "sha256": "5b0307d2835f2593e945e857a3d516d95837324a812564be8330c6e46e652dc8"
+    },
+    "results/ambient_new_study.json": {
+      "sha256": "32d556290a6fac73298d7a55ab32977c4e7280b50878e3a60b20b608379776f0"
+    },
     "results/figure_inventory_05_thailand_impact.csv": {
       "sha256": "a52fabbf57dfd916da65daac39c3c1dca29baad1c134f1bd42018cab6b3b8f4d"
     },
@@ -75,13 +81,13 @@
       "sha256": "a9e3996b7511d21281a7d5002b26f3dc08f931477cc7ff8bf4350832a8d9b5b3"
     },
     "results/thailand_detection.csv": {
-      "sha256": "049c7f38ceda164d703a0b77472aedbd9e8c11d2e2c1038123c6e19ba4249e1c"
+      "sha256": "1d847eaf9a3865c569a871df13ba3c79f386049dabeda6d200416905345024fd"
     },
     "results/thailand_impact.csv": {
       "sha256": "76eb6ffd161818b8dad584a9d07a935e37ba55fed1d867512d92bd7011058cd1"
     },
     "results/thailand_summary.json": {
-      "sha256": "291debf223ede77df1f196a8c061c867eb0a5ad1aceec8a9b6bd3af161e56ae3"
+      "sha256": "c77da8cd8e76556a709d7b0406f63e94555f333c14784963cd7e1e549772c2e2"
     }
   },
   "stage": "05_thailand_impact"
