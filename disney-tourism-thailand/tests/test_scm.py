@@ -1,7 +1,8 @@
 """Tests for dtt.scm: simplex QP, direct and nested synthetic control, ridge augmentation, placebos.
 
-All data are SIMULATED.  Reference solutions come from cvxpy (interior point,
-CLARABEL) and from first-order optimality conditions checked independently.
+The arrays are hand-built or built from seeded noise arrays (see handmade_panels.py).
+Reference solutions come from cvxpy (interior point, CLARABEL) and from
+first-order optimality conditions checked independently.
 """
 import time
 
@@ -11,7 +12,8 @@ import pytest
 
 cp = pytest.importorskip("cvxpy")
 
-from dtt import scm, simulate  # noqa: E402
+from dtt import scm  # noqa: E402
+from handmade_panels import factor_panel, study_panel  # noqa: E402
 
 
 def cvx_solve(prob):
@@ -396,7 +398,7 @@ def test_synth_with_covariate_predictors_and_ridge_augmentation():
 
 
 def test_synth_matches_independent_cvxpy_solution_on_simulated_hong_kong_block():
-    df, _ = simulate.simulate_panel(seed=21, trend_spread=0.5)
+    df, _ = study_panel(trend_spread=0.5, noise_seed=21)
     hk = df[(df.study_case == "Hong Kong") & df.year.between(1999, 2018)]
     W = hk.pivot(index="year", columns="unit_id", values="receipts_pct_gdp")[[2, 3, 4, 7, 8, 9]]
     pre = W.index.values < 2005
@@ -405,7 +407,7 @@ def test_synth_matches_independent_cvxpy_solution_on_simulated_hong_kong_block()
     w_ref, _ = cvx_ls(Y0[pre], y1[pre])
     assert r.w == pytest.approx(w_ref, abs=1e-6)
     assert r.fits["direct"].w == pytest.approx(w_ref, abs=1e-6)
-    assert abs(r.mean_post_gap - 5.0) < 0.6  # known effect of the simulated panel
+    assert abs(r.mean_post_gap - 5.0) < 0.6  # known effect of the Hong Kong block of the hand-built panel
 
 
 # ----------------------------------------------------------------------------
@@ -435,7 +437,7 @@ def reference_placebo(Y, treated, pre, exclude_treated):
 
 @pytest.mark.parametrize("exclude_treated", [True, False])
 def test_placebo_table_matches_independent_solutions(exclude_treated):
-    d = simulate.simulate_factor_panel(n_donors=7, T=20, T0=12, n_active=3, seed=3)
+    d = factor_panel(n_donors=7, T=20, T0=12, n_active=3, noise_seed=3)
     Y, pre = d["Y"], d["pre"]
     pl = scm.placebo_in_space(Y, 0, pre, exclude_treated=exclude_treated)
     ref = reference_placebo(Y, 0, pre, exclude_treated)
@@ -447,7 +449,7 @@ def test_placebo_table_matches_independent_solutions(exclude_treated):
 
 
 def test_placebo_ranks_and_p_values():
-    d = simulate.simulate_factor_panel(n_donors=15, T=20, T0=12, n_active=3, tau=3.0, seed=4)
+    d = factor_panel(n_donors=15, T=20, T0=12, n_active=3, tau=3.0, noise_seed=4)
     pl = scm.placebo_in_space(d["Y"], 0, d["pre"], labels=[f"u{i}" for i in range(16)])
     t = pl.table
     assert len(t) == 16 and t.unit.iloc[0] == "u0" and pl.treated_label == "u0"
@@ -460,7 +462,7 @@ def test_placebo_ranks_and_p_values():
 
 
 def test_placebo_p_values_rank_every_unit_including_those_that_fit_badly():
-    d = simulate.simulate_factor_panel(n_donors=15, T=20, T0=12, n_active=3, tau=3.0, seed=4)
+    d = factor_panel(n_donors=15, T=20, T0=12, n_active=3, tau=3.0, noise_seed=4)
     pre = d["pre"]
     clean = scm.placebo_in_space(d["Y"], 0, pre)
     assert clean.table.rank_abs_mean_gap.iloc[0] == 1 and clean.p_value_abs_mean_gap == pytest.approx(1 / 16)
@@ -476,13 +478,13 @@ def test_placebo_p_values_rank_every_unit_including_those_that_fit_badly():
 
 
 def test_placebo_without_effect_gives_a_large_p_value():
-    d = simulate.simulate_factor_panel(n_donors=15, T=20, T0=12, n_active=3, tau=0.0, seed=5)
+    d = factor_panel(n_donors=15, T=20, T0=12, n_active=3, tau=0.0, noise_seed=5)
     pl = scm.placebo_in_space(d["Y"], 0, d["pre"])
     assert pl.p_value_ratio > 0.1
 
 
 def test_placebo_donor_subset_and_pool_logic():
-    d = simulate.simulate_factor_panel(n_donors=8, T=20, T0=12, n_active=3, seed=6)
+    d = factor_panel(n_donors=8, T=20, T0=12, n_active=3, noise_seed=6)
     Y, pre = d["Y"], d["pre"]
     donors = [1, 2, 3, 4, 5]
     pl = scm.placebo_in_space(Y, 0, pre, donors=donors)
@@ -497,7 +499,7 @@ def test_placebo_donor_subset_and_pool_logic():
 
 
 def test_placebo_nested_method_uses_predictors():
-    d = simulate.simulate_factor_panel(n_donors=6, T=18, T0=10, n_active=3, seed=7)
+    d = factor_panel(n_donors=6, T=18, T0=10, n_active=3, noise_seed=7)
     Y, pre = d["Y"], d["pre"]
     X = Y[pre]  # outcomes in the pre-period as predictors (units in columns)
     a = scm.placebo_in_space(Y, 0, pre, method="direct")
@@ -506,7 +508,7 @@ def test_placebo_nested_method_uses_predictors():
 
 
 def test_ninety_six_economy_pool_is_fast_and_exact():
-    d = simulate.simulate_factor_panel(n_donors=96, T=22, T0=14, seed=8)
+    d = factor_panel(n_donors=96, T=22, T0=14, noise_seed=8)
     Y, pre = d["Y"], d["pre"]
     t0 = time.perf_counter()
     r = scm.synth(Y[:, 0], Y[:, 1:], pre, method="both", seed=0)

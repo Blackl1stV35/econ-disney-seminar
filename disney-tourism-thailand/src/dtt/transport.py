@@ -27,89 +27,24 @@ Transport problem
     by log-domain scaling iterations whose update for a relaxed marginal has
     exponent ``rho / (rho + eps)`` (Chizat, Peyre, Schmitzer and Vialard).
 
-Small regularisation
-    The scaling iterations contract by the factor ``rho / (rho + eps)`` per
-    iteration when a marginal is relaxed, so they need about ``(rho + eps) /
-    eps`` iterations per factor ``e`` of accuracy.  When ``eps`` is small next
-    to ``rho``, for example when the feature weights are almost concentrated on
-    a feature with few values and :func:`select_eps` gives a small positive
-    value, the iterations can stop at ``max_iter`` before the marginal residual
-    is below ``tol``.  The solvers then solve the same problem (same ``eps``,
-    ``rho`` and masses) from scratch by a log-domain rescue: Newton iterations
-    with Levenberg damping on the dual objective in the log-scalings of the
-    smaller side of the plan, the log-scalings of the other side being
-    eliminated exactly by their log-sum-exp update, with a continuation in
-    ``eps`` that starts at the largest cost and shrinks by a factor of four
-    per stage until the requested value.  The plan is evaluated from the
-    log-scalings, and the costs are shifted by their row and column minima, so
-    the rescue converges for ``eps`` far below the reach of the scaling
-    iterations.  A scaling iteration that reaches the tolerance is returned
-    unchanged, bit for bit, and the rescue is never run for it.
-    :class:`Plan` reports a rescued plan
-    in ``log_domain``, :class:`LocoResult` and :func:`bootstrap_transport`
-    count rescued solves in ``n_log_domain``, and ``n_nonconverged`` counts only
-    the solves that do not reach the tolerance even after the rescue.  The
-    rescue needs ``eps`` large enough for the exponents ``C / eps`` to be
-    resolved in double precision (the marginal residual cannot fall below about
-    ``1e-16 * max(C) / eps``); below that the solve is reported as not
-    converged.  The balanced iterations of :func:`sinkhorn_divergence` have no
-    rescue.
-
 Transported effect
     ``effect_j = sum_i pi_ij tau_i / sum_i pi_ij`` for each target point, and
     the target effect is the ``b``-weighted mean of these values.
 
-Limits of the method
-    The leave-one-economy-out errors of :func:`loco_validation` are the errors
-    of cases predicted at their own features, so they measure interpolation
-    among the cases.  The transported effect of a target point is a weighted
-    mean of source effects, so the transport cannot predict an effect larger
-    than the largest source effect (or smaller than the smallest one): a target
-    that is costlier, larger or more concentrated than every case is an
-    extrapolation that the method cannot make.  The intervals of this module
-    describe the target only inside the support checked by
-    :func:`target_support`, which reports the effective number of sources
-    behind the target and whether the target lies within the range of the
-    sources on the features that carry the weight.
-
-Three intervals
-    The module produces three different intervals, each for its own purpose.
-
-    * The bootstrap interval of the transported average effect,
-      ``bootstrap_transport(...)["draws"]`` and its ``percentiles``.  It
-      describes the sampling uncertainty of the transported average effect
-      (resampled cases and measurement noise).  It is not an interval for the
-      effect observed in a new study and it is not validated.
-    * The predictive draws of :func:`bootstrap_transport`
-      (``predictive_draws``).  They add a between-case deviation and the
-      measurement noise to the bootstrap draws, from a normal model.  They are
-      not validated against held-out cases.
-    * The conformal interval of the observed effect of a new study at the
-      target, :func:`loco_interval` (also ``loco_predictive_draws(...)["interval"]``).
-      It is the estimate plus and minus an order statistic of the absolute
-      leave-one-economy-out errors, whose coverage of the effect observed in a
-      new study at the target is validated by construction under
-      exchangeability of the errors.  The ``percentiles`` of
-      :func:`loco_predictive_draws` are descriptive and carry no such guarantee.
-
-Numerical tolerances
-    Decisions that rounding noise could flip use explicit tolerances.  A mass
-    or a feature weight of at most ``1e-12`` times the largest one is zero,
-    pairwise distances that agree to a relative ``1e-9`` are ties, a squared
-    distance of at most ``1e-18`` times the largest squared weighted
-    coordinate of the rows is zero (so the choices of ``eps`` and of the kernel
-    bandwidth do not depend on the units of the features), RMSEs that agree to
-    a relative ``1e-9`` of the larger of the largest RMSE and the largest
-    absolute effect share a rank, and counts of permutation statistics at least
-    as large as the observed one allow a relative ``1e-9``.
+Limits
+    The validation folds of :func:`loco_validation` use the leave-one-economy-out
+    errors of the cases at their own features, so they measure interpolation
+    among the cases.  The transported effect is a mixture of the source effects,
+    so the transport cannot predict an effect larger than the largest source
+    effect.  The intervals of :func:`loco_predictive_draws` and :func:`loco_interval`
+    describe the target only inside the support that :func:`target_support`
+    checks, and that support must be checked before the intervals are read.
 """
 from __future__ import annotations
 
-import math
 import warnings
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from fractions import Fraction
 from typing import Any
 
 import numpy as np
@@ -133,47 +68,39 @@ __all__ = [
     "wasserstein2",
     "sinkhorn_divergence",
     "overlap_permutation_test",
+    "target_support",
     "leave_group_out_indices",
     "LocoResult",
     "loco_validation",
     "loco_interval",
     "loco_predictive_draws",
-    "target_support",
     "bootstrap_transport",
 ]
 
-# Relative size below which a mass or a feature weight is rounding noise.
-_NOISE = 1e-12
-# Relative tolerance of comparisons whose exact-arithmetic outcome is an equality.
-_TIE_TOL = 1e-9
-# Squared weighted distances at most this large, relative to the largest squared weighted coordinate of the
-# rows compared, are rounding noise and count as zero.  The reference is the size of the coordinates, which is
-# what the rounding error of a difference depends on, so the rule does not depend on the units of the features.
-_DIST_NOISE = 1e-18
 _MAD_TO_SD = 1.4826
 _LOCO_METHODS = ("ot_weighted", "ot_uniform", "equal", "nn1", "nn3", "kernel")
 _WEIGHTED_METHODS = ("ot_weighted", "nn1", "nn3", "kernel")
 _PERCENTILES = (5, 25, 50, 75, 95)
-# Log-domain rescue: the largest ratios between the regularisation strengths of successive stages of the continuation,
-# tried in turn until the final stage reaches the tolerance, the largest number of stages, the marginal residual at
-# which an intermediate stage is accepted, the largest numbers of Newton steps of an intermediate and of the final
-# stage, and the largest change of one log-scaling in one step.
-_RESCUE_RATIOS = (0.25, 0.5, 0.75)
-_RESCUE_MAX_STAGES = 60
-_RESCUE_STAGE_TOL = 1e-5
-_RESCUE_STAGE_STEPS = 40
-_RESCUE_FINAL_STEPS = 60
-_RESCUE_STEP_CAP = 30.0
-# Near the solution (marginal residual below _RESCUE_WIDE_ERR) the coordinates that carry mass, as opposed to those
-# with at most _RESCUE_PASSIVE times the total mass, may first try a step of up to _RESCUE_WIDE_CAP, because flat
-# directions of the dual objective need steps far beyond _RESCUE_STEP_CAP.
-_RESCUE_WIDE_ERR = 1e-3
-_RESCUE_WIDE_CAP = 1e6
-_RESCUE_PASSIVE = 1e-10
 _RATIO_NOTE = (
     "The intervals of the RMSE ratios are descriptive: they describe the cases at hand "
     "and are not a test of the route rule."
 )
+
+# Tolerances of the discrete decisions of the module.  Every comparison whose outcome would change with the
+# last bits of a floating-point number (a tie, a zero, a threshold) uses one of them, so that the result does
+# not depend on the math kernel of the machine.
+#
+# _ZERO_DISTANCE: a pairwise distance of at most this fraction of the larger of 1 and the largest pairwise
+#     distance is zero.  The features are standardised, so 1 is the size of one scale unit.
+# _MASS_TOLERANCE: a mass, usage or weight of at most this fraction of the largest one is rounding noise and
+#     counts as zero.
+# _TIE_TOLERANCE: two values within this relative distance of each other (or of 1, for small values) are tied.
+# _SUPPORT_TOLERANCE: a range of a feature of at most this fraction of the larger of 1 and its largest
+#     absolute value is zero.
+_ZERO_DISTANCE = 1e-12
+_MASS_TOLERANCE = 1e-12
+_TIE_TOLERANCE = 1e-9
+_SUPPORT_TOLERANCE = 1e-9
 
 
 # ----------------------------------------------------------------------------
@@ -250,10 +177,7 @@ def _by_label(x: Any, labels: pd.Index | None) -> Any:
 
 
 def _rescaled_weights(w: Any, d: int, names: pd.Index | None = None, name: str = "w") -> np.ndarray:
-    """Validate feature weights and rescale them to sum to ``d``; ``name`` labels the weights in error messages.
-
-    A weight of at most ``1e-12`` times the largest weight is rounding noise and is set to zero.
-    """
+    """Validate feature weights and rescale them to sum to ``d``; ``name`` labels the weights in error messages."""
     if isinstance(w, pd.Series) and names is not None:
         missing = [c for c in names if c not in w.index]
         if missing:
@@ -267,11 +191,11 @@ def _rescaled_weights(w: Any, d: int, names: pd.Index | None = None, name: str =
         raise ValueError(f"{name} has {arr.size} entries but there are {d} features")
     if not np.all(np.isfinite(arr)) or np.any(arr < 0):
         raise ValueError(f"{name} must be finite and non-negative")
+    arr = _zero_noise(arr)
     total = float(arr.sum())
     if total <= 0:
         raise ValueError(f"{name} sums to zero")
-    arr = np.where(arr > _NOISE * arr.max(), arr, 0.0)
-    return arr * (d / float(arr.sum()))
+    return arr * (d / total)
 
 
 def _vector(x: Any, n: int, name: str, finite: bool = False, positive: bool = False) -> np.ndarray:
@@ -292,21 +216,33 @@ def _vector(x: Any, n: int, name: str, finite: bool = False, positive: bool = Fa
     return arr
 
 
+def _zero_noise(arr: np.ndarray) -> np.ndarray:
+    """Set the entries that are at most ``_MASS_TOLERANCE`` times the largest entry to zero.
+
+    Masses and weights this small are rounding noise in exact arithmetic.  The
+    zero they stand for is taken exactly, so that every positivity test sees
+    the same sources and features on any machine.
+    """
+    top = float(arr.max()) if arr.size else 0.0
+    if top <= 0:
+        return arr
+    return np.where(arr <= _MASS_TOLERANCE * top, 0.0, arr)
+
+
 def _mass_vector(x: Any, n: int, name: str, allow_zero_total: bool = False) -> np.ndarray:
     """Return non-negative masses of length ``n``; uniform ``1/n`` when ``x`` is ``None``.
 
-    The total must be positive unless ``allow_zero_total`` is true.  A mass of at
-    most ``1e-12`` times the largest mass is rounding noise and is set to zero.
+    Masses at most ``1e-12`` times the largest one are set to zero.  The total
+    must be positive unless ``allow_zero_total`` is true.
     """
     if x is None:
         return np.full(n, 1.0 / n)
     arr = _vector(x, n, name)
     if not np.all(np.isfinite(arr)) or np.any(arr < 0):
         raise ValueError(f"{name} must be finite and non-negative")
+    arr = _zero_noise(arr)
     if arr.sum() <= 0 and not allow_zero_total:
         raise ValueError(f"{name} has zero total mass")
-    if arr.size and arr.max() > 0:
-        arr = np.where(arr > _NOISE * arr.max(), arr, 0.0)
     return arr
 
 
@@ -328,17 +264,20 @@ def _check_eps(eps: float) -> float:
     return eps
 
 
-def _default_eps(Z: np.ndarray, wt: np.ndarray) -> tuple[float, bool]:
-    """Return the default regularisation strength of the rows of ``Z`` and whether a fallback was used.
+def _default_eps_info(Z: np.ndarray, wt: np.ndarray) -> tuple[float, bool]:
+    """Return :func:`select_eps` of the rows of ``Z`` and whether its fallback was used.
 
-    The value is :func:`select_eps` at the median.  The flag is true when the
-    median of the pairwise weighted distances is zero, so that the median of the
-    positive distances, or 1, was used instead.  Fewer than two rows raise a
-    ``ValueError``.
+    At least two rows are needed, because no spread can be measured with fewer.  The value is positive
+    whenever there are two rows, including rows that coincide in the weighted features.
     """
     if Z.shape[0] < 2:
         raise ValueError("eps must be given when fewer than two sources are available")
-    return _select_eps(Z, _rescaled_weights(wt, Z.shape[1]), 0.5)
+    return _eps_and_fallback(Z, _rescaled_weights(wt, Z.shape[1]), 0.5)
+
+
+def _default_eps(Z: np.ndarray, wt: np.ndarray) -> float:
+    """Return :func:`select_eps` of the rows of ``Z``; see :func:`_default_eps_info`."""
+    return _default_eps_info(Z, wt)[0]
 
 
 def _per_case(items: Any, labels: pd.Index, name: str) -> list[Any]:
@@ -404,20 +343,6 @@ def _sq_cost(A: np.ndarray, B: np.ndarray, wt: np.ndarray, names: tuple[str, str
     return cdist(A_ * sw, B_ * sw, "sqeuclidean")
 
 
-def _coordinate_size(wt: np.ndarray, *tables: np.ndarray) -> float:
-    """Largest squared weighted coordinate ``w_k z_ik^2`` over the rows of ``tables`` and the features with weight.
-
-    The rounding errors of differences between coordinates are proportional to this size.  The tables must
-    be finite in the features with positive weight.
-    """
-    active = wt > 0
-    size = 0.0
-    for table in tables:
-        if table.size and active.any():
-            size = max(size, float(np.max(wt[active] * table[:, active] ** 2)))
-    return size
-
-
 # ----------------------------------------------------------------------------
 # Standardisation and ground cost
 # ----------------------------------------------------------------------------
@@ -428,8 +353,8 @@ def _median_and_scale(values: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
 
 
 def _unusable_scale(centre: pd.Series, scale: pd.Series) -> pd.Series:
-    """Flag the scales that are missing, zero or at most ``1e-12`` times the absolute value of the centre."""
-    return ~np.isfinite(scale) | (scale <= 1e-12 * centre.abs())
+    """Flag the scales that are missing, zero or at most ``1e-12`` times the larger of 1 and the absolute centre."""
+    return ~np.isfinite(scale) | (scale <= 1e-12 * centre.abs().clip(lower=1.0))
 
 
 def robust_standardise(
@@ -443,8 +368,8 @@ def robust_standardise(
 
     Each feature is centred at the median of ``reference`` and divided by
     ``1.4826`` times the median absolute deviation of ``reference``.  When that
-    scale is missing, zero or at most ``1e-12`` times the absolute value of the
-    centre, the feature takes the scale of the pooled sources ``Xs``, computed in
+    scale is missing, zero or at most ``1e-12`` times the larger of 1 and the
+    absolute value of the centre, the feature takes the scale of the pooled sources ``Xs``, computed in
     the same way from the median and the deviations of ``Xs``; when that scale
     is unusable as well, the scale is 1.  A feature whose reference median is
     missing is centred at the median of ``Xs``.  Standardised values are clipped
@@ -523,8 +448,7 @@ def weighted_sq_cost(Zs: pd.DataFrame | ArrayLike, Zt: pd.DataFrame | ArrayLike,
     features including those with zero weight, so that uniform weights give the
     plain squared Euclidean distance and a common factor in ``w`` has no effect.
     A feature with zero weight does not influence the result and may contain
-    missing values; a weight of at most ``1e-12`` times the largest weight is
-    rounding noise and counts as zero.  When both inputs are DataFrames the columns of ``Zt`` are
+    missing values.  When both inputs are DataFrames the columns of ``Zt`` are
     matched to those of ``Zs`` by name, and a Series ``w`` is matched to the
     columns by name.
 
@@ -547,6 +471,43 @@ def weighted_sq_cost(Zs: pd.DataFrame | ArrayLike, Zt: pd.DataFrame | ArrayLike,
     return _sq_cost(A, B, wt)
 
 
+def _eps_and_fallback(Z: np.ndarray, wt: np.ndarray, quantile: float) -> tuple[float, bool]:
+    """Regularisation strength of :func:`select_eps` and whether a fallback replaced the quantile.
+
+    Parameters
+    ----------
+    Z : ndarray, shape (n, d)
+        Standardised features, at least two rows.
+    wt : ndarray, length d
+        Feature weights rescaled to sum to ``d``.
+    quantile : float
+        Quantile of the pairwise distances, between 0 and 1.
+
+    Returns
+    -------
+    eps : float
+        ``0.1`` times the quantile of the pairwise weighted distances; ``0.1`` times the same quantile of
+        the positive distances when the quantile of all distances is zero; ``1.0`` when no distance is positive.
+    fallback : bool
+        Whether the quantile of all distances was zero.
+
+    Notes
+    -----
+    A distance of at most ``_ZERO_DISTANCE`` times the larger of 1 and the largest pairwise distance is zero,
+    so that rows which coincide up to rounding error are treated like rows which coincide exactly.
+    """
+    C = _sq_cost(Z, Z, wt, ("Z", "Z"))
+    pair = C[np.triu_indices(Z.shape[0], k=1)]
+    level = float(np.quantile(pair, quantile))
+    floor = _ZERO_DISTANCE * max(1.0, float(pair.max()))
+    if level > floor:
+        return 0.1 * level, False
+    positive = pair[pair > floor]
+    if positive.size == 0:
+        return 1.0, True
+    return 0.1 * float(np.quantile(positive, quantile)), True
+
+
 def select_eps(Z: pd.DataFrame | ArrayLike, w: ArrayLike, quantile: float = 0.5) -> float:
     """Entropic regularisation strength from the spread of a feature cloud.
 
@@ -555,25 +516,18 @@ def select_eps(Z: pd.DataFrame | ArrayLike, w: ArrayLike, quantile: float = 0.5)
     pairs of distinct rows ``i < j`` of ``Z``, with ``w`` rescaled to sum to the
     number of features as in :func:`weighted_sq_cost`.
 
-    Many pairs coincide when the weight is concentrated on a feature that takes
-    few values, for example a 0/1 indicator.  Two fallbacks keep the value
-    positive.  When the requested quantile of the distances is zero, ``q`` is
-    the same quantile of the positive distances.  When no pairwise distance is
-    positive, all rows coincide in the weighted features and the function
-    returns 1.0.  A distance of at most ``1e-18`` times the largest squared
-    weighted coordinate ``w_k z_ik^2`` of the rows is rounding noise and counts
-    as zero, so that multiplying the features by ``c`` multiplies the value by
-    ``c^2`` (apart from the constant 1.0 of the second fallback).  The value is
-    unchanged by the fallbacks whenever the requested quantile is positive.
-
-    Weights that are close to, but not exactly, concentrated on a feature with
-    few values give a small positive quantile of the distances and so a small
-    ``eps``, with no fallback.  The Sinkhorn iterations of such a small ``eps``
-    may not reach the tolerance within their iteration limit.  The solvers then
-    solve the same problem by the log-domain rescue of :func:`sinkhorn_plan`,
-    which converges for small ``eps``, and the callers report those solves as
-    ``n_log_domain``; ``n_nonconverged`` counts the solves that do not reach the
-    tolerance even after the rescue.
+    Two fallbacks keep the value positive.  When weights concentrate on a
+    feature with few distinct values, for example a 0/1 indicator, more than
+    a fraction ``quantile`` of the pairs can coincide in the weighted features
+    and the quantile is zero.  Then ``q`` is the same quantile of the positive
+    distances only.  When no pairwise distance is positive, because all rows
+    coincide in the weighted features, the value is ``1.0``, so that the
+    transport problem stays well posed; the plan is then uniform over the
+    rows.  A distance of at most ``1e-12`` times the larger of 1 and the
+    largest distance is treated as zero (the features are standardised, so 1 is
+    one scale unit), so that rounding error cannot decide between the ordinary
+    value and a fallback.  The value is unchanged whenever the quantile of all
+    distances is positive.
 
     Parameters
     ----------
@@ -592,42 +546,11 @@ def select_eps(Z: pd.DataFrame | ArrayLike, w: ArrayLike, quantile: float = 0.5)
     if not 0.0 <= quantile <= 1.0:
         raise ValueError("quantile must lie between 0 and 1")
     A, cols, _ = _as_matrix(Z, "Z")
-    if A.shape[0] < 2:
+    n = A.shape[0]
+    if n < 2:
         raise ValueError("Z needs at least two rows")
     wt = _rescaled_weights(w, A.shape[1], cols)
-    return _select_eps(A, wt, quantile)[0]
-
-
-def _select_eps(A: np.ndarray, wt: np.ndarray, quantile: float) -> tuple[float, bool]:
-    """Regularisation strength of :func:`select_eps` for rescaled weights, and whether a fallback was used.
-
-    Parameters
-    ----------
-    A : ndarray, shape (n, d)
-        Features, at least two rows.
-    wt : ndarray, shape (d,)
-        Weights rescaled to sum to ``d``.
-    quantile : float
-        Quantile of the pairwise distances, between 0 and 1.
-
-    Returns
-    -------
-    eps : float
-        The value, positive.
-    fallback : bool
-        Whether the quantile of all distances was zero, so that the positive
-        distances (or the constant 1) determined the value.
-    """
-    n = A.shape[0]
-    dist = _sq_cost(A, A, wt, ("Z", "Z"))[np.triu_indices(n, k=1)]
-    dist = np.where(dist <= _DIST_NOISE * _coordinate_size(wt, A), 0.0, dist)
-    level = float(np.quantile(dist, quantile))
-    if level > 0.0:
-        return 0.1 * level, False
-    positive = dist[dist > 0.0]
-    if positive.size == 0:
-        return 1.0, True
-    return 0.1 * float(np.quantile(positive, quantile)), True
+    return _eps_and_fallback(A, wt, quantile)[0]
 
 
 # ----------------------------------------------------------------------------
@@ -644,9 +567,7 @@ class Plan:
     converged : bool
         Whether ``marginal_error`` fell below the tolerance.
     n_iter : int
-        Number of scaling iterations performed.  When ``log_domain`` is true
-        these are the iterations that did not reach the tolerance and preceded
-        the rescue.
+        Number of scaling iterations performed.
     marginal_error : float
         Largest L1 residual of the two marginal optimality conditions, divided
         by the total mass of the plan, so that it does not depend on the scale of
@@ -664,11 +585,6 @@ class Plan:
         Labels of the sources, used by the functions that return pandas objects.
     target_index : Index, optional
         Labels of the target points.
-    log_domain : bool
-        True when the scaling iterations did not reach the tolerance within
-        ``max_iter`` and the plan comes from the log-domain rescue (see the
-        module header and :func:`sinkhorn_plan`), which reached it.  False for
-        a plan of the scaling iterations, also for one that did not converge.
     mass : float
         Total transported mass (read-only property).
     """
@@ -682,7 +598,6 @@ class Plan:
     rho_target: float | None
     source_index: pd.Index | None = field(default=None, repr=False)
     target_index: pd.Index | None = field(default=None, repr=False)
-    log_domain: bool = False
 
     @property
     def mass(self) -> float:
@@ -765,203 +680,6 @@ def _sinkhorn_core(
     return phi, psi, pi, n_iter, float(err)
 
 
-def _lower(err: float, best: float) -> bool:
-    """Whether the residual ``err`` is smaller than ``best``; any finite residual beats a missing one."""
-    return bool(err < best) or (bool(np.isnan(best)) and not bool(np.isnan(err)))
-
-
-def _log_domain_rescue(
-    a: np.ndarray,
-    b: np.ndarray,
-    C: np.ndarray,
-    eps: float,
-    rho_s: float | None,
-    rho_t: float | None,
-    tol: float,
-) -> tuple[np.ndarray, float, int]:
-    """Plan of the transport problem of :func:`sinkhorn_plan` by Newton iterations on the dual, for small ``eps``.
-
-    With the log-scalings ``phi`` of the sources and ``psi`` of the targets the
-    plan is ``pi = exp(log a + log b - C / eps + phi + psi)`` and the dual
-    objective divided by ``eps`` is ``T_s(phi) + T_t(psi) - sum_ij pi_ij``.
-    ``T_s(phi)`` is ``sum_i a_i phi_i`` when the source marginal is enforced
-    and ``-(rho_s / eps) sum_i a_i exp(-eps phi_i / rho_s)`` when it is
-    relaxed, and likewise ``T_t(psi)``.  The objective is concave, and its
-    gradient is the marginal residual of the optimality conditions that
-    :func:`_sinkhorn_core` iterates on.
-
-    The log-scalings of the larger side of the plan are eliminated: for given
-    log-scalings of the smaller side they are the exact maximiser, which is the
-    log-sum-exp scaling update.  The reduced objective of the smaller side has
-    the marginal residual of that side as its gradient and a negative Hessian
-    that is the sum of the Laplacian of the coupling ``pi' diag(1 / pi 1) pi``,
-    a non-negative multiple of that coupling when the larger side is relaxed,
-    and the diagonal of the penalty of the smaller side when it is relaxed.
-    All three are formed without subtracting nearly equal numbers.  Newton
-    steps with a Levenberg damping that grows until the dual objective does not
-    fall (within rounding), and with every coordinate limited to
-    ``_RESCUE_STEP_CAP``, update the log-scalings.
-
-    The costs are shifted by their row minima and then their column minima, and
-    the log-scalings are measured from the shifts divided by ``eps``, so the
-    exponents that are evaluated stay of moderate size.  The problem is solved
-    for a decreasing sequence of regularisation strengths that starts at the
-    larger of ``eps`` and the largest cost, shrinks geometrically by a factor of
-    at most ``_RESCUE_RATIOS[0]`` and ends at ``eps``; each stage starts from the
-    dual potentials ``eps * psi`` (in cost units) of the previous one.  When the
-    final stage does not reach ``tol``, the continuation is repeated with the
-    next, finer, ratio of ``_RESCUE_RATIOS``, and the best result is returned.
-
-    Parameters
-    ----------
-    a, b : ndarray
-        Strictly positive source and target masses.
-    C : ndarray, shape (len(a), len(b))
-        Cost matrix.
-    eps : float
-        Regularisation strength.
-    rho_s, rho_t : float or None
-        Penalty strengths of the source and target marginals, ``None`` when enforced.
-    tol : float
-        Tolerance on the marginal residual relative to the total mass of the plan.
-
-    Returns
-    -------
-    pi : ndarray, shape (len(a), len(b))
-        The plan of the best state found.
-    err : float
-        Its marginal residual divided by its total mass, as defined for ``Plan.marginal_error``.
-    n_steps : int
-        Number of Newton steps taken in all stages and continuations.
-    """
-    if C.shape[1] > C.shape[0]:
-        pi, err, n_steps = _log_domain_rescue(b, a, C.T, eps, rho_t, rho_s, tol)
-        return pi.T, err, n_steps
-    m = C.shape[1]
-    log_a, log_b = np.log(a), np.log(b)
-    row_min = C.min(axis=1)
-    col_min = (C - row_min[:, None]).min(axis=0)
-    shifted = C - row_min[:, None] - col_min[None, :]
-    first = max(eps, float(C.max()))
-
-    def newton(e: float, y: np.ndarray, accept: float, max_steps: int, polish: bool) -> tuple[dict[str, Any], int]:
-        """Newton iterations at strength ``e`` from the column log-scalings ``y``; the best state and the steps taken."""
-        kernel = log_a[:, None] + log_b[None, :] - shifted / e
-        ks = 0.0 if rho_s is None else e / rho_s
-        kt = 0.0 if rho_t is None else e / rho_t
-
-        def state(yy: np.ndarray) -> dict[str, Any]:
-            """Row log-scalings, plan, dual objective and marginal residual at the column log-scalings ``yy``."""
-            with np.errstate(over="ignore", under="ignore", invalid="ignore", divide="ignore"):
-                grid = kernel + yy[None, :]
-                top = grid.max(axis=1)
-                lse = top + np.log(np.exp(grid - top[:, None]).sum(axis=1))
-                if rho_s is None:
-                    xx = log_a - lse
-                    row_ref = a
-                    dual = float(a @ xx)
-                    size = abs(dual)
-                else:
-                    xx = (rho_s / (rho_s + e)) * (log_a - row_min / rho_s - lse)
-                    row_ref = np.exp(log_a - row_min / rho_s - ks * xx)
-                    penalty = float(row_ref.sum()) / ks
-                    dual = -penalty
-                    size = penalty
-                if rho_t is None:
-                    col_ref = b
-                    linear = float(b @ yy)
-                    dual += linear
-                    size += abs(linear)
-                else:
-                    col_ref = np.exp(log_b - col_min / rho_t - kt * yy)
-                    penalty = float(col_ref.sum()) / kt
-                    dual -= penalty
-                    size += penalty
-                pi = np.exp(grid + xx[:, None])
-                row, col = pi.sum(axis=1), pi.sum(axis=0)
-                total = float(row.sum())
-                dual -= total
-                size += total
-                err = max(np.abs(row - row_ref).sum(), np.abs(col - col_ref).sum()) / total if total > 0 else np.inf
-            return {
-                "y": yy, "pi": pi, "row": row, "col": col, "col_ref": col_ref, "dual": dual, "size": size, "err": float(err)
-            }
-
-        current = best = state(y)
-        taken = settled = 0
-        damping = 1e-10
-        while True:
-            if _lower(current["err"], best["err"]):
-                best = current
-            if current["err"] < accept:
-                settled += 1
-                if not polish or current["err"] < 1e-3 * accept or settled > 2:
-                    break
-            if taken >= max_steps:
-                break
-            pi, col, col_ref = current["pi"], current["col"], current["col_ref"]
-            residual = col_ref - col
-            share = np.divide(pi, current["row"][:, None], out=np.zeros_like(pi), where=current["row"][:, None] > 0)
-            coupling = pi.T @ share
-            off = coupling - np.diag(np.diag(coupling))
-            curvature = np.diag(kt * col_ref + off.sum(axis=1)) - off + (ks / (1.0 + ks)) * coupling
-            scale = col + kt * col_ref
-            live = scale > 0
-            dead = np.flatnonzero(~live)
-            passive = scale <= _RESCUE_PASSIVE * float(col.sum())
-            accepted = False
-            for _ in range(14):
-                system = curvature + damping * np.diag(scale)
-                system[dead, :] = 0.0
-                system[:, dead] = 0.0
-                system[dead, dead] = 1.0
-                try:
-                    step = np.linalg.solve(system, np.where(live, residual, 0.0))
-                except np.linalg.LinAlgError:
-                    step = None
-                if step is not None and np.isfinite(step).all():
-                    candidates = [np.clip(step, -_RESCUE_STEP_CAP, _RESCUE_STEP_CAP)]
-                    if current["err"] < _RESCUE_WIDE_ERR:
-                        wide = np.where(passive, candidates[0], np.clip(step, -_RESCUE_WIDE_CAP, _RESCUE_WIDE_CAP))
-                        candidates.insert(0, wide)
-                    for candidate in candidates:
-                        trial = state(current["y"] + candidate)
-                        if np.isfinite(trial["dual"]) and trial["dual"] >= current["dual"] - 1e-13 * current["size"]:
-                            accepted = True
-                            break
-                    if accepted:
-                        break
-                damping *= 100.0
-            if not accepted:
-                break
-            current = trial
-            damping = max(0.1 * damping, 1e-12)
-            taken += 1
-        return best, taken
-
-    n_steps = 0
-    result = None
-    for factor in _RESCUE_RATIOS:
-        strengths = [first]
-        ratio = min(factor, (eps / first) ** (1.0 / _RESCUE_MAX_STAGES))
-        while strengths[-1] > eps:
-            strengths.append(max(eps, strengths[-1] * ratio))
-        y = np.zeros(m)
-        for k, e in enumerate(strengths):
-            last = k == len(strengths) - 1
-            best, taken = newton(
-                e, y, tol if last else _RESCUE_STAGE_TOL, _RESCUE_FINAL_STEPS if last else _RESCUE_STAGE_STEPS, last
-            )
-            n_steps += taken
-            if not last:
-                y = e * best["y"] / strengths[k + 1]
-        if result is None or _lower(best["err"], result["err"]):
-            result = best
-        if best["err"] < tol:
-            break
-    return result["pi"], result["err"], n_steps
-
-
 def _solve(
     a: np.ndarray,
     b: np.ndarray,
@@ -971,15 +689,8 @@ def _solve(
     rho_t: float | None,
     max_iter: int,
     tol: float,
-    rescue: bool = True,
-) -> tuple[np.ndarray, bool, int, float, bool]:
+) -> tuple[np.ndarray, bool, int, float]:
     """Solve on the support of ``a`` and ``b``.
-
-    The scaling iterations of :func:`_sinkhorn_core` run first.  When they do
-    not reach ``tol`` within ``max_iter`` iterations, or produce non-finite
-    values, and ``rescue`` is true, the same problem is solved by
-    :func:`_log_domain_rescue` and the plan with the smaller marginal residual
-    is returned.  Iterations that reach ``tol`` are returned as they are.
 
     Parameters
     ----------
@@ -992,11 +703,9 @@ def _solve(
     rho_s, rho_t : float or None
         Penalty strengths of the source and target marginals, ``None`` when enforced.
     max_iter : int
-        Maximum number of scaling iterations.
+        Maximum number of iterations.
     tol : float
         Tolerance on the marginal residual relative to the total mass of the plan.
-    rescue : bool
-        Whether to run the log-domain rescue when the iterations do not converge.
 
     Returns
     -------
@@ -1005,33 +714,23 @@ def _solve(
     converged : bool
         Whether the relative residual fell below ``tol``.
     n_iter : int
-        Number of scaling iterations performed.
+        Number of iterations performed.
     err : float
         Marginal residual of the returned plan relative to its total mass.
-    rescued : bool
-        Whether the returned plan comes from the rescue and reached ``tol``.
     """
     ia = np.flatnonzero(a > 0)
     jb = np.flatnonzero(b > 0)
     a_s, b_s = a[ia], b[jb]
     if rho_s is None and rho_t is None:
         b_s = b_s * (a_s.sum() / b_s.sum())
-    C_s = C[np.ix_(ia, jb)]
-    _, _, pi_s, n_iter, err = _sinkhorn_core(a_s, b_s, C_s, eps, rho_s, rho_t, max_iter, tol)
-    finite = bool(np.isfinite(pi_s).all())
-    rescued = False
-    if rescue and not (finite and err < tol):
-        pi_r, err_r, _ = _log_domain_rescue(a_s, b_s, C_s, eps, rho_s, rho_t, tol)
-        if bool(np.isfinite(pi_r).all()) and (not finite or err_r < err):
-            pi_s, err, finite = pi_r, err_r, True
-            rescued = bool(err_r < tol)
-    if not finite:
+    _, _, pi_s, n_iter, err = _sinkhorn_core(a_s, b_s, C[np.ix_(ia, jb)], eps, rho_s, rho_t, max_iter, tol)
+    if not np.isfinite(pi_s).all():
         raise ValueError("the scaling iterations produced non-finite values; increase eps or rho")
     if ia.size == a.size and jb.size == b.size:
-        return pi_s, bool(err < tol), n_iter, err, rescued
+        return pi_s, bool(err < tol), n_iter, err
     pi = np.zeros(C.shape)
     pi[np.ix_(ia, jb)] = pi_s
-    return pi, bool(err < tol), n_iter, err, rescued
+    return pi, bool(err < tol), n_iter, err
 
 
 def sinkhorn_plan(
@@ -1043,9 +742,8 @@ def sinkhorn_plan(
     rho_target: float | None = None,
     max_iter: int = 5000,
     tol: float = 1e-9,
-    rescue: bool = True,
 ) -> Plan:
-    """Entropic optimal transport plan by log-domain Sinkhorn iterations, rescued for small ``eps``.
+    """Entropic optimal transport plan by log-domain Sinkhorn iterations.
 
     The plan minimises ``<C, pi> + eps KL(pi | a b') + rho_s KL(pi 1 | a) +
     rho_t KL(pi' 1 | b)`` over non-negative matrices, with
@@ -1053,26 +751,9 @@ def sinkhorn_plan(
     (or ``inf``) is enforced exactly instead of penalised.  A relaxed marginal
     uses the scaling update with exponent ``rho / (rho + eps)``.  Any
     combination of enforced and relaxed marginals is supported.  Entries of
-    ``a`` or ``b`` equal to zero, or at most ``1e-12`` times the largest entry
-    (rounding noise), receive no mass.  When both marginals are
+    ``a`` or ``b`` equal to zero receive no mass.  When both marginals are
     enforced their total masses must agree to a relative 1e-6, and ``b`` is
     rescaled to the total mass of ``a``.
-
-    Small ``eps``.  A relaxed marginal makes the scaling iterations contract by
-    the factor ``rho / (rho + eps)`` per iteration, which is close to one when
-    ``eps`` is small next to ``rho``, so the iterations can end at ``max_iter``
-    with a marginal residual above ``tol``.  When ``rescue`` is true and that
-    happens, the same problem (the same ``eps``, ``rho`` and masses) is solved
-    from scratch by Newton iterations on the dual objective in the log domain
-    with a continuation in ``eps`` (see the module header), and the plan with
-    the smaller marginal residual is returned.  The returned ``Plan`` has
-    ``log_domain`` true when that plan comes from the rescue and reached
-    ``tol``, and ``converged`` false only when neither the iterations nor the
-    rescue reached ``tol``.  Iterations that reach ``tol`` are returned
-    unchanged, bit for bit, whatever ``rescue`` is.  The rescue is accurate
-    while the exponents ``C / eps`` are resolved in double precision, which
-    bounds the attainable marginal residual below by about ``1e-16 * max(C) /
-    eps``.
 
     Parameters
     ----------
@@ -1091,14 +772,10 @@ def sinkhorn_plan(
     rho_target : float, optional
         Strength of the KL penalty on the target marginal, ``None`` to enforce it.
     max_iter : int
-        Maximum number of scaling iterations before the rescue.
+        Maximum number of iterations.
     tol : float
         Tolerance on ``Plan.marginal_error``, the marginal residual relative to
         the total mass of the plan.
-    rescue : bool
-        Whether to run the log-domain rescue when the scaling iterations do not
-        reach ``tol`` within ``max_iter`` iterations.  With ``False`` the plan
-        of the scaling iterations is returned whatever its residual.
 
     Returns
     -------
@@ -1121,9 +798,7 @@ def sinkhorn_plan(
         gap = abs(a_arr.sum() - b_arr.sum())
         if gap > 1e-6 * max(a_arr.sum(), b_arr.sum()):
             raise ValueError("balanced transport needs a and b with equal total mass")
-    pi, converged, n_iter, err, rescued = _solve(
-        a_arr, b_arr, C_arr, eps, rho_s, rho_t, int(max_iter), float(tol), rescue=bool(rescue)
-    )
+    pi, converged, n_iter, err = _solve(a_arr, b_arr, C_arr, eps, rho_s, rho_t, int(max_iter), float(tol))
     if isinstance(a, pd.Series):
         source_index = a.index
     elif isinstance(C, pd.DataFrame):
@@ -1146,7 +821,6 @@ def sinkhorn_plan(
         rho_target=rho_t,
         source_index=source_index,
         target_index=target_index,
-        log_domain=rescued,
     )
 
 
@@ -1293,7 +967,7 @@ def weighted_quantile(values: ArrayLike, probs: ArrayLike, q: ArrayLike) -> floa
     below them plus half of their own mass, and the quantile is obtained by
     linear interpolation between these positions, with the extreme values
     returned beyond the first and last position.  With equal weights this is
-    the Hazen quantile.  Points with zero weight or a missing value are dropped;
+    the Hazen quantile.  Points whose weight is at most ``1e-12`` times the largest weight, or whose value is missing, are dropped;
     infinite values are not allowed.
 
     Parameters
@@ -1320,7 +994,8 @@ def weighted_quantile(values: ArrayLike, probs: ArrayLike, q: ArrayLike) -> floa
         raise ValueError("probs must be finite and non-negative")
     if np.isinf(v).any():
         raise ValueError("values must not contain infinite entries")
-    keep = (p > 0) & np.isfinite(v)
+    threshold = _MASS_TOLERANCE * float(p.max()) if p.size else 0.0
+    keep = (p > threshold) & np.isfinite(v)
     v, p = v[keep], p[keep]
     if v.size == 0:
         raise ValueError("no support point with positive weight")
@@ -1360,6 +1035,7 @@ def transported_mixture(plan: Plan, draws_by_source: Sequence[ArrayLike] | Mappi
         Probability of each draw, summing to one.
     """
     usage = source_usage(plan)
+    threshold = _MASS_TOLERANCE * float(usage.max())
     arrays = _per_case(draws_by_source, usage.index, "draws_by_source")
     values: list[np.ndarray] = []
     probs: list[np.ndarray] = []
@@ -1368,7 +1044,7 @@ def transported_mixture(plan: Plan, draws_by_source: Sequence[ArrayLike] | Mappi
         if np.isinf(d).any():
             raise ValueError("draws_by_source must not contain infinite entries")
         d = d[np.isfinite(d)]
-        if u > 0 and d.size > 0:
+        if u > threshold and d.size > 0:
             values.append(d)
             probs.append(np.full(d.size, u / d.size))
     if not values:
@@ -1633,15 +1309,9 @@ def overlap_permutation_test(
     sources and of the target are pooled and split at random into pseudo
     sources and a pseudo target of the original sizes, which gives the exact
     permutation test of the hypothesis that all rows come from one
-    distribution.  The p-value is ``(1 + #{null >= statistic}) / (n_perm + 1)``,
-    where a null value counts when it is at least the statistic less a relative
-    ``1e-9`` (``1e-9`` times the larger of 1 and the statistic), so that null
-    values equal to the statistic in exact arithmetic are counted whatever the
-    rounding.
-
-    The test uses the features it is given.  A feature left out of ``Zs`` and
-    ``Zt`` (or carrying zero weight) does not enter the statistic, so a target
-    that is far from the sources on that feature only is not detected.
+    distribution.  The p-value is ``(1 + #{null >= statistic}) / (n_perm + 1)``, where a null
+    value counts when it is at least the statistic less ``1e-9`` times the
+    larger of 1 and the statistic, so that rounding error cannot decide a tie.
 
     Parameters
     ----------
@@ -1702,24 +1372,25 @@ def overlap_permutation_test(
         for s in range(null.size):
             draw = rng.choice(P.shape[0], size=m, replace=P.shape[0] < m)
             null[s] = b_norm @ nearest[draw]
-    at_least = null >= statistic - _TIE_TOL * max(1.0, abs(statistic))
-    p_value = float((1 + np.count_nonzero(at_least)) / (null.size + 1))
+    tolerance = _TIE_TOLERANCE * max(1.0, abs(statistic))
+    p_value = float((1 + np.count_nonzero(null >= statistic - tolerance)) / (null.size + 1))
     return {"statistic": statistic, "p_value": p_value, "null": null, "n_perm": int(null.size)}
 
 
-# ----------------------------------------------------------------------------
-# Support of the target
-# ----------------------------------------------------------------------------
-def _nonnegative(value: Any, name: str, upper: float | None = None) -> float:
-    """Return ``value`` as a finite float that is at least 0 (and at most ``upper`` when given)."""
-    try:
-        out = float(value)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{name} must be a number") from exc
-    if not np.isfinite(out) or out < 0 or (upper is not None and out > upper):
-        bound = "" if upper is None else f" and at most {upper:g}"
-        raise ValueError(f"{name} must be finite, at least 0{bound}")
-    return out
+def _frame_on(X: Any, names: Sequence[Any], name: str) -> pd.DataFrame:
+    """Return the features of ``X`` as a frame whose columns are ``names``, in that order.
+
+    A DataFrame is matched to ``names`` by column label, an array by position.
+    """
+    arr, cols, _ = _as_matrix(X, name, allow_row=False)
+    if cols is None:
+        if arr.shape[1] != len(names):
+            raise ValueError(f"{name} has {arr.shape[1]} features but {len(names)} are expected")
+        return pd.DataFrame(arr, columns=list(names))
+    missing = [c for c in names if c not in cols]
+    if missing:
+        raise KeyError(f"{name} lacks the features {missing}")
+    return pd.DataFrame(arr, columns=list(cols))[list(names)]
 
 
 def target_support(
@@ -1727,182 +1398,191 @@ def target_support(
     Xt: pd.DataFrame | ArrayLike,
     w: ArrayLike,
     plan: Plan,
-    reference: pd.DataFrame | None = None,
+    reference: pd.DataFrame | ArrayLike | None = None,
     min_ess: float = 2.0,
     min_weight: float = 0.10,
     range_tolerance: float = 0.10,
     clip: float | None = 5.0,
 ) -> dict[str, Any]:
-    """Check that a target lies inside the support of the sources of a transport plan.
+    """Whether the sources of a transport plan cover the target cloud.
 
-    A barycentric transport cannot exceed the largest observed effect of the
-    sources, so a target that is costlier, larger or more concentrated than
-    every case is an extrapolation that the method cannot make.  Two checks
-    describe how far the target is from what the sources can represent.
+    The transported effect is a barycentric mixture of the source effects.  It
+    therefore cannot exceed the largest source effect, and it describes the
+    target only where the sources that carry the mass resemble it.  The check
+    has two parts.
 
-    The first is the mass.  The usage of source ``i`` is the row sum ``u_i`` of
-    the plan, and the effective number of sources behind the target is
-    ``ess = (sum u)^2 / sum u^2`` (:func:`effective_sample_size` of the usage).
-    It equals the number of sources with positive usage when all share the mass
-    equally and approaches 1 when one source carries almost all of it.
+    Concentration
+        The mass that each source sends in the plan is its usage ``u_i``, the
+        row sum of the plan.  The effective number of sources is
+        ``ess = (sum u)^2 / sum u^2`` over the sources with positive usage, the
+        number of sources when the mass is spread evenly and one when a single
+        source carries all of it.  Usages below ``1e-12`` times the largest one
+        count as zero.
 
-    The second is the range of every feature.  A feature is *outside* when the
-    target lies beyond ``[min - range_tolerance * range, max + range_tolerance
-    * range]``, where ``min``, ``max`` and ``range`` are taken over the sources
-    with positive usage (a usage above ``1e-12`` of the total).  For a target
-    cloud with several rows the target value is the median of the rows.  The
-    test is made on the raw feature values, so it is not hidden by the clipping
-    of standardised values (the tables are standardised internally with
-    :func:`robust_standardise`, without clipping, only to report the standardised
-    value and whether it would be clipped).  A feature on which the sources
-    have no range (relative range at most ``1e-9``) is outside when the target
-    differs from the common value by more than ``1e-9`` times the larger of 1
-    and the absolute value.  Comparisons use a slack of relative ``1e-9`` so
-    that a target on the edge of the band is inside whatever the rounding.
+    Range
+        For each feature the sources with positive usage define the interval
+        from their minimum to their maximum, widened on both sides by
+        ``range_tolerance`` times its width.  A feature is outside when the
+        target lies beyond the widened interval.  The test runs on the robust
+        standardised values before clipping, so that clipping at ``clip`` cannot
+        hide a target far from the sources.  For a feature on which the sources
+        share one value the tolerance is ``1e-9`` times the larger of 1 and the
+        absolute value of that value.  The excess of a feature outside the
+        interval is its distance beyond the interval in units of the source
+        range; for a feature with zero range it is the distance in units of the
+        reference scale.
 
-    The target is *supported* when the effective number of sources is at least
-    ``min_ess`` and no feature with a normalised weight of at least
-    ``min_weight`` is outside.  A feature with a smaller weight may be outside
-    without affecting the result, because it hardly enters the ground cost.
-    The conformal and bootstrap intervals of this module describe the target
-    only when it is supported.
+    A feature with zero weight never counts as outside for the decision, and a
+    feature counts as material when its normalised weight is at least
+    ``min_weight``.
+
+    The target is a cloud of rows.  Its feature values are the medians of its
+    rows, which equal the medians of the standardised rows.  The function does
+    not check the mass of the target, which the plan enforces.
 
     Parameters
     ----------
     Xs : DataFrame or array, shape (n, d)
-        Raw (unstandardised) features of the sources, one row per row of the plan.
+        Raw (unstandardised) features of the sources, one row per source of the
+        plan in the order of the plan.  Values must be finite in the features
+        with positive weight.
     Xt : DataFrame or array, shape (m, d)
-        Raw features of the target points; a one-dimensional array is one
-        point.  Two DataFrames are matched by column name and the columns of
-        ``Xs`` are used.  When either table is an array, the columns are
-        matched by position and carry the names of ``Xs`` (``0, 1, ...`` when
-        ``Xs`` is an array).
+        Raw features of the target points, one row per target point of the
+        plan.  Columns are matched to those of ``Xs`` by name when both are
+        DataFrames.  Values must be finite in the features with positive weight.
     w : array-like or Series, length d
-        Non-negative feature weights of the ground cost; normalised here to sum to one.
+        Non-negative feature weights, normalised here to sum to one.
     plan : Plan
-        Plan from the sources to the target, for example from :func:`sinkhorn_plan`.
-    reference : DataFrame, optional
-        Table whose median and scaled deviation standardise the features, as in
-        :func:`robust_standardise`; the rows of ``Xs`` when ``None``.
+        Transport plan from the sources to the target points.
+    reference : DataFrame or array, optional
+        Table that defines the centre and the scale of the standardisation, as
+        in :func:`robust_standardise`.  When ``None`` the rows of ``Xs`` are used.
     min_ess : float
-        Smallest effective number of sources for which the target is supported.
+        Smallest acceptable effective number of sources.
     min_weight : float
-        Smallest normalised weight of a feature whose range test must pass, between 0 and 1.
+        Normalised weight from which a feature is material, between 0 and 1.
     range_tolerance : float
-        Margin around the range of the sources, as a share of that range.
+        Widening of the source range on both sides, as a fraction of its width.
     clip : float or None
-        Bound beyond which a standardised value counts as clipped in the
-        notebooks; ``None`` flags no feature.
+        Bound of the standardised values used to report ``clipped``; ``None``
+        reports no clipping.
 
     Returns
     -------
     dict
         ``ess`` (effective number of sources), ``max_source_share`` (largest
-        share of the total usage), ``n_sources`` (sources with positive usage),
-        ``features`` (DataFrame with one row per feature and the columns
-        ``weight``, ``target``, ``source_min``, ``source_max``, ``outside``,
-        ``excess``, ``z_target`` and ``clipped``), ``weighted_outside_share``
-        (sum of the weights of the outside features), ``ess_ok``, ``range_ok``,
-        ``supported`` and ``reasons`` (plain sentences, empty when supported).
-        ``excess`` is the distance from the target to the nearest edge of the
-        band in units of the range of the sources (0 when inside; in units of
-        the robust scale of the feature when the sources have no range; missing
-        when the target or the sources have no value).  ``z_target`` is the
-        robust standardised value without clipping and ``clipped`` is
-        ``abs(z_target) > clip``.
+        usage divided by the total usage), ``n_sources`` (number of sources with
+        positive usage), ``features`` (DataFrame with one row per feature and the
+        columns ``weight`` (normalised to sum to one), ``target`` (median of the
+        raw target rows), ``source_min`` and ``source_max`` (raw extremes over the
+        sources with positive usage), ``outside`` (bool), ``excess`` (distance
+        outside in units of the source range, 0 when inside), ``z_target``
+        (robust standardised target value without clipping) and ``clipped``
+        (bool, ``abs(z_target) > clip``)), ``weighted_outside_share`` (sum of the
+        weights of the features that are outside), ``ess_ok`` (``ess >= min_ess``),
+        ``range_ok`` (no material feature is outside), ``supported`` (both) and
+        ``reasons`` (plain sentences that say why the target is not supported, an
+        empty list when it is).  The comparisons with ``min_ess`` and
+        ``min_weight`` allow a tolerance of ``1e-9``.
     """
-    if not isinstance(plan, Plan):
-        raise TypeError("plan must be a Plan")
-    min_ess = _nonnegative(min_ess, "min_ess")
-    min_weight = _nonnegative(min_weight, "min_weight", upper=1.0)
-    range_tolerance = _nonnegative(range_tolerance, "range_tolerance")
+    min_ess = float(min_ess)
+    min_weight = float(min_weight)
+    range_tolerance = float(range_tolerance)
+    if not np.isfinite(min_ess) or min_ess < 0:
+        raise ValueError("min_ess must be finite and non-negative")
+    if not np.isfinite(min_weight) or not 0.0 <= min_weight <= 1.0:
+        raise ValueError("min_weight must lie between 0 and 1")
+    if not np.isfinite(range_tolerance) or range_tolerance < 0:
+        raise ValueError("range_tolerance must be finite and non-negative")
     if clip is not None:
         clip = float(clip)
         if not np.isfinite(clip) or clip <= 0:
             raise ValueError("clip must be positive and finite, or None")
-    Xs_f = _as_frame(Xs, "Xs")
-    if isinstance(Xs, pd.DataFrame) and isinstance(Xt, pd.DataFrame):
-        Xt_f = Xt
-    else:
-        rows, _, _ = _as_matrix(Xt, "Xt")
-        if rows.shape[1] != Xs_f.shape[1]:
-            raise ValueError(f"Xs has {Xs_f.shape[1]} features but Xt has {rows.shape[1]}")
-        Xt_f = pd.DataFrame(rows, columns=Xs_f.columns)
-    cols = list(Xs_f.columns)
-    n = len(Xs_f)
-    if n == 0 or len(Xt_f) == 0:
-        raise ValueError("Xs and Xt need at least one row")
-    if plan.pi.shape[0] != n:
-        raise ValueError(f"plan has {plan.pi.shape[0]} sources but Xs has {n} rows")
-    wt = _rescaled_weights(w, len(cols), Xs_f.columns, "w")
-    weight = wt / float(wt.sum())
-    Zs, Zt, scale = robust_standardise(Xs_f, Xt_f, reference=reference, clip=None)
-
-    usage = plan.pi.sum(axis=1)
-    total = float(usage.sum())
-    used = usage > _NOISE * total if total > 0 else np.zeros(n, dtype=bool)
-    ess = effective_sample_size(usage)
-    max_share = float(usage.max() / total) if total > 0 else float("nan")
-
-    source_values = Xs_f[cols].astype(float).to_numpy()[used]
-    target_rows = Xt_f[cols].astype(float).to_numpy()
+    A, cols, _ = _as_matrix(Xs, "Xs", allow_row=False)
+    names = list(cols) if cols is not None else list(range(A.shape[1]))
+    d = len(names)
+    B = _frame_on(Xt, names, "Xt").to_numpy(dtype=float)
+    wt = _rescaled_weights(w, d, pd.Index(names), "w")
+    weight = wt / d
     active = wt > 0
-    if not np.isfinite(target_rows[:, active]).all():
+    if not np.isfinite(A[:, active]).all():
+        raise ValueError("Xs must be finite in the features with positive weight")
+    if not np.isfinite(B[:, active]).all():
         raise ValueError("Xt must be finite in the features with positive weight")
-    if not np.isfinite(source_values[:, active]).all():
-        raise ValueError("Xs must be finite in the features with positive weight for the sources with positive usage")
-    source_frame = pd.DataFrame(source_values, columns=cols)
-    lo = source_frame.min().to_numpy()
-    hi = source_frame.max().to_numpy()
-    target = pd.DataFrame(target_rows, columns=cols).median().to_numpy()
-    span = hi - lo
-    magnitude = np.maximum(1.0, np.maximum(np.abs(lo), np.abs(hi)))
-    slack = _TIE_TOL * magnitude
-    flat = span <= slack
-    with np.errstate(invalid="ignore", divide="ignore"):
-        beyond = np.maximum((lo - range_tolerance * span) - target, target - (hi + range_tolerance * span))
-        known = np.isfinite(beyond)
-        outside = known & (beyond > slack)
-        unit = np.where(flat, scale.to_numpy(dtype=float), span)
-        excess = np.where(known, np.where(outside, beyond / unit, 0.0), np.nan)
-    z_target = Zt.median().to_numpy(dtype=float)
-    clipped = np.zeros(len(cols), dtype=bool) if clip is None else np.abs(z_target) > clip
+    if A.shape[0] != plan.pi.shape[0]:
+        raise ValueError(f"Xs has {A.shape[0]} rows but the plan has {plan.pi.shape[0]} sources")
+    if B.shape[0] != plan.pi.shape[1]:
+        raise ValueError(f"Xt has {B.shape[0]} rows but the plan has {plan.pi.shape[1]} target points")
+
+    usage = source_usage(plan).to_numpy(dtype=float)
+    top = float(usage.max()) if usage.size else 0.0
+    if not top > 0:
+        raise ValueError("the plan sends no mass")
+    used = usage > _MASS_TOLERANCE * top
+    ess = effective_sample_size(np.where(used, usage, 0.0))
+
+    Xs_frame = pd.DataFrame(A, columns=names)
+    Xt_frame = pd.DataFrame(B, columns=names)
+    ref_frame = None if reference is None else _frame_on(reference, names, "reference")
+    Zs, Zt, scale = robust_standardise(Xs_frame, Xt_frame, reference=ref_frame, columns=names, clip=None)
+    scale_v = scale.to_numpy(dtype=float)
+    zs = Zs.to_numpy(dtype=float)
+    z_target = np.median(Zt.to_numpy(dtype=float), axis=0)
+    target = np.median(B, axis=0)
+
+    source_min = A[used].min(axis=0)
+    source_max = A[used].max(axis=0)
+    z_min = zs[used].min(axis=0)
+    z_max = zs[used].max(axis=0)
+    span = z_max - z_min
+    low = z_min - range_tolerance * span
+    high = z_max + range_tolerance * span
+    distance = np.maximum(low - z_target, 0.0) + np.maximum(z_target - high, 0.0)
+    tolerance = _SUPPORT_TOLERANCE * np.maximum(1.0, np.maximum(np.abs(z_min), np.abs(z_max)))
+    zero_span = source_max == source_min
+    raw_distance = np.abs(target - source_min)
+    raw_tolerance = _SUPPORT_TOLERANCE * np.maximum(1.0, np.abs(source_min))
+    outside = np.where(zero_span, raw_distance > raw_tolerance, distance > tolerance)
+    scaled_distance = np.where(zero_span, raw_distance / scale_v, distance / np.where(span > 0, span, 1.0))
+    excess = np.where(outside, scaled_distance, 0.0)
+    clipped = np.abs(z_target) > clip if clip is not None else np.zeros(d, dtype=bool)
+
+    material = (weight > 0) & (weight >= min_weight - _TIE_TOLERANCE)
+    ess_ok = bool(ess >= min_ess - _TIE_TOLERANCE)
+    range_ok = bool(not np.any(outside & material))
+    reasons: list[str] = []
+    if not ess_ok:
+        reasons.append(
+            f"The transport draws on {ess:.2f} effective sources, below the minimum of {min_ess:g}, "
+            "so the transported effect rests on too few cases."
+        )
+    for j in np.flatnonzero(outside & material):
+        if span[j] > 0:
+            reasons.append(
+                f"The target lies outside the range of the sources on the feature '{names[j]}' "
+                f"(weight {weight[j]:.2f}), by {excess[j]:.2f} times that range."
+            )
+        else:
+            reasons.append(
+                f"The sources share one value on the feature '{names[j]}' (weight {weight[j]:.2f}) and the "
+                f"target differs from it by {excess[j]:.3g} reference scales."
+            )
     features = pd.DataFrame(
         {
             "weight": weight,
             "target": target,
-            "source_min": lo,
-            "source_max": hi,
+            "source_min": source_min,
+            "source_max": source_max,
             "outside": outside,
             "excess": excess,
             "z_target": z_target,
             "clipped": clipped,
         },
-        index=pd.Index(cols, name="feature"),
+        index=pd.Index(names, name="feature"),
     )
-
-    ess_ok = bool(ess >= min_ess * (1.0 - _TIE_TOL))
-    heavy = weight >= min_weight - _TIE_TOL
-    failing = np.flatnonzero(outside & heavy)
-    range_ok = failing.size == 0
-    reasons: list[str] = []
-    if not ess_ok:
-        share = "" if not np.isfinite(max_share) else f"; the largest source carries {100.0 * max_share:.0f} percent of the mass"
-        reasons.append(
-            f"The effective number of sources behind the target is {ess:.2f}, below the minimum of {min_ess:g}{share}."
-        )
-    for k in failing[np.argsort(-weight[failing], kind="stable")]:
-        if flat[k]:
-            where = f"the sources have the single value {lo[k]:g} and the target has {target[k]:g}"
-        else:
-            where = f"{excess[k]:.2f} source ranges beyond the allowed band of the sources"
-        reasons.append(
-            f"The target lies outside the range of the sources on {cols[k]} (weight {weight[k]:.2f}): {where}, "
-            f"standardised value {z_target[k]:.1f}."
-        )
     return {
         "ess": float(ess),
-        "max_source_share": max_share,
+        "max_source_share": float(top / usage.sum()),
         "n_sources": int(used.sum()),
         "features": features,
         "weighted_outside_share": float(weight[outside].sum()),
@@ -1954,11 +1634,8 @@ class LocoResult:
     summary : DataFrame
         One row per method with ``rmse``, ``mae``, ``mean_error``,
         ``correlation`` (between prediction and observed effect), ``rank`` (1 for
-        the smallest RMSE; RMSEs that differ by at most ``1e-9`` times the
-        larger of the largest RMSE and the largest absolute observed effect are
-        tied and share the smaller rank, so that methods that are all exact up
-        to rounding share rank 1) and ``rmse_adj`` (square root of the mean
-        squared error less the mean squared standard error, floored at zero).
+        the smallest RMSE) and ``rmse_adj`` (square root of the mean squared
+        error less the mean squared standard error, floored at zero).
     ratios : DataFrame
         One row per RMSE ratio (``ot_weighted / equal`` and ``ot_weighted /
         ot_uniform`` when both methods were run) with the sample ``ratio``,
@@ -1976,26 +1653,14 @@ class LocoResult:
     n_boot : int
         Number of bootstrap resamples of cases, or of groups when groups were given.
     n_nonconverged : int
-        Number of Sinkhorn solves that did not reach the tolerance, also after
-        the log-domain rescue of :func:`sinkhorn_plan`.  A solve is counted
-        here only when the scaling iterations and the rescue both stopped with
-        a marginal residual above the tolerance.
+        Number of Sinkhorn solves that did not reach the tolerance.
     n_eps_fallback : int
-        Number of fold solves of the optimal-transport methods in which the
-        default regularisation strength came from a fallback of
-        :func:`select_eps` (the median of the pairwise weighted distances of the
-        fold was zero, so the median of the positive distances, or 1, was
-        used).  It is zero when ``eps`` is given.
-    n_log_domain : int
-        Number of fold solves of the optimal-transport methods in which the
-        scaling iterations did not reach the tolerance within their iteration
-        limit and the log-domain rescue of :func:`sinkhorn_plan` solved the same
-        problem to the tolerance.  Weights that are close to, but not exactly,
-        concentrated on a feature with few values give a small default ``eps``
-        (see :func:`select_eps`) for which the scaling iterations are slow, so
-        the folds of such weights are counted here and not in
-        ``n_nonconverged``.  The field is last, so that positional construction
-        with the other fields still works.
+        Number of fold solves of ``ot_weighted`` and ``ot_uniform`` whose
+        regularisation strength, selected in the fold, came from a fallback of
+        :func:`select_eps` because the median weighted distance among the
+        sources and the held-out target was zero (more than half of the pairs
+        coincide in the weighted features, for example when the weights
+        concentrate on a 0/1 indicator).  It is zero when ``eps`` is given.
     ratio_note : str
         Statement that the intervals of ``ratios`` are descriptive.
 
@@ -2016,7 +1681,6 @@ class LocoResult:
     n_nonconverged: int
     ratio_note: str = _RATIO_NOTE
     n_eps_fallback: int = 0
-    n_log_domain: int = 0
 
     def _wide(self, column: str) -> pd.DataFrame:
         """Return ``column`` of the table with one row per case and one column per method."""
@@ -2035,7 +1699,7 @@ class LocoResult:
         return self._wide("error")
 
 
-def _loco_nn(C: np.ndarray, tau: np.ndarray, k: int, noise: float = 0.0) -> np.ndarray:
+def _loco_nn(C: np.ndarray, tau: np.ndarray, k: int) -> np.ndarray:
     """Mean effect of the ``k`` nearest sources at each target point.
 
     Parameters
@@ -2046,58 +1710,19 @@ def _loco_nn(C: np.ndarray, tau: np.ndarray, k: int, noise: float = 0.0) -> np.n
         Source effects.
     k : int
         Number of neighbours, reduced to ``n`` when there are fewer sources.
-    noise : float
-        Squared distance at or below which a difference between two distances
-        is rounding noise (see :func:`_coordinate_size`).
 
     Returns
     -------
     ndarray, shape (m,)
-        Prediction at each target point.  Distances that agree to a relative
-        ``1e-9``, or to within ``noise``, are ties, and ties are broken by
+        Prediction at each target point.  Distances are compared on a grid of
+        width ``1e-9`` times the larger of 1 and the largest distance, so that
+        distances which agree up to rounding error are tied; ties are broken by
         source order.
     """
     k = min(k, C.shape[0])
-    nearest = np.empty((k, C.shape[1]), dtype=np.intp)
-    for j in range(C.shape[1]):
-        order = np.argsort(C[:, j], kind="stable")
-        ranked = C[order, j]
-        new_block = np.diff(ranked) > _TIE_TOL * np.abs(ranked[1:]) + noise
-        block = np.concatenate(([0], np.cumsum(new_block)))
-        nearest[:, j] = order[np.lexsort((order, block))][:k]
+    grid = _TIE_TOLERANCE * max(1.0, float(C.max())) if C.size else 1.0
+    nearest = np.argsort(np.round(C / grid), axis=0, kind="stable")[:k]
     return tau[nearest].mean(axis=0)
-
-
-def _kernel_bandwidth(dist: np.ndarray, size: float) -> float:
-    """Bandwidth of the Gaussian kernel from the pairwise distances between the sources of a fold.
-
-    The bandwidth is the median of ``dist``.  A distance of at most ``1e-9`` times ``sqrt(size)`` is rounding
-    noise and counts as zero.  When the median is zero (more than half of the pairs coincide, as for weights
-    concentrated on a 0/1 indicator) the bandwidth is the median of the positive distances.  When no distance
-    is positive the sources coincide and every bandwidth that is large next to the noise gives them equal
-    weights, so ``sqrt(size)`` is used (1 when all coordinates are zero).
-
-    Parameters
-    ----------
-    dist : ndarray
-        Weighted distances (not squared) between pairs of sources, or from the sources to the target points
-        when there is one source.
-    size : float
-        Largest squared weighted coordinate of the sources (see :func:`_coordinate_size`).
-
-    Returns
-    -------
-    float
-        Positive bandwidth in distance units.
-    """
-    noise = float(np.sqrt(_DIST_NOISE * size))
-    median = float(np.median(dist))
-    if median > noise:
-        return median
-    positive = dist[dist > noise]
-    if positive.size:
-        return float(np.median(positive))
-    return float(np.sqrt(size)) if size > 0.0 else 1.0
 
 
 def _loco_kernel(C: np.ndarray, tau: np.ndarray, bandwidth: float) -> np.ndarray:
@@ -2122,28 +1747,16 @@ def _loco_kernel(C: np.ndarray, tau: np.ndarray, bandwidth: float) -> np.ndarray
     return (weights * tau[:, None]).sum(axis=0) / weights.sum(axis=0)
 
 
-def _correlation(x: np.ndarray, y: np.ndarray) -> float:
-    """Pearson correlation of two vectors, missing when either is constant.
+def _is_constant(values: np.ndarray) -> bool:
+    """Whether the spread of ``values`` is at most ``1e-9`` times the larger of 1 and their largest absolute value."""
+    return bool(np.ptp(values) <= _TIE_TOLERANCE * max(1.0, float(np.abs(values).max())))
 
-    A vector whose range is at most ``1e-12`` times its largest absolute value is constant.
-    """
-    if x.size < 2 or np.ptp(x) <= _NOISE * np.abs(x).max() or np.ptp(y) <= _NOISE * np.abs(y).max():
+
+def _correlation(x: np.ndarray, y: np.ndarray) -> float:
+    """Pearson correlation of two vectors, missing when either is constant."""
+    if x.size < 2 or _is_constant(x) or _is_constant(y):
         return float("nan")
     return float(np.corrcoef(x, y)[0, 1])
-
-
-def _rank_with_tolerance(values: np.ndarray, scale: float = 0.0) -> np.ndarray:
-    """Rank of every value, 1 for the smallest, with ties shared at the smallest rank.
-
-    Values that agree to ``1e-9`` times the larger of the largest finite value and ``scale`` are ties; missing
-    values rank last.  ``scale`` is the size of the quantity the values measure (for the RMSE of effect
-    predictors, the largest absolute effect), so that values that are all rounding noise next to that size are
-    ties.
-    """
-    present = values[~np.isnan(values)]
-    finite = present[np.isfinite(present)]
-    slack = _TIE_TOL * max(float(np.abs(finite).max()) if finite.size else 0.0, scale)
-    return np.array([1 + (np.count_nonzero(present < v - slack) if not np.isnan(v) else present.size) for v in values], dtype=int)
 
 
 def _rmse_ratio_table(
@@ -2199,7 +1812,7 @@ def _rmse_ratio_table(
                 "hi80": float(hi80),
                 "lo95": float(lo95),
                 "hi95": float(hi95),
-                "share_below_one": float(np.mean(boot < 1.0 - _TIE_TOL)),
+                "share_below_one": float(np.mean(boot < 1.0)),
             }
     return pd.DataFrame(list(rows.values()), index=pd.Index(list(rows), name="comparison"), columns=columns)
 
@@ -2243,20 +1856,16 @@ def loco_validation(
     ``kernel``
         Nadaraya-Watson Gaussian-kernel mean of the sources, with a bandwidth
         equal to the median weighted distance (not squared) between pairs of
-        sources.  Distances of at most ``1e-9`` times the largest weighted
-        coordinate are rounding noise and count as zero.  When the median is
-        zero (weights concentrated on a feature with few values) the bandwidth
-        is the median of the positive distances, and when all sources coincide
-        it is the largest weighted coordinate.
+        sources, or to 1 when that median is zero.
 
     For a cloud target the nearest-neighbour and kernel predictors are
     evaluated at each cloud point and averaged with equal weights.  Feature
     weights are rescaled to sum to the number of features as in
     :func:`weighted_sq_cost`.
 
-    The weights ``w`` are either an array, fixed for all folds, or a function
+    The weights ``w`` are either an array used for all folds, or a function
     ``w(train_idx)`` that returns the weights learned from the training cases of
-    the fold.  Fixed weights learned from the validated cases themselves carry
+    the fold.  Weights learned once from the validated cases themselves carry
     information about the held-out effects into every prediction and make the
     validation optimistic; a function that learns its weights from
     ``train_idx`` only does not.  The function is called once per held-out
@@ -2269,35 +1878,24 @@ def loco_validation(
     When ``eps`` is ``None`` it is selected in every fold by :func:`select_eps`
     from the sources of the fold together with the rows of the held-out target,
     with the weights of the fold for ``ot_weighted`` and uniform weights for
-    ``ot_uniform``.  When the weights of a fold concentrate on a feature that
-    takes few values (a 0/1 indicator), more than half of the pairwise
-    distances can be zero; :func:`select_eps` then falls back to the median of
-    the positive distances, or to 1 when all rows coincide, and
-    ``LocoResult.n_eps_fallback`` counts the fold solves in which this happened.
-    Weights that are close to, but not exactly, concentrated on such a feature
-    (a largest weight of 0.999 or more with small positive weights elsewhere)
-    give a small positive default ``eps`` with no fallback.  The scaling
-    iterations of such a fold may not reach the tolerance within 5000
-    iterations; the fold is then solved by the log-domain rescue of
-    :func:`sinkhorn_plan` with the same ``eps``, ``rho_source`` and masses, and
-    ``LocoResult.n_log_domain`` counts those folds.  ``LocoResult.n_nonconverged``
-    counts only the solves that do not reach the tolerance even after the rescue.
-
-    What the validation measures.  Every fold predicts a case at its own
-    features from the other cases (or the cases outside its group), so the
-    errors are leave-one-economy-out errors of cases at the features of cases:
-    they measure interpolation among the cases.  They do not measure the error
-    of a target that lies outside the cases, and the transport cannot predict
-    an effect larger than the largest source effect.  Intervals built from
-    these errors (:func:`loco_interval`, :func:`loco_predictive_draws`)
-    describe a target only inside the support checked by
-    :func:`target_support`.
+    ``ot_uniform``.  When the median weighted distance of a fold is zero, for
+    example because the weights learned in the fold concentrate on a 0/1
+    indicator and more than half of the pairs coincide on it, the fallback of
+    :func:`select_eps` supplies the value and ``LocoResult.n_eps_fallback``
+    counts the solve; the validation then runs to the end.
 
     The paired bootstrap resamples cases with replacement, or whole groups when
     ``groups`` is given, the same cases for every method; a resample has the
     mean squared error of its cases.  The resulting intervals of the RMSE
     ratios are descriptive: they describe the cases at hand and are not a test
     of the route rule.
+
+    The predictions are interpolations.  Each case is predicted from the other
+    cases and its error is measured at its own features, so the errors describe
+    how well the transport interpolates among the cases.  A transported
+    prediction is a mixture of the source effects and cannot exceed the largest
+    source effect.  The errors say nothing about a target outside the support
+    checked by :func:`target_support`.
 
     The per-case arguments ``tau``, ``se``, ``a`` and ``groups`` are used by
     position, except that a Series whose index is a permutation of the row
@@ -2312,7 +1910,7 @@ def loco_validation(
     se : array-like, length n, or None
         Positive standard error of each estimated effect.
     w : array-like of length d, or callable
-        Non-negative feature weights fixed for all folds (weights learned from
+        Non-negative feature weights used for all folds (weights learned from
         the validated cases make the validation optimistic), or a function
         ``w(train_idx)`` from the integer positions of the training cases of a
         fold to weights learned from those cases only.
@@ -2408,7 +2006,6 @@ def loco_validation(
     n_used = np.zeros(n, dtype=int)
     n_nonconverged = 0
     n_eps_fallback = 0
-    n_log_domain = 0
     for i in range(n):
         if guard is not None:
             guard()
@@ -2430,14 +2027,16 @@ def loco_validation(
         for method in methods:
             if method == "equal":
                 pred[method][i] = tau_src.mean()
-            elif method in ("nn1", "nn3"):
-                noise = _DIST_NOISE * _coordinate_size(wt, Zv[src], target)
-                pred[method][i] = _loco_nn(C_w, tau_src, 1 if method == "nn1" else 3, noise).mean()
+            elif method == "nn1":
+                pred[method][i] = _loco_nn(C_w, tau_src, 1).mean()
+            elif method == "nn3":
+                pred[method][i] = _loco_nn(C_w, tau_src, 3).mean()
             elif method == "kernel":
                 if code not in fold_bandwidth:
                     pair = _sq_cost(Zv[src], Zv[src], wt, ("Z", "Z"))
                     dist = np.sqrt(pair[np.triu_indices(src.size, k=1)]) if src.size > 1 else np.sqrt(C_w.ravel())
-                    fold_bandwidth[code] = _kernel_bandwidth(dist, _coordinate_size(wt, Zv[src]))
+                    median = float(np.median(dist))
+                    fold_bandwidth[code] = median if median > _ZERO_DISTANCE * max(1.0, float(dist.max())) else 1.0
                 pred[method][i] = _loco_kernel(C_w, tau_src, fold_bandwidth[code]).mean()
             else:
                 weights_m = wt if method == "ot_weighted" else uniform
@@ -2445,12 +2044,11 @@ def loco_validation(
                 if fixed_eps is not None:
                     eps_m = fixed_eps
                 else:
-                    eps_m, fell_back = _default_eps(pooled, weights_m)
-                    n_eps_fallback += int(fell_back)
+                    eps_m, used_fallback = _default_eps_info(pooled, weights_m)
+                    n_eps_fallback += int(used_fallback)
                 fold_eps[method].append(eps_m)
-                pi, converged, _, _, rescued = _solve(a_src, b_i, C_m, eps_m, rho_s, None, 5000, 1e-9)
+                pi, converged, _, _ = _solve(a_src, b_i, C_m, eps_m, rho_s, None, 5000, 1e-9)
                 n_nonconverged += int(not converged)
-                n_log_domain += int(rescued)
                 _, effect = _barycentric(pi, tau_src)
                 pred[method][i] = float(effect.mean())
     records = []
@@ -2482,7 +2080,7 @@ def loco_validation(
         },
         index=pd.Index(list(methods), name="method"),
     )
-    summary["rank"] = _rank_with_tolerance(summary["rmse"].to_numpy(), float(np.abs(tau_v).max()))
+    summary["rank"] = summary["rmse"].rank(method="min", na_option="bottom").astype(int)
     summary["rmse_adj"] = [float(np.sqrt(max(squared[m].mean() - noise, 0.0))) if np.isfinite(noise) else np.nan for m in methods]
     rng = np.random.default_rng(seed)
     ratios = _rmse_ratio_table(squared, int(n_boot), rng, codes)
@@ -2498,22 +2096,25 @@ def loco_validation(
         n_nonconverged=n_nonconverged,
         ratio_note=_RATIO_NOTE,
         n_eps_fallback=n_eps_fallback,
-        n_log_domain=n_log_domain,
     )
 
 
-def _loco_errors(table: Any) -> np.ndarray:
-    """Return the validation errors of a table of one method, one per row.
+def _table_errors(table: Any, estimate: Any) -> tuple[np.ndarray, float]:
+    """Validate a validation-error table and a point estimate.
 
     Parameters
     ----------
     table : DataFrame
-        Rows of ``LocoResult.table`` for one method, with the column ``error``.
+        Rows of ``LocoResult.table`` for one method.
+    estimate : float
+        Point estimate of the effect for the target.
 
     Returns
     -------
-    ndarray, shape (len(table),)
-        The finite errors (prediction minus observed effect).
+    errors : ndarray
+        The finite values of the column ``error``.
+    estimate : float
+        The estimate as a finite float.
     """
     if not isinstance(table, pd.DataFrame) or "error" not in table.columns:
         raise ValueError("table must be a DataFrame with the column 'error'")
@@ -2522,59 +2123,62 @@ def _loco_errors(table: Any) -> np.ndarray:
     n_cases = len(table)
     if n_cases == 0:
         raise ValueError("table has no rows")
-    return _vector(table["error"], n_cases, "table['error']", finite=True)
+    errors = _vector(table["error"], n_cases, "table['error']", finite=True)
+    estimate = float(estimate)
+    if not np.isfinite(estimate):
+        raise ValueError("estimate must be finite")
+    return errors, estimate
 
 
-def _check_level(level: Any) -> float:
-    """Return ``level`` as a float strictly between 0 and 1."""
-    try:
-        value = float(level)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("level must be a number strictly between 0 and 1") from exc
-    if not 0.0 < value < 1.0:
-        raise ValueError("level must lie strictly between 0 and 1")
+def _check_level(level: Any, allow_none: bool = False) -> float | None:
+    """Return ``level`` as a float strictly between 0 and 1; ``None`` is accepted when ``allow_none`` is true."""
+    if level is None and allow_none:
+        return None
+    message = "level must lie strictly between 0 and 1" + (", or be None" if allow_none else "")
+    if isinstance(level, (bool, np.bool_)) or not isinstance(level, (int, float, np.integer, np.floating)):
+        raise ValueError(message)
+    value = float(level)
+    if not (np.isfinite(value) and 0.0 < value < 1.0):
+        raise ValueError(message)
     return value
 
 
 def _conformal_rank(n: int, level: float) -> int:
-    """Order statistic ``ceil(level * (n + 1))`` of ``n`` scores used by split conformal prediction.
+    """Order statistic ``ceil(level * (n + 1))`` of ``n`` calibration scores, at least 1.
 
-    A product that exceeds an integer by at most ``1e-9`` counts as that integer, so that the
-    representation error of ``level`` (``0.55 * 100`` is ``55.00000000000001``) does not change the rank.
-    The arithmetic is exact, so the rank does not depend on the rounding of the machine.
+    The product is rounded down by ``_TIE_TOLERANCE`` before the ceiling, so that a product which is an
+    integer in exact arithmetic is not pushed up to the next integer by rounding error.
     """
-    return max(math.ceil(Fraction(level) * (n + 1) - Fraction(_TIE_TOL)), 1)
+    return max(1, int(np.ceil(level * (n + 1) - _TIE_TOLERANCE)))
 
 
 def _errors_needed(level: float) -> int:
-    """Smallest number of scores for which :func:`_conformal_rank` does not exceed the number of scores.
-
-    The rank does not exceed ``n`` exactly when ``n >= (level - 1e-9) / (1 - level)``; the bound is computed
-    in exact arithmetic, so the cost does not grow with the answer.
-    """
-    level = Fraction(level)
-    return max(math.ceil((level - Fraction(_TIE_TOL)) / (1 - level)), 1)
+    """Smallest number of calibration scores for which the order statistic of ``level`` exists."""
+    n = max(1, int(np.ceil((level - _TIE_TOLERANCE) / (1.0 - level))))
+    while _conformal_rank(n, level) > n:
+        n += 1
+    return n
 
 
-def _interval_from_errors(errors: np.ndarray, estimate: float, level: float) -> dict[str, Any]:
-    """Conformal interval of :func:`loco_interval` from validated errors, a finite estimate and a valid level."""
+def _conformal_interval(errors: np.ndarray, estimate: float, level: float) -> dict[str, Any]:
+    """Split conformal interval about ``estimate`` from validated errors; see :func:`loco_interval`."""
     n = int(errors.size)
     rank = _conformal_rank(n, level)
     out: dict[str, Any] = {
-        "lower": float("nan"),
-        "upper": float("nan"),
-        "half_width": float("nan"),
+        "lower": np.nan,
+        "upper": np.nan,
+        "half_width": np.nan,
         "n": n,
         "rank": rank,
         "level": level,
-        "guaranteed_level": float("nan"),
+        "guaranteed_level": np.nan,
         "status": "ok",
     }
     if rank > n:
         needed = _errors_needed(level)
         out["status"] = (
-            f"No interval exists at level {level!r}: at least {needed} validation errors are needed "
-            f"and the table has {n}."
+            f"No interval exists at level {level:g}: the validation has {n} error{'s' if n != 1 else ''} "
+            f"and at least {needed} are needed."
         )
         return out
     half_width = float(np.sort(np.abs(errors))[rank - 1])
@@ -2588,55 +2192,55 @@ def _interval_from_errors(errors: np.ndarray, estimate: float, level: float) -> 
 
 
 def loco_interval(table: pd.DataFrame, estimate: float, level: float = 0.90) -> dict[str, Any]:
-    """Conformal interval for the effect observed in a new study at the target.
+    """Split conformal interval for the observed effect of a new study at the target.
 
-    This is split conformal prediction with the leave-one-out errors as the
-    calibration scores.  The ``error`` column of the table of
-    :func:`loco_validation` holds the prediction of each case, made without
-    that case (or without its group), minus the effect observed for the case.
-    With ``n`` such errors the interval is ``estimate -/+ q``, where ``q`` is
-    the ``rank``-th smallest absolute error and ``rank = ceil(level * (n +
-    1))``.  If the error of a new study at the target is exchangeable with the
-    ``n`` validation errors, the interval contains the effect observed in that
-    study with probability at least ``rank / (n + 1)``, which is
-    ``guaranteed_level``, and exactly ``rank / (n + 1)`` when the absolute
-    errors have no ties.  The guarantee holds in finite samples and needs no
-    model for the errors.  ``guaranteed_level`` is at least ``level``; it
-    exceeds it because ``level * (n + 1)`` is rounded up to an integer.
+    The interval is ``estimate -/+ q``, where ``q`` is the ``ceil(level * (n + 1))``-th
+    smallest absolute leave-one-economy-out error among the ``n`` errors of
+    the table, one error per case (the table is the table of one method of
+    :func:`loco_validation`).  This is split conformal prediction with the
+    validation errors as calibration scores.  If the error of the observed
+    effect of a new study at the target is exchangeable with the ``n``
+    validation errors, the interval contains that observed effect with
+    probability at least ``rank / (n + 1)``, which is at least ``level``,
+    whatever the distribution of the errors.  The guarantee is
+    finite-sample; it covers the observed effect of one new study, so it
+    includes the sampling error of that effect and the error of the transport,
+    and it is not an interval for the average effect.  The bounds are missing
+    when ``rank`` would exceed ``n``, which for ``level = 0.90`` is the case
+    below 9 errors.
 
-    The interval is for the effect *observed* in a new study, not for the
-    underlying effect, because the errors contain the measurement noise of the
-    validated cases.  The estimation error of the transport enters through the
-    validation errors, each of which is the error of an estimate built from the
-    other cases.
+    Three intervals can be formed with this module and they answer different
+    questions.
 
-    Three intervals can be produced by this module and each has its own use.
-    The bootstrap interval of the transported average effect
-    (``bootstrap_transport(...)["draws"]``) describes the sampling uncertainty
-    of the transported average effect and is not validated for a new study.
-    The predictive draws of :func:`bootstrap_transport` add a normal
-    between-case deviation and measurement noise and are not validated either.
-    This interval is validated by construction for the observed effect of a new
-    study at the target.
+    ``bootstrap_transport(...)["draws"]``
+        Bootstrap interval of the transported average effect of the cases
+        that resemble the target.  It describes the sampling uncertainty of the
+        average, for example for a statement about the typical effect, and
+        it does not describe one new study.
+    ``bootstrap_transport(...)["predictive_draws"]``
+        Predictive draws for one new study, built from a deconvolved
+        between-case deviation and the measurement noise of one case.  They are
+        a model-based sensitivity analysis and are not validated against held-out
+        cases.
+    :func:`loco_interval`
+        Conformal interval of the observed effect of a new study at the target.
+        Its coverage is validated by construction, under exchangeability of
+        the errors.
 
-    Limits.  The table needs one error per case and is a table for one method;
-    every row of the table counts as one validation error.  Cases of one
-    economy are dependent, so when an economy has several cases the
-    exchangeability assumption holds only approximately and so does the
-    guarantee.  Leave-one-out errors are also computed from overlapping sets of
-    training cases, so they are exchangeable only approximately.  The
-    validation errors are errors of cases predicted at their
-    own features (interpolation among the cases).  The interval therefore
-    describes a target that resembles the cases, as checked by
-    :func:`target_support`, and it does not widen for a target far from the
-    cases; the transport cannot predict an effect larger than the largest
-    source effect.
+    Cases of one economy are dependent: the table of an economy with several
+    cases holds several errors that are not exchangeable with a new economy, so
+    the guarantee is approximate when an economy has several cases.  A table
+    with one row per economy has the exact guarantee.  The interval describes
+    the target only inside the support checked by :func:`target_support`, where
+    the validation errors resemble the error at the target; the errors are
+    those of cases at their own features, an interpolation among the cases,
+    and the transport cannot predict an effect larger than the largest effect
+    of its sources.
 
     Parameters
     ----------
     table : DataFrame
-        Rows of ``LocoResult.table`` for one method, with the column ``error``
-        and, optionally, the column ``method``.
+        Rows of ``LocoResult.table`` for one method, with the column ``error``.
     estimate : float
         Finite point estimate of the effect for the target.
     level : float
@@ -2645,19 +2249,17 @@ def loco_interval(table: pd.DataFrame, estimate: float, level: float = 0.90) -> 
     Returns
     -------
     dict
-        ``lower`` and ``upper`` (the bounds), ``half_width`` (``q``), ``n`` (the
-        number of validation errors), ``rank`` (the order statistic used),
-        ``level``, ``guaranteed_level`` (``rank / (n + 1)``) and ``status``.
-        ``status`` is ``"ok"`` when the interval exists.  It exists when
-        ``rank <= n``, which needs at least 9 errors for ``level=0.90``.
-        Otherwise the bounds, ``half_width`` and ``guaranteed_level`` are NaN
-        and ``status`` is a sentence that gives the number of errors needed.
+        ``lower`` and ``upper`` (the bounds; missing when no interval exists),
+        ``half_width`` (``q``), ``n`` (number of validation errors), ``rank``
+        (the order statistic ``ceil(level * (n + 1))`` that the level asks for),
+        ``level``, ``guaranteed_level`` (``rank / (n + 1)``, the coverage the
+        construction gives under exchangeability; missing when no interval
+        exists) and ``status`` (``"ok"``, or a sentence that says why no
+        interval exists and how many errors are needed).
     """
-    errors = _loco_errors(table)
-    estimate = float(estimate)
-    if not np.isfinite(estimate):
-        raise ValueError("estimate must be finite")
-    return _interval_from_errors(errors, estimate, _check_level(level))
+    level = _check_level(level)
+    errors, estimate = _table_errors(table, estimate)
+    return _conformal_interval(errors, estimate, level)
 
 
 def loco_predictive_draws(
@@ -2681,41 +2283,42 @@ def loco_predictive_draws(
     including the dispersion of that cost across groups and its systematic
     bias, and they do not use the uncertainty of the estimate itself.
 
-    Calibration.  The percentiles of the raw draws are essentially the range of
-    the validation errors, so their coverage of a new study falls short of the
-    nominal one when there are few errors.  With ``level`` given, the interval
-    of :func:`loco_interval` is computed from the errors of the table (one per
-    row).  When it exists, the draws are rescaled about the estimate by ``scale
-    = q / (the level-quantile of the absolute raw draws about the estimate)``,
-    where ``q`` is the half width of the interval, so that the symmetric
-    interval of the rescaled draws about the estimate at ``level`` equals the
-    conformal interval.  When the interval does not exist (too few errors), the
-    draws are unchanged and ``calibrated`` is False.  With ``level=None`` no
-    interval is computed and the draws are the raw ones.
+    The raw draws are the empirical distribution of the validation errors
+    and their symmetric interval about the estimate is close to the range of
+    the errors, which covers less than ``level`` when there are few errors.
+    With ``level`` given and the interval of :func:`loco_interval` available,
+    the draws are rescaled about the estimate by ``scale = q / Q``, where ``q``
+    is the half-width of that conformal interval and ``Q`` the ``level``-quantile
+    of the absolute raw draws about the estimate.  The symmetric interval of the
+    rescaled draws about the estimate at ``level`` is then exactly the conformal
+    interval, whose coverage is guaranteed in finite samples under
+    exchangeability; ``percentiles`` are those of the rescaled draws and
+    describe the shape of the predictive distribution, while the validated
+    interval is ``interval["lower"]`` to ``interval["upper"]``.  With
+    ``level=None``, or when there are too few errors for an interval, the draws
+    are the raw draws.  They are also left unrescaled, with ``calibrated`` false,
+    when the level-quantile of the absolute raw draws is zero while the interval
+    is not, because no scale can map zero onto a positive half-width.
 
-    Only ``interval`` has a coverage guarantee.  The ``percentiles`` are
-    descriptive percentiles of the (rescaled) draws and have no coverage
-    guarantee: the 5 and 95 percent points are equal-tail points of the draws,
-    not the ends of the symmetric conformal interval, and when the validation
-    errors are biased (their mean is far from zero) they can cover less than
-    the percentiles of the raw draws.  Statements about coverage of a new
-    study must use ``interval``.
+    Three intervals can be formed with this module and they answer different
+    questions.
 
-    Three intervals can be produced by this module and each has its own use.
-    The bootstrap interval of the transported average effect
-    (``bootstrap_transport(...)["draws"]``) describes the sampling uncertainty
-    of the transported average effect.  The predictive draws of
-    :func:`bootstrap_transport` add a normal between-case deviation and
-    measurement noise and are not validated.  The conformal interval of this
-    function (``interval``) is validated by construction for the observed
-    effect of a new study at the target.
+    ``bootstrap_transport(...)["draws"]``
+        Bootstrap interval of the transported average effect, the sampling
+        uncertainty of the average over the cases that resemble the target.
+    ``bootstrap_transport(...)["predictive_draws"]``
+        Model-based predictive draws for one new study; not validated against
+        held-out cases.
+    ``loco_predictive_draws`` with ``interval`` (see :func:`loco_interval`)
+        Conformal interval of the observed effect of a new study at the target;
+        validated by construction under exchangeability of the errors.
 
-    What the draws describe.  The validation errors are leave-one-economy-out
-    errors of cases predicted at their own features (interpolation among the
-    cases).  The transport cannot predict an effect larger than the largest
-    source effect, and the draws and the interval describe the target only
-    inside the support checked by :func:`target_support`; they do not widen for
-    a target far from the cases.
+    The validation errors are those of cases at their own features, that is
+    an interpolation among the cases.  The transport cannot predict an effect
+    larger than the largest source effect.  The draws and the
+    interval describe the target only inside the support checked by
+    :func:`target_support`; for a target far from the cases, or one that draws
+    on a single source, they are too narrow.
 
     Parameters
     ----------
@@ -2732,31 +2335,25 @@ def loco_predictive_draws(
     seed : int or numpy.random.Generator
         Seed of the random generator.
     level : float or None
-        Nominal coverage of the conformal interval and of the calibration,
-        strictly between 0 and 1; ``None`` returns the raw draws.
+        Nominal coverage of the conformal interval, strictly between 0 and 1,
+        or ``None`` for the raw draws.
 
     Returns
     -------
     dict
         ``draws`` (ndarray of length ``n_draws``), ``percentiles`` (Series of the
-        5, 25, 50, 75 and 95 percent points of the draws, descriptive and
-        without a coverage guarantee), ``estimate``,
-        ``n_draws``, ``n_groups`` and ``n_cases``; ``interval`` (the dict of
-        :func:`loco_interval`, ``None`` when ``level`` is ``None``), ``scale``
-        (the factor applied to the raw draws about the estimate, 1.0 when they
-        are unchanged) and ``calibrated`` (bool, whether the draws were
-        rescaled to the conformal interval).  The draws are also left unchanged
-        when they have no spread about the estimate while the interval has.
+        5, 25, 50, 75 and 95 percent points of the draws), ``estimate``,
+        ``n_draws``, ``n_groups`` and ``n_cases``, and in addition
+        ``interval`` (the dict of :func:`loco_interval` at ``level``, ``None``
+        when ``level`` is ``None``), ``scale`` (the factor applied to the draws
+        about the estimate, 1 when they are not rescaled) and ``calibrated``
+        (bool, whether the draws were rescaled).
     """
-    errors = _loco_errors(table)
+    errors, estimate = _table_errors(table, estimate)
     n_cases = errors.size
-    estimate = float(estimate)
-    if not np.isfinite(estimate):
-        raise ValueError("estimate must be finite")
     if int(n_draws) < 1:
         raise ValueError("n_draws must be at least 1")
-    if level is not None:
-        level = _check_level(level)
+    level = _check_level(level, allow_none=True)
     if groups is None:
         groups = table["group"] if "group" in table.columns else np.arange(n_cases)
     codes = _group_codes(groups, n_cases)
@@ -2770,19 +2367,18 @@ def loco_predictive_draws(
     for k in range(n_draws):
         pool = np.concatenate([members[g] for g in sampled[k]])
         picked[k] = pool[int(position[k] * pool.size)]
-    chosen = errors[picked]
-    interval: dict[str, Any] | None = None
-    scale, calibrated = 1.0, False
-    if level is not None:
-        interval = _interval_from_errors(errors, estimate, level)
-        if interval["status"] == "ok":
-            width = interval["half_width"]
-            spread = float(np.quantile(np.abs(chosen), level))
-            if width <= 0.0:
-                scale, calibrated = (0.0 if spread > 0.0 else 1.0), True
-            elif spread > _NOISE * width:
-                scale, calibrated = width / spread, True
-    draws = estimate - scale * chosen
+    drawn_errors = errors[picked]
+    interval = None if level is None else _conformal_interval(errors, estimate, level)
+    scale = 1.0
+    calibrated = False
+    if interval is not None and interval["status"] == "ok":
+        raw = float(np.quantile(np.abs(drawn_errors), level))
+        half_width = interval["half_width"]
+        if raw > 0.0 and np.isfinite(half_width / raw):
+            scale, calibrated = half_width / raw, True
+        elif raw == 0.0 and half_width == 0.0:
+            calibrated = True
+    draws = estimate - scale * drawn_errors
     levels = list(_PERCENTILES)
     return {
         "draws": draws,
@@ -2836,33 +2432,11 @@ def bootstrap_transport(
     deviation ``sqrt(S)``, the measurement noise of one case.  The measurement
     noise therefore enters the predictive draw once.
 
-    Three intervals can be produced by this module and each has its own use.
-    ``draws`` (with ``percentiles``) is the bootstrap distribution of the
-    transported average effect; it describes the sampling uncertainty of that
-    average effect and not the effect observed in a new study.
-    ``predictive_draws`` come from the normal model above and are not validated
-    against held-out cases.  The interval that is validated by construction for
-    the effect observed in a new study at the target is the conformal interval
-    of :func:`loco_interval`, built from the leave-one-economy-out errors of
-    :func:`loco_validation`.
-
-    What the bootstrap describes.  The transport averages source effects, so it
-    cannot predict an effect larger than the largest source effect, and the
-    resampling reflects only the cases at hand.  The validation folds behind
-    :func:`loco_validation` use the leave-one-economy-out errors of cases at
-    their own features (interpolation among the cases).  The intervals
-    describe the target only inside the support checked by
-    :func:`target_support` (effective number of sources, range of the
-    features).  When the median pairwise weighted distance of the sources is
-    zero and ``eps`` is ``None``, :func:`select_eps` falls back to the median
-    of the positive distances, or to 1 when all sources coincide.  When the
-    weights are close to, but not exactly, concentrated on a feature with few
-    values, ``eps`` is small and positive and the scaling iterations of a
-    replicate may not reach the tolerance within 5000 iterations; the replicate
-    is then solved by the log-domain rescue of :func:`sinkhorn_plan` with the
-    same ``eps``, ``rho_source`` and masses, and ``n_log_domain`` counts those
-    solves while ``n_nonconverged`` counts the solves that do not reach the
-    tolerance even after the rescue.
+    The transported effect is a mixture of the source effects, so it cannot
+    exceed the largest source effect.  The draws and the predictive draws
+    describe the target only inside the support checked by :func:`target_support`;
+    for a target outside that support the sources do not contain the effect that
+    the target may have, and the draws are not valid for it.
 
     The per-case arguments ``tau``, ``se``, ``a`` and ``groups`` (and ``b`` for
     the target points) are used by position, except that a Series whose index
@@ -2888,7 +2462,9 @@ def bootstrap_transport(
     b : array-like, length m, optional
         Weights of the target points, uniform when ``None``; normalised to sum to one.
     eps : float, optional
-        Entropic regularisation strength.  When ``None`` it is :func:`select_eps` of ``Zs``.
+        Entropic regularisation strength.  When ``None`` it is :func:`select_eps`
+        of the sources with positive mass, including its fallbacks for sources
+        that coincide in the weighted features (at least two sources are needed).
     rho_source : float or None
         Strength of the penalty on the source marginal; ``None`` enforces it.
     n_boot : int
@@ -2916,10 +2492,8 @@ def bootstrap_transport(
         original sources), ``between_sd`` (deconvolved between-case standard
         deviation under the original plan), ``measurement_sd`` (root of the
         usage-weighted mean squared standard error under the original plan),
-        ``eps``, ``n_boot``, ``n_nonconverged`` (solves of the original sources
-        and of the replicates that did not reach the tolerance, also after the
-        rescue) and ``n_log_domain`` (solves that the rescue brought to the
-        tolerance).
+        ``eps``, ``eps_fallback`` (whether the default ``eps`` came from a
+        fallback of :func:`select_eps`), ``n_boot`` and ``n_nonconverged``.
     """
     if int(n_boot) < 1:
         raise ValueError("n_boot must be at least 1")
@@ -2951,7 +2525,11 @@ def bootstrap_transport(
     b_v = b_v / b_v.sum()
     rho_s = _rho(rho_source, "rho_source")
     C = _sq_cost(A, B, wt)
-    eps_v = _check_eps(eps) if eps is not None else _default_eps(A, wt)[0]
+    eps_fallback = False
+    if eps is not None:
+        eps_v = _check_eps(eps)
+    else:
+        eps_v, eps_fallback = _default_eps_info(A, wt)
     se2 = se_v**2
     rng = np.random.default_rng(seed)
     n_draws = int(n_boot)
@@ -2966,14 +2544,14 @@ def bootstrap_transport(
         noise = np.split(rng.standard_normal(int(lengths.sum())), np.cumsum(lengths)[:-1])
     predictive_noise = rng.standard_normal((n_draws, 2))
 
-    def one(ii: np.ndarray, tau_r: np.ndarray) -> tuple[float, float, float, bool, bool]:
-        """Target effect, between-case variance, measurement variance, convergence and rescue flags for the sources ``ii``.
+    def one(ii: np.ndarray, tau_r: np.ndarray) -> tuple[float, float, float, bool]:
+        """Target effect, between-case variance, measurement variance and convergence flag for the sources ``ii``.
 
         ``tau_r`` holds the effects of the sources including any added noise; the spread is measured on the
         observed effects ``tau_v[ii]``.
         """
         a_r = a_v[ii] / a_v[ii].sum()
-        pi, converged, _, _, rescued = _solve(a_r, b_v, C[ii], eps_v, rho_s, None, 5000, 1e-9)
+        pi, converged, _, _ = _solve(a_r, b_v, C[ii], eps_v, rho_s, None, 5000, 1e-9)
         _, effect = _barycentric(pi, tau_r)
         use = b_v > 0
         value = float((b_v[use] * effect[use]).sum())
@@ -2983,22 +2561,20 @@ def bootstrap_transport(
         centre = float(usage @ observed / total)
         spread = float(usage @ (observed - centre) ** 2 / total)
         measurement = float(usage @ se2[ii] / total)
-        return value, max(spread - measurement, 0.0), measurement, converged, rescued
+        return value, max(spread - measurement, 0.0), measurement, converged
 
     everyone = np.arange(n)
-    estimate, base_between, base_measurement, base_converged, base_rescued = one(everyone, tau_v)
+    estimate, base_between, base_measurement, base_converged = one(everyone, tau_v)
     draws = np.empty(n_draws)
     between = np.empty(n_draws)
     measurement = np.empty(n_draws)
     n_nonconverged = int(not base_converged)
-    n_log_domain = int(base_rescued)
     for r in range(n_draws):
         if guard is not None and r % 50 == 0:
             guard()
         ii = resamples[r]
-        draws[r], between[r], measurement[r], converged, rescued = one(ii, tau_v[ii] + se_v[ii] * noise[r])
+        draws[r], between[r], measurement[r], converged = one(ii, tau_v[ii] + se_v[ii] * noise[r])
         n_nonconverged += int(not converged)
-        n_log_domain += int(rescued)
     predictive = draws + np.sqrt(between) * predictive_noise[:, 0] + np.sqrt(measurement) * predictive_noise[:, 1]
     levels = list(_PERCENTILES)
     return {
@@ -3012,7 +2588,7 @@ def bootstrap_transport(
         "between_sd": float(np.sqrt(base_between)),
         "measurement_sd": float(np.sqrt(base_measurement)),
         "eps": eps_v,
+        "eps_fallback": eps_fallback,
         "n_boot": int(n_boot),
         "n_nonconverged": n_nonconverged,
-        "n_log_domain": n_log_domain,
     }

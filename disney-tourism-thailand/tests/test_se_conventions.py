@@ -20,7 +20,7 @@ where ``K`` is the number of estimated parameters of the dummy-variable
 regression (``K = N - df`` from the ``friend_did`` output).
 
 The relation is an algebraic identity.  It holds exactly on any data set
-(verified below to about 1e-12 on simulated data) and, on the reference values,
+(verified below to about 1e-12 on hand-built panels) and, on the reference values,
 up to the print precision of the two standard errors (six and seven decimals).
 Only ``N``, ``G`` and ``K`` enter; no data are needed.
 """
@@ -147,10 +147,10 @@ def test_report_formula_equals_n_over_n_minus_k_scaling():
 
 
 # ----------------------------------------------------------------------------
-# Exactness on data (simulated; independent implementation in statsmodels)
+# Exactness on data (hand-built; independent implementation in statsmodels)
 # ----------------------------------------------------------------------------
 def _random_panel(seed, g, t_min, t_max, heavy=True):
-    """SIMULATED unbalanced panel with one treated unit; returns y, treat, unit, year."""
+    """Hand-built unbalanced panel with one treated unit; returns y, treat, unit, year."""
     rng = np.random.default_rng(seed)
     rows = []
     t0 = 0

@@ -1,6 +1,7 @@
 """Tests for dtt.cases: catalogue schema, features, imputation, donor pools and feasibility.
 
-All data are SIMULATED by dtt.simulate_global or built by hand inside the tests.
+The catalogue and the outcome panel come from the hand-built world of
+tests/handmade_world.py, or from small tables built by hand inside the tests.
 """
 import csv
 import sys
@@ -38,14 +39,14 @@ from dtt.cases import (  # noqa: E402
     resolve_next_start,
 )
 from dtt.panel import build_global_panel  # noqa: E402
-from dtt.simulate_global import simulate_global_world  # noqa: E402
+from handmade_world import build_handmade_world  # noqa: E402
 
 LEVELS = ["log_gdp_pc", "log_pop", "receipts_pct_gdp", "log_receipts_per_arrival", "arrivals_per_capita", "air_pax_per_capita"]
 
 
 @pytest.fixture(scope="module")
 def world(tmp_path_factory):
-    return simulate_global_world(tmp_path_factory.mktemp("world"), seed=2)
+    return build_handmade_world(tmp_path_factory.mktemp("world"))
 
 
 @pytest.fixture(scope="module")
@@ -76,7 +77,7 @@ def mid(panel, cases) -> pd.Series:
 
 
 def edited_catalogue(world, target: Path, edit) -> Path:
-    """Copy the simulated catalogue to ``target`` after applying ``edit`` to the all-text frame."""
+    """Copy the catalogue of the hand-built world to ``target`` after applying ``edit`` to the all-text frame."""
     raw = pd.read_csv(world.cases_path, dtype=str, keep_default_na=False)
     edit(raw)
     raw.to_csv(target, index=False)
@@ -148,13 +149,15 @@ def test_blank_numbers_and_flag_spellings_are_accepted(world, tmp_path):
         df.loc[0, "investment_usd_bn_nominal"] = ""
         df.loc[1, "first_year_attendance_m"] = " "
         df.loc[2, "investment_year_basis"] = ""
-        df["in_wdi_panel"] = ["TRUE", "false", "1", "0", "Yes", "no", "y", "n"] + ["yes"] * (len(df) - 8)
+        df["in_wdi_panel"] = ["TRUE", "false", "1", "0", "Yes", "no"] + ["yes"] * (len(df) - 6)
+        df["panel_feasible"] = ["y", "n"] + ["yes"] * (len(df) - 2)
         df.loc[3, "panel_feasible"] = ""
 
     cs = load_cases(edited_catalogue(world, tmp_path / "cases.csv", edit))
     assert cs.loc[0, "investment_usd_bn_nominal"] != cs.loc[0, "investment_usd_bn_nominal"]
     assert np.isnan(cs.loc[1, "first_year_attendance_m"]) and np.isnan(cs.loc[2, "investment_year_basis"])
-    assert cs["in_wdi_panel"].tolist()[:8] == [True, False, True, False, True, False, True, False]
+    assert cs["in_wdi_panel"].tolist()[:6] == [True, False, True, False, True, False]
+    assert cs["panel_feasible"].tolist()[:2] == [True, False]
     assert cs["panel_feasible"].isna().tolist()[3] and cs["panel_feasible"].notna().sum() == len(cs) - 1
 
 
@@ -773,12 +776,13 @@ def test_donor_pool_depends_on_the_focal_opening_year(panel, cases):
     assert c01["opening_year"] == 1997 and early["opening_year"] <= 2002 and late["opening_year"] >= 2003
     assert c01["iso3"] not in donor_pool(panel, early, cases)
     assert c01["iso3"] in donor_pool(panel, late, cases)
-    far_future = cases.loc[cases["case_id"] == "C16"].iloc[0]
+    far_future = cases.loc[cases["case_id"] == "C06"].iloc[0]
     assert far_future["opening_year"] > 2019 and far_future["iso3"] in donor_pool(panel, early, cases)
 
 
-def test_donor_pool_parameters(panel, cases, mid):
-    case = mid
+def test_donor_pool_parameters(panel, cases):
+    # C04 is the focal case with another opening (C03, 2008) one to five years before its own (2013).
+    case = cases.loc[cases["case_id"] == "C04"].iloc[0]
     base = donor_pool(panel, case, cases)
     no_buffer = donor_pool(panel, case, cases, buffer=0)
     assert set(base) < set(no_buffer)
@@ -788,7 +792,7 @@ def test_donor_pool_parameters(panel, cases, mid):
 
 
 def test_donor_pool_accepts_identifier_row_and_mapping(panel, cases):
-    row = cases.iloc[6]
+    row = cases.iloc[2]
     expected = donor_pool(panel, row, cases)
     assert donor_pool(panel, row["case_id"], cases) == expected
     assert donor_pool(panel, {"iso3": row["iso3"], "opening_year": row["opening_year"]}, cases) == expected
@@ -817,7 +821,7 @@ def test_check_feasibility_counts_years_and_donors_like_a_brute_force_count(pane
 def test_feasibility_reasons_name_every_failed_condition(panel, cases, mid):
     feas = check_feasibility(cases, panel).set_index("case_id")
     assert feas.loc["C01", "reason"] == "n_pre 2 below minimum 5" and not feas.loc["C01", "feasible"]
-    assert feas.loc["C16", "reason"] == "n_post 0 below minimum 3" and not feas.loc["C16", "feasible"]
+    assert feas.loc["C06", "reason"] == "n_post 0 below minimum 3" and not feas.loc["C06", "feasible"]
     assert feas.loc[mid["case_id"], "reason"] == "" and feas.loc[mid["case_id"], "feasible"]
     got = feas.loc[mid["case_id"]]
     strict = check_feasibility(
@@ -915,18 +919,18 @@ def test_raw_cases_of_a_shared_economy_fail_on_other_openings_exactly_when_one_f
             assert not feas.loc[row.case_id, "feasible"]
         else:
             assert not any(part.startswith("other_openings") for part in reasons), row.case_id
-    assert flagged == ["C05", "C09"]
+    assert flagged == ["C02", "C03"]
 
 
 def test_the_members_of_an_episode_are_not_other_openings_of_the_episode(cluster_panel, cluster_cases, episodes):
     for feas in (check_feasibility(episodes, cluster_panel), check_feasibility(episodes, cluster_panel, catalogue=cluster_cases)):
         assert not feas["reason"].str.contains("other_openings").any()
-        assert feas["feasible"].sum() == 11
+        assert feas["feasible"].sum() == 3
 
 
 def test_another_episode_in_the_window_is_an_other_opening_only_when_the_window_is_not_cut_at_its_start(cluster_panel, cluster_cases):
     split = build_episodes(cluster_cases, merge_gap=2)
-    assert len(split) == 16
+    assert len(split) == 8
     capped = check_feasibility(split, cluster_panel, catalogue=cluster_cases)
     assert not capped["reason"].str.contains("other_openings").any()
     uncapped = check_feasibility(split.drop(columns=["next_start_year"]), cluster_panel, catalogue=cluster_cases)
@@ -1079,7 +1083,7 @@ def test_price_year_and_its_assumed_flag_are_kept_from_the_conversion_file(world
             {"case_id": ids[1], "price_year": 2004, "price_year_assumed": "Yes", "investment_usd_bn_fxconv": 2.5},
             {"case_id": ids[2], "investment_usd_bn_fxconv": 3.5},
             {"case_id": ids[5], "price_year": 1999, "price_year_assumed": "n", "investment_usd_bn_fxconv": 99.0},
-            {"case_id": ids[6], "price_year": 2010, "price_year_assumed": "y"},
+            {"case_id": ids[4], "price_year": 2010, "price_year_assumed": "y"},
             {"case_id": "NOT_A_CASE", "price_year": 1990, "price_year_assumed": "yes", "investment_usd_bn_fxconv": 7.0},
         ],
     )
@@ -1093,9 +1097,9 @@ def test_price_year_and_its_assumed_flag_are_kept_from_the_conversion_file(world
     assert joined["investment_basis"].iloc[2] == "fx_converted"
     assert joined["investment_basis"].iloc[5] == "reported" and joined["price_year"].iloc[5] == 1999.0
     assert joined["price_year_assumed"].iloc[5] == False  # noqa: E712
-    assert joined["price_year"].iloc[6] == 2010.0 and joined["price_year_assumed"].iloc[6] == True  # noqa: E712
-    assert joined["investment_basis"].iloc[6] == "reported"
-    rest = [i for i in range(len(ids)) if i not in (0, 1, 2, 5, 6)]
+    assert joined["price_year"].iloc[4] == 2010.0 and joined["price_year_assumed"].iloc[4] == True  # noqa: E712
+    assert joined["investment_basis"].iloc[4] == "reported"
+    rest = [i for i in range(len(ids)) if i not in (0, 1, 2, 4, 5)]
     assert joined["price_year"].iloc[rest].isna().all() and joined["price_year_assumed"].iloc[rest].isna().all()
 
 
@@ -1611,11 +1615,11 @@ def test_every_case_of_the_simulated_catalogue_is_its_own_episode(cases):
 
 
 # ----------------------------------------------------------------------------
-# Episodes with a panel: a synthetic test world in which economies host several cases
+# Episodes with a panel: the cluster world, in which economies host several cases
 # ----------------------------------------------------------------------------
 @pytest.fixture(scope="module")
 def cluster_world(tmp_path_factory):
-    return simulate_global_world(tmp_path_factory.mktemp("cluster"), seed=0, cluster_economies=True)
+    return build_handmade_world(tmp_path_factory.mktemp("cluster"), cluster_economies=True)
 
 
 @pytest.fixture(scope="module")
@@ -1633,10 +1637,10 @@ def episodes(cluster_cases) -> pd.DataFrame:
     return build_episodes(cluster_cases)
 
 
-def test_clustered_catalogue_collapses_to_thirteen_episodes(cluster_cases, episodes):
+def test_clustered_catalogue_collapses_to_five_episodes(cluster_cases, episodes):
     sizes = cluster_cases.groupby("iso3").size()
-    assert len(cluster_cases) == 16 and sorted(sizes[sizes > 1]) == [2, 3]
-    assert len(episodes) == 13 and episodes["n_openings"].sum() == 16
+    assert len(cluster_cases) == 8 and sorted(sizes[sizes > 1]) == [2, 3]
+    assert len(episodes) == 5 and episodes["n_openings"].sum() == 8
     assert sorted(episodes["n_openings"][episodes["n_openings"] > 1]) == [2, 3]
     assert episodes["case_id"].is_unique and episodes["next_start_year"].isna().all()
     for row in episodes.itertuples():
@@ -1649,7 +1653,7 @@ def test_clustered_catalogue_collapses_to_thirteen_episodes(cluster_cases, episo
 
 def test_shorter_merge_gap_splits_the_clusters_and_sets_next_start_years(cluster_cases):
     eps = build_episodes(cluster_cases, merge_gap=2)
-    assert len(eps) > 13
+    assert len(eps) == 8
     for iso3, sub in eps.groupby("iso3"):
         assert sub["opening_year"].is_monotonic_increasing
         assert sub["next_start_year"].iloc[:-1].tolist() == sub["opening_year"].iloc[1:].astype(float).tolist()
@@ -1668,7 +1672,7 @@ def test_episode_feasibility_uses_the_shortened_window_and_every_catalogue_openi
         assert got["n_pre"] == (sub["year"] < row["opening_year"]).sum()
         assert got["n_post"] == ((sub["year"] >= row["opening_year"]) & (sub["year"] <= end)).sum()
         assert got["n_donors"] == len(brute_force_donors(cluster_panel, cluster_cases, row))
-    assert int(feas["feasible"].sum()) == 11
+    assert int(feas["feasible"].sum()) == 3
     pd.testing.assert_frame_equal(check_feasibility(episodes, cluster_panel), feas)
 
 

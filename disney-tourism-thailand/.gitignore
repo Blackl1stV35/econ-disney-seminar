@@ -20,11 +20,11 @@ env/
 Thumbs.db
 desktop.ini
 
-# Executed copies and conversion output
+# Executed copies of the notebooks, written by nbconvert to an output directory
 executed/
 *.nbconvert.ipynb
 
-# Local configuration and editors
+# Local settings, secrets and editor folders
 .env
-.idea/
 .vscode/
+.idea/

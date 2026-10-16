@@ -18,7 +18,7 @@ python -m pip install -r requirements.txt
 python -m pytest -q                  # about 6 minutes
 ```
 
-Run this command before every pull request. The notebooks run on the dataset in the repository; a full run takes one to two hours (almost all in notebook 03) and is not part of a normal change. The unit tests use synthetic test data from `dtt.simulate` and `dtt.simulate_global`.
+Run this command before every pull request. The notebooks run on the dataset in the repository; a full run takes one to two hours (almost all in notebook 03) and is not part of a normal change. The unit tests build their test data by hand in `tests/handmade_panels.py` and `tests/handmade_world.py`.
 
 ## Rules
 

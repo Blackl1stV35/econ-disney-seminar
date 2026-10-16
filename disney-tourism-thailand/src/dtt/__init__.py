@@ -19,8 +19,6 @@ scm
 replication
     Panel loading, the full single-country analysis and the equivalence check
     against the reference values.
-simulate
-    Synthetic single-country test panels for validating the estimators.
 
 Global extension
 ----------------
@@ -32,8 +30,6 @@ cases
 effects
     Synthetic-control effect of every feasible case with placebo-in-space
     inference.
-simulate_global
-    Synthetic test worlds with known case effects.
 
 Transport to the target economy
 -------------------------------

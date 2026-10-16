@@ -1,14 +1,17 @@
 """Tests for dtt.replication: panel loading, the analysis driver, the equivalence check and the reference values.
 
-The analysis is run on a synthetic test panel.  The equivalence check is exercised
-with pseudo-targets built from the Python results themselves (every row must
-pass) and with perturbed copies (the perturbed rows must fail), and against the
-reference values for the quantities that depend only on the sample structure.
-The reference file is checked against numbers read by hand from the original
-output and against the arithmetic relations that tie its entries together.  The
-test that uses the panel file runs whenever data/raw/disney_did_panel.csv exists.
+The analysis is run on a hand-built panel with the structure of the dataset.  The
+equivalence check is exercised with pseudo-targets built from the Python results
+themselves (every row must pass) and with perturbed copies (the perturbed rows
+must fail), and against the reference values for the quantities that depend only
+on the sample structure.  The reference file is checked against numbers read by
+hand from the original output and against the arithmetic relations that tie its
+entries together.  The test that needs the dataset runs only when DTT_RUN_REAL=1
+is set and the panel file exists.
 """
 import json
+import os
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -16,14 +19,17 @@ import pytest
 from scipy import stats
 
 from dtt import replication as rp
-from dtt import simulate
+from handmade_panels import study_panel
 
 PROVENANCE = "Numbers printed by an independent run of the original analysis, used as equivalence targets."
+#: Directories that hold a virtual environment, a tool cache or executed copies, not files of the repository.
+SKIPPED_DIRECTORIES = {".venv", "venv", "env", "site-packages", ".git", "__pycache__", ".pytest_cache", ".ipynb_checkpoints", "executed"}
+STATA_SUFFIXES = {".dta", ".do", ".ado", ".log", ".smcl"}
 
 
 @pytest.fixture(scope="module")
 def sim():
-    df, truth = simulate.simulate_panel(seed=11, trend_spread=0.0)
+    df, truth = study_panel(trend_spread=0.0, noise_seed=11)
     return df
 
 
@@ -215,7 +221,7 @@ def test_reference_tables_equal_the_values(reference):
         for f in ("pre_rmspe", "post_rmspe", "ratio", "mean_gap", "rank"):
             assert r[f] == value(reference, f"log2/placebo_ratio/{r['unit_id']}/{f}")
     for r in tables["placebo_mean_gap"]["hk"]:
-        name = simulate.UNIT_NAMES[r["unit_id"]]
+        name = rp.UNIT_NAMES[r["unit_id"]]
         for f in ("mean_gap", "rank"):
             assert r[f] == value(reference, f"log1/scm/hk/placebo_meangap/{name}/{f}")
     assert len(tables["placebo_ratio"]["hk"]) == len(tables["placebo_mean_gap"]["hk"]) == 6
@@ -484,9 +490,9 @@ def test_hong_kong_placebo_rank_as_printed(reference):
 # Panel loading and validation
 # ----------------------------------------------------------------------------
 def real_layout(df):
-    """Simulated panel in the column order of the real file, with its two extra columns."""
+    """The panel in the column order of the dataset file, with its two extra columns."""
     out = df.copy()
-    out["unit"] = out.unit_id.map(simulate.UNIT_NAMES)
+    out["unit"] = out.unit_id.map(rp.UNIT_NAMES)
     out["treatment_year"] = out.study_case.map(rp.TREATMENT_YEAR)
     cols = ["study_case", "unit", "year", "treated", "post", "treated_post", "rel_year", "treatment_year", "receipts_pct_gdp", "unit_id"]
     return out[cols]
@@ -832,7 +838,7 @@ def test_summary_and_formatted_table(results, pseudo):
 
 
 def test_equivalence_with_the_reference_values_on_simulated_data_fails_loudly(results, reference):
-    """Numbers from a synthetic panel must not pass as the results of the original study."""
+    """Numbers from a panel other than the dataset must not pass as the results."""
     table = rp.check_equivalence(results, reference)
     det = table[table.kind == "deterministic"]
     assert (det.status == "FAIL").mean() > 0.9
@@ -848,13 +854,22 @@ def test_equivalence_accepts_the_path_of_a_reference_file(results, reference, tm
 
 
 # ----------------------------------------------------------------------------
-# Panel file of the repository
+# Dataset check (runs only on request)
 # ----------------------------------------------------------------------------
-def test_default_panel_is_the_file_of_the_original_study():
+def test_real_run_requires_the_switch_and_the_panel_file(sim, tmp_path):
+    path = tmp_path / "panel.csv"
+    sim.to_csv(path, index=False)
+    assert rp.REAL_RUN_VARIABLE == "DTT_RUN_REAL"
+    assert rp.real_run_enabled(path, env={"DTT_RUN_REAL": "1"})
+    assert not rp.real_run_enabled(path, env={})
+    assert not rp.real_run_enabled(path, env={"DTT_RUN_REAL": "0"})
+    assert not rp.real_run_enabled(path, env={"DTT_RUN_REAL": "true"})
+    assert not rp.real_run_enabled(tmp_path / "absent.csv", env={"DTT_RUN_REAL": "1"})
     assert rp.DEFAULT_PANEL == rp.REPO_ROOT / "data" / "raw" / "disney_did_panel.csv"
 
 
-def test_panel_file_matches_the_reference_values(reference):
+@pytest.mark.skipif(not rp.real_run_enabled(), reason="dataset check not run (set DTT_RUN_REAL=1 to run on the desktop)")
+def test_real_panel_matches_the_reference_values(reference):
     df = rp.load_panel()
     res = rp.run_all(df)
     table = rp.check_equivalence(res, reference)
@@ -866,13 +881,51 @@ def test_panel_file_matches_the_reference_values(reference):
 # ----------------------------------------------------------------------------
 # Repository content
 # ----------------------------------------------------------------------------
+def _skipped_directory(directory: Path) -> bool:
+    """True for a directory that holds a virtual environment, a tool cache or executed copies."""
+    return directory.name in SKIPPED_DIRECTORIES or (directory / "pyvenv.cfg").is_file()
+
+
+def repository_files(root: Path) -> list[Path]:
+    """Return the files below ``root`` as paths relative to it.
+
+    Directories are skipped by their name below ``root`` and by a ``pyvenv.cfg``
+    file inside them, so the names of the directories above ``root`` play no part.
+    """
+    found: list[Path] = []
+    for current, dirnames, filenames in os.walk(root):
+        here = Path(current)
+        dirnames[:] = sorted(name for name in dirnames if not _skipped_directory(here / name))
+        found.extend((here / name).relative_to(root) for name in filenames)
+    return sorted(found)
+
+
+def stata_files(root: Path) -> list[str]:
+    """List the files below ``root`` whose suffix belongs to Stata."""
+    return [path.as_posix() for path in repository_files(root) if path.suffix.lower() in STATA_SUFFIXES]
+
+
 def test_repository_has_no_dependence_on_stata_files(root):
-    banned_suffixes = {".dta", ".do", ".ado", ".log", ".smcl"}
-    ignored = {".git", "__pycache__", ".pytest_cache", ".ipynb_checkpoints"}
-    files = [p for p in root.rglob("*") if p.is_file() and not (set(p.relative_to(root).parts) & ignored)]
-    assert [str(p.relative_to(root)) for p in files if p.suffix.lower() in banned_suffixes] == []
+    assert stata_files(root) == []
     reader = "read_" + "stata"
     writer = "to_" + "stata"
     sources = [p for p in (root / "src").rglob("*.py")]
     assert sources
     assert [p.name for p in sources if reader in p.read_text(encoding="utf-8") or writer in p.read_text(encoding="utf-8")] == []
+
+
+def test_repository_scan_ignores_a_virtual_environment_and_finds_the_repository_files(tmp_path):
+    repo = tmp_path / "env" / "copy"
+    (repo / "analysis").mkdir(parents=True)
+    (repo / "analysis" / "old_code.do").write_text("* Stata code of the original analysis\n", encoding="utf-8")
+    venv = repo / ".venv"
+    (venv / "Lib" / "site-packages").mkdir(parents=True)
+    (venv / "pyvenv.cfg").write_text("home = C:\\Python313\n", encoding="utf-8")
+    (venv / "Lib" / "site-packages" / "helper.do").write_text("* third-party file\n", encoding="utf-8")
+    (venv / "Lib" / "site-packages" / "note.md").write_text(f"Third-party {chr(0x2014)} text.\n", encoding="utf-8")
+    vendored = repo / "tools" / "python_copy"
+    vendored.mkdir(parents=True)
+    (vendored / "pyvenv.cfg").write_text("", encoding="utf-8")
+    (vendored / "other.dta").write_bytes(b"")
+    assert stata_files(repo) == ["analysis/old_code.do"]
+    assert all(".venv" not in path.parts and "python_copy" not in path.parts for path in repository_files(repo))

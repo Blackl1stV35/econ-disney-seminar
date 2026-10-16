@@ -5,7 +5,7 @@ cases with their opening year and investment. This module reads and validates
 the catalogue, merges the openings of one economy that follow each other closely
 into treatment episodes (:func:`build_episodes`), decides which cases or episodes
 can be analysed with a synthetic control on the global panel, builds the donor
-pool of each, and describes the economy at the time of the opening with a fixed
+pool of each, and describes the economy at the time of the opening with a defined
 list of numeric features (:data:`FEATURE_COLUMNS`) and the investment of the
 first opening (``capex_first_pct_gdp``).
 
