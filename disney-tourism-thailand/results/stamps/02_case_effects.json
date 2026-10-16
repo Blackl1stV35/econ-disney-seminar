@@ -1,0 +1,73 @@
+{
+  "format": 1,
+  "inputs": {
+    "data/processed/cases_catalogue.csv": {
+      "producer": null,
+      "sha256": "cd3d24b78aa8f1ca380bdd24e89bfdf9ecd8d687c30a375ce78c69ad6a068b91"
+    },
+    "data/processed/cases_investment_fx.csv": {
+      "producer": null,
+      "sha256": "5567ea28efd9511a7b999ec558923ac78daa8a7738ab5a28c16c35c6658258f7"
+    },
+    "data/processed/global_panel.csv": {
+      "producer": "00_build_global_panel",
+      "sha256": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7"
+    },
+    "results/donor_eligibility.csv": {
+      "producer": "00_build_global_panel",
+      "sha256": "ef8a8ffc1c79bec948e905bc6db36d16d592979c04b5876dbf66f42b75c47cf7"
+    },
+    "results/panel_coverage.csv": {
+      "producer": "00_build_global_panel",
+      "sha256": "00d8ead60bcca0b9855db01d0681869ee099184a57a74d133e45fc9f1d341515"
+    }
+  },
+  "outputs": {
+    "figures/case_effect_vs_capex.png": {
+      "sha256": "18c3d03f96d73dabad42538c6560c4e5684b2a4faa1007fc16cf5286e34690a9"
+    },
+    "figures/case_effects_forest.png": {
+      "sha256": "3ebd33db6c78552d46b00b9e5e3bb04bba7ad85038d6ae40dd421b271ffccb02"
+    },
+    "figures/case_estimator_comparison.png": {
+      "sha256": "7b1821013d8ed7abbad792b6455bdef6f1a688f04d6e38c14fc05dcaaa311663"
+    },
+    "figures/case_gap_paths.png": {
+      "sha256": "d8cdb43c23ba8c98d00d72a9389ead773bd38df115c86ead8c001408a88694ce"
+    },
+    "results/case_effects.csv": {
+      "sha256": "4f5276f3d6ff4f67ff445f040f8985774542b09bbb75f877b234faa817226b83"
+    },
+    "results/case_effects_robustness.csv": {
+      "sha256": "42ab060359fa3549014e71bd6e9d0b694c9b0d914f20eb3da5fd108ae3c83f30"
+    },
+    "results/case_features.csv": {
+      "sha256": "ec07ce69f65abdc04998e8b0030ff0e0765bec098557b39762807b8d4fa36a46"
+    },
+    "results/case_features_imputed.csv": {
+      "sha256": "a5cbe34facd1276a501689e4c55db7c926029e1c7b4720078a75cbe929449488"
+    },
+    "results/case_investment_fits.csv": {
+      "sha256": "de3d180304335fc90ddafe7926700dcf80451fb76e38c2cd5c5abe6738497440"
+    },
+    "results/case_placebos.csv": {
+      "sha256": "da76e1556c496539742734e1e14d920a2b0af9fae6d79974172244c850197385"
+    },
+    "results/episodes.csv": {
+      "sha256": "9c5394ede29dec291eef8f9ec20374740729f85e937c6eb85e2e4fd22422b1ce"
+    },
+    "results/feasibility.csv": {
+      "sha256": "5587c156cf2358848f1f4dc44408dec9cf9797866549e68ff23b7c1506fce69d"
+    },
+    "results/figure_inventory_02_case_effects.csv": {
+      "sha256": "2bdd2f03bfa1bd7c87b8c18cba8218b5c7a776081cee19307cdff2210796db7e"
+    },
+    "results/imputation_report.csv": {
+      "sha256": "69efcf2bd2a634bd4fa69da75816a1fd035d0549b748fed56e4075cae4909d17"
+    },
+    "results/reference_features.csv": {
+      "sha256": "1fe68acda034d2d748f9e762b5fe45bc260cfb08231a89017d1f1bef4133cad0"
+    }
+  },
+  "stage": "02_case_effects"
+}

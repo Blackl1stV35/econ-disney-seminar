@@ -1,0 +1,88 @@
+{
+  "format": 1,
+  "inputs": {
+    "data/processed/global_panel.csv": {
+      "producer": "00_build_global_panel",
+      "sha256": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7"
+    },
+    "results/case_effects.csv": {
+      "producer": "02_case_effects",
+      "sha256": "4f5276f3d6ff4f67ff445f040f8985774542b09bbb75f877b234faa817226b83"
+    },
+    "results/case_features.csv": {
+      "producer": "02_case_effects",
+      "sha256": "ec07ce69f65abdc04998e8b0030ff0e0765bec098557b39762807b8d4fa36a46"
+    },
+    "results/case_features_imputed.csv": {
+      "producer": "02_case_effects",
+      "sha256": "a5cbe34facd1276a501689e4c55db7c926029e1c7b4720078a75cbe929449488"
+    },
+    "results/importance_diagnostics.json": {
+      "producer": "03_feature_importance",
+      "sha256": "61cea3474a9b4dc9b1682724c5fc0eadfec139a9677b42ab444e9ccfa89f9e77"
+    },
+    "results/loco_fold_weights.csv": {
+      "producer": "04_optimal_transport",
+      "sha256": "4e164cabcb365a32b8a21216d596a350f75953754f542022924e9fb5eae977d4"
+    },
+    "results/loco_summary.csv": {
+      "producer": "04_optimal_transport",
+      "sha256": "d6757ab99a7a6712181ff08b0df5c36ba81a4910bf388c8ff3d990ab86509368"
+    },
+    "results/loco_table.csv": {
+      "producer": "04_optimal_transport",
+      "sha256": "1caad298d08ab90adc49f8c6f65b7736863e537d28a24705ff467848d6177e5d"
+    },
+    "results/thailand_scenario_draws.csv": {
+      "producer": "04_optimal_transport",
+      "sha256": "06227342054f6d2f0404e19545583b9935f930923104e175673be56002bb5d50"
+    },
+    "results/thailand_scenario_null_draws.csv": {
+      "producer": "04_optimal_transport",
+      "sha256": "b0e899106e33d6a0fa1293355da894e55cb13c3a3756ea1ab02e1f2ff2c6b506"
+    },
+    "results/thailand_scenario_usage.csv": {
+      "producer": "04_optimal_transport",
+      "sha256": "a5c827265ce86b6d6bb536b9e7da3e695cc48f14df66b51b3e701eb7dabdb561"
+    },
+    "results/thailand_scenarios.csv": {
+      "producer": "04_optimal_transport",
+      "sha256": "68209ba1996a5c497be9bb2eb4ebe785077258d6d4db9e78011e32ff75dbf7d5"
+    },
+    "results/thailand_transport.json": {
+      "producer": "04_optimal_transport",
+      "sha256": "f23cea3774c5e1c4b375cf431e8b7c750ad5584ff20b6a4b73187c629d48bba8"
+    },
+    "results/thailand_transport_draws.csv": {
+      "producer": "04_optimal_transport",
+      "sha256": "756bff292826d606bcf1f38cffe573a02faa72cb7d8097d5d550055c14be3c1a"
+    }
+  },
+  "outputs": {
+    "figures/impact_routes.png": {
+      "sha256": "eee97b844be7af26f6d29076417127f81f3740b51768ade2bc88b885b72f0baa"
+    },
+    "figures/impact_scaling_law.png": {
+      "sha256": "11e551dc12862a1cbd013e7ca5d9b7e0ffedd0537092644d90532ae14c51b0f2"
+    },
+    "results/ambient_loeo.csv": {
+      "sha256": "3bac946f876b88f58106795700d45fef74e951d608e80c9e562369ed1ffd6b19"
+    },
+    "results/figure_inventory_05_thailand_impact.csv": {
+      "sha256": "a52fabbf57dfd916da65daac39c3c1dca29baad1c134f1bd42018cab6b3b8f4d"
+    },
+    "results/route_decision.json": {
+      "sha256": "a9e3996b7511d21281a7d5002b26f3dc08f931477cc7ff8bf4350832a8d9b5b3"
+    },
+    "results/thailand_detection.csv": {
+      "sha256": "049c7f38ceda164d703a0b77472aedbd9e8c11d2e2c1038123c6e19ba4249e1c"
+    },
+    "results/thailand_impact.csv": {
+      "sha256": "76eb6ffd161818b8dad584a9d07a935e37ba55fed1d867512d92bd7011058cd1"
+    },
+    "results/thailand_summary.json": {
+      "sha256": "291debf223ede77df1f196a8c061c867eb0a5ad1aceec8a9b6bd3af161e56ae3"
+    }
+  },
+  "stage": "05_thailand_impact"
+}

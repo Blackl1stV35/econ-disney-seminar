@@ -1,0 +1,101 @@
+{
+  "format": 1,
+  "inputs": {
+    "data/processed/global_panel.csv": {
+      "producer": "00_build_global_panel",
+      "sha256": "cccca9e08b36db846adcf6577fe3681af7da5e93cd908b74b79e15b837d635e7"
+    },
+    "results/case_effects.csv": {
+      "producer": "02_case_effects",
+      "sha256": "4f5276f3d6ff4f67ff445f040f8985774542b09bbb75f877b234faa817226b83"
+    },
+    "results/case_features_imputed.csv": {
+      "producer": "02_case_effects",
+      "sha256": "a5cbe34facd1276a501689e4c55db7c926029e1c7b4720078a75cbe929449488"
+    },
+    "results/case_placebos.csv": {
+      "producer": "02_case_effects",
+      "sha256": "da76e1556c496539742734e1e14d920a2b0af9fae6d79974172244c850197385"
+    },
+    "results/reference_features.csv": {
+      "producer": "02_case_effects",
+      "sha256": "1fe68acda034d2d748f9e762b5fe45bc260cfb08231a89017d1f1bef4133cad0"
+    },
+    "results/transport_weights.csv": {
+      "producer": "03_feature_importance",
+      "sha256": "ef825dbc5f788e9983e983dd895caf2394cf630e569c70b1f6608ed86b008b9c"
+    }
+  },
+  "outputs": {
+    "figures/ot_feature_space.png": {
+      "sha256": "3df482e1d28219b467e548eed4392c92a5f15a876dbfdfb5b3d92c4e23430243"
+    },
+    "figures/ot_loco_validation.png": {
+      "sha256": "e27a34cd6e4ca331a86af25957b3f401ce066eed03a1c8e0b090617b984b3487"
+    },
+    "figures/ot_plan_heatmap.png": {
+      "sha256": "27be0a3021947e20597ba12060756955a4a143b3bb11b6a00a7b1e5ff4cdfd43"
+    },
+    "figures/ot_validation_null.png": {
+      "sha256": "2a51288f763c59bd7674a8f1eafc77a561e0979bcaeaca253ee5161d6e4a8969"
+    },
+    "results/figure_inventory_04_optimal_transport.csv": {
+      "sha256": "23b06b17ccf91d23b9c4b1efef2e1e82eabb896ea96cbc287e4e2b7fe070ff73"
+    },
+    "results/loco_fold_weights.csv": {
+      "sha256": "4e164cabcb365a32b8a21216d596a350f75953754f542022924e9fb5eae977d4"
+    },
+    "results/loco_ratios.csv": {
+      "sha256": "dde5c69db3c34b4eb99c8fcaa71189de4589ac3cf4cbd8e76d3a3feba7695c34"
+    },
+    "results/loco_ratios_rel.csv": {
+      "sha256": "709b88f1f47f4b8c2eb8c895477a1206fdda18c16474c7021eb5e3eee9d72311"
+    },
+    "results/loco_summary.csv": {
+      "sha256": "d6757ab99a7a6712181ff08b0df5c36ba81a4910bf388c8ff3d990ab86509368"
+    },
+    "results/loco_summary_rel.csv": {
+      "sha256": "60e68e0d5cf1cc2eefd5363463cbcd31cd0d34556459163f69617ce051a4b03f"
+    },
+    "results/loco_table.csv": {
+      "sha256": "1caad298d08ab90adc49f8c6f65b7736863e537d28a24705ff467848d6177e5d"
+    },
+    "results/loco_table_rel.csv": {
+      "sha256": "3664056767e6e7e090f404a708811c03ab38dd68bff50ee36408f44f7d7acca3"
+    },
+    "results/overlap_test.json": {
+      "sha256": "830f5108bc2ec96d3bc771790acdcb59666c7fce5136462a9b9b4724c9b72989"
+    },
+    "results/thailand_scenario_draws.csv": {
+      "sha256": "06227342054f6d2f0404e19545583b9935f930923104e175673be56002bb5d50"
+    },
+    "results/thailand_scenario_null_draws.csv": {
+      "sha256": "b0e899106e33d6a0fa1293355da894e55cb13c3a3756ea1ab02e1f2ff2c6b506"
+    },
+    "results/thailand_scenario_usage.csv": {
+      "sha256": "a5c827265ce86b6d6bb536b9e7da3e695cc48f14df66b51b3e701eb7dabdb561"
+    },
+    "results/thailand_scenarios.csv": {
+      "sha256": "68209ba1996a5c497be9bb2eb4ebe785077258d6d4db9e78011e32ff75dbf7d5"
+    },
+    "results/thailand_target_cloud.csv": {
+      "sha256": "e4dc8dee7aa6f97fb2eda3a5768fe153de8627040b4346fd9b22aa6046e0669c"
+    },
+    "results/thailand_transport.json": {
+      "sha256": "f23cea3774c5e1c4b375cf431e8b7c750ad5584ff20b6a4b73187c629d48bba8"
+    },
+    "results/thailand_transport_draws.csv": {
+      "sha256": "756bff292826d606bcf1f38cffe573a02faa72cb7d8097d5d550055c14be3c1a"
+    },
+    "results/transport_plan.csv": {
+      "sha256": "824fb4a3621b0016c6ccd683c29ee183aaa56eaab7cb7bd9e271c0d966b94592"
+    },
+    "results/transport_sensitivity.csv": {
+      "sha256": "07198b89ddf170d87c7f9c90d067909bf616a1feb10dda4cc8f36498e36362a3"
+    },
+    "results/transport_usage.csv": {
+      "sha256": "1f838904d780227f4de9bed2a6db8b9b27430f7c052515d9487067f752f9ba87"
+    }
+  },
+  "stage": "04_optimal_transport"
+}

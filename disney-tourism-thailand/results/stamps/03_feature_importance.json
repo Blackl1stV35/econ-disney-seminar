@@ -1,0 +1,52 @@
+{
+  "format": 1,
+  "inputs": {
+    "results/case_effects.csv": {
+      "producer": "02_case_effects",
+      "sha256": "4f5276f3d6ff4f67ff445f040f8985774542b09bbb75f877b234faa817226b83"
+    },
+    "results/case_features_imputed.csv": {
+      "producer": "02_case_effects",
+      "sha256": "a5cbe34facd1276a501689e4c55db7c926029e1c7b4720078a75cbe929449488"
+    },
+    "results/donor_eligibility.csv": {
+      "producer": "00_build_global_panel",
+      "sha256": "ef8a8ffc1c79bec948e905bc6db36d16d592979c04b5876dbf66f42b75c47cf7"
+    },
+    "results/imputation_report.csv": {
+      "producer": "02_case_effects",
+      "sha256": "69efcf2bd2a634bd4fa69da75816a1fd035d0549b748fed56e4075cae4909d17"
+    },
+    "results/panel_coverage.csv": {
+      "producer": "00_build_global_panel",
+      "sha256": "00d8ead60bcca0b9855db01d0681869ee099184a57a74d133e45fc9f1d341515"
+    }
+  },
+  "outputs": {
+    "figures/importance_bars.png": {
+      "sha256": "b0d54c5723ff428b96f65cc76207aa2f4b7e097a4b41ff89424e0d3c14d62c3a"
+    },
+    "figures/importance_penalty_path.png": {
+      "sha256": "b45a544a6a68648b749aef58ab388aa4e435b0ddd7318da41f626b2f5e8211ec"
+    },
+    "figures/importance_rank_correlation.png": {
+      "sha256": "32634f0402cb11e84679d0ec49130567369cffb324415b2a3fb553938410973c"
+    },
+    "figures/importance_selection_frequency.png": {
+      "sha256": "a32481c0826efd68bb593b5c914c74577aa7df51e7ed323045ec3752620fe7a4"
+    },
+    "results/feature_importance.csv": {
+      "sha256": "22f2f87660056e018c1c4864cb52ad402e990a9fd0bcd7bc959b9397ee204dc0"
+    },
+    "results/figure_inventory_03_feature_importance.csv": {
+      "sha256": "b9923da5082280da9bf7c7144adbc20512b66ade826abff5692a0f650929da98"
+    },
+    "results/importance_diagnostics.json": {
+      "sha256": "61cea3474a9b4dc9b1682724c5fc0eadfec139a9677b42ab444e9ccfa89f9e77"
+    },
+    "results/transport_weights.csv": {
+      "sha256": "ef825dbc5f788e9983e983dd895caf2394cf630e569c70b1f6608ed86b008b9c"
+    }
+  },
+  "stage": "03_feature_importance"
+}
