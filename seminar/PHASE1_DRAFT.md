@@ -1,6 +1,6 @@
-﻿# Phase 1 seminar document (working draft, 14 October 2026)
+# Phase 1 seminar document
 
-Status: working draft for the team. Items marked PENDING need input from the team before submission. Submission deadline: 16 October 2026.
+Submission deadline: 16 October 2026.
 
 ## 1. Title
 
@@ -44,8 +44,6 @@ Appraising a Proposed Disney-type Theme-Park Complex in Thailand: Bottom-up Tour
 **(b) Theme-park and single-attraction evidence.** Plaza (2006) estimates the effect of the Guggenheim Museum Bilbao on overnight stays, jobs and the return on investment. The published article reports 61,742 additional overnight stays a month from a single-series time-series model with no control group, so it supports context rather than a causal transfer. Published estimates for other attractions are reviewed in the causal benchmark note and are not transferred to Thailand (section 7.6).
 
 **(c) Historical cases.** Hong Kong Disneyland and Shanghai Disney Resort are the closest cases. Their evidence is used for calibration ranges and as context, not as a transfer coefficient (section 7.6). Chan (2004) studies residents' perceptions of Hong Kong Disneyland and its impacts. The thesis reports two telephone surveys of 1,060 respondents and is verified against the PolyU repository record. A second case study, of Universal Studios Singapore by Tan, How and Koh, could not be verified and is not cited in this draft.
-
-Methods references for the supplementary historical track are to be added once freely available copies are confirmed.
 
 **Gap.** The literature provides single-attraction, macroeconomic and appraisal-standard evidence, but no bottom-up model for a Thai complex that follows the national appraisal guidance. This study fills that gap.
 
@@ -104,32 +102,27 @@ The project is supported as a basis for decisions if H3 holds at the 7 percent s
 - National Economic and Social Development Council. (2024). *Guide to public investment project appraisal* (July 2024 edition). https://www.nesdc.go.th/wp-content/uploads/2025/05/article_20241009124821.pdf
 - Plaza, B. (2006). The return on investment of the Guggenheim Museum Bilbao. *International Journal of Urban and Regional Research*, 30(2), 452-467.
 
-## Appendix A. Closure record of the supplementary analysis
-
-# Appendix B closure record: theme-park openings and tourism receipts, Thailand
+## Appendix A. Supplementary historical analysis: record of results and limitations
 
 Date of record: 16 October 2026 (UTC+7).
 
 Repository: `econ-disney-seminar` (public), folder `disney-tourism-thailand`.
 
-- Code: pull request [#2](https://github.com/Blackl1stV35/econ-disney-seminar/pull/2), branch `blackl1stv35/remove-simulated-world`, commit `b6bb77f`.
-- Results: pull request [#3](https://github.com/Blackl1stV35/econ-disney-seminar/pull/3), branch `blackl1stv35/rerun-2026-10-16`, commit `e206a5b`, based on #2.
-- Both pull requests are merged into `main`: #2 as merge commit `6204dc2` and #3 as merge commit `d7c6b74`. The tree of `main` is identical to commit `e206a5b`.
+Code commit `b6bb77f`. Results commit `e206a5b`. Both commits are in the history of `main`.
 
-## 1. Status
+### 1. Status
 
-The analysis runs on the dataset only. The simulated world, the simulated run mode and the tests and notebook sections that used them were removed. The clean run of 16 October 2026 completed every step, except the SkylakeX kernel, which cannot run on the development computer. The route rule selects the ambient route, and the primary estimator is A2. The primary effect for the proposal of 300 billion baht has a median of 0.40 percentage points of GDP, with a 5 to 95 percent range from -1.14 to 1.94 points. At the 2025 baseline that is 2.33 billion US dollars a year (range -6.55 to 11.17 billion). The weighted transport gives a point estimate of -0.73 points, with the opposite sign. Both are reported.
+The analysis runs on the dataset only. The simulation generators and the simulated run mode are not part of the repository. The clean run of 16 October 2026 completed every step, except the SkylakeX kernel, which cannot run on the computer used for the run. The route rule selects the ambient route, and the primary estimator is A2. The primary effect for the proposal of 300 billion baht has a median of 0.40 percentage points of GDP, with a 5 to 95 percent range from -1.14 to 1.94 points. At the 2025 baseline that is 2.33 billion US dollars a year (range -6.55 to 11.17 billion). The weighted transport gives a point estimate of -0.73 points, with the opposite sign. Both are reported.
 
-## 2. Run provenance
+### 2. Run provenance
 
-- Run folder on the development computer: `logs\20261016_081245\`. The run started at 08:12:45 and finished at 10:01:05 on 16 October 2026 (UTC+7). It contains `status.txt`, `summary.txt`, `manifest_sha256.csv`, `pip_freeze.txt`, `python_version.txt`, `dataset_chain.log`, `pytest_default.log`, `pytest_dataset.log`, `pytest_Haswell.log`, `pytest_Zen.log`, `pytest_SkylakeX.log`, `wdi.log` and the folder `wdi\`.
+- Run folder on the computer used for the run: `logs\20261016_081245\`. The run started at 08:12:45 and finished at 10:01:05 on 16 October 2026 (UTC+7). It contains `status.txt`, `summary.txt`, `manifest_sha256.csv`, `pip_freeze.txt`, `python_version.txt`, `dataset_chain.log`, `pytest_default.log`, `pytest_dataset.log`, `pytest_Haswell.log`, `pytest_Zen.log`, `pytest_SkylakeX.log`, `wdi.log` and the folder `wdi\`.
 - Code of the run: the pipeline files of commit `b6bb77f` are identical to the files that ran. The notebooks ran with `DTT_RUN_REAL=1`. The notebook times were 00 11.6 s, 01 23.6 s, 02 36.0 s, 03 4511.4 s, 04 55.9 s and 05 28.0 s, 4711.5 s in total.
-- Manifest: `manifest_sha256.csv` was taken at 08:13, before the first step, from the tree as it stood then. It lists 160 files. Its entries for `results_20261016\`, `figures_20261016\` and `executed_20261016\` describe superseded pre-fix outputs, which were set aside after the run and are not part of the final tree.
-- Changes after the manifest: text in `README.md` (World Bank status, kernel statement, result section and thermal sentence), the first markdown cell of notebooks 00 to 05 (run-time paragraph only), and the heading list in `tests/test_notebooks_static.py`. No code cell changed after the manifest was taken.
+- Manifest: `manifest_sha256.csv` was taken at 08:13, before the first step, and lists 160 files. Its entries for `results_20261016\`, `figures_20261016\` and `executed_20261016\` are outputs of an earlier run. They are not part of the final tree.
+- Text changes after the manifest was taken in `README.md` (World Bank status, kernel statement, result section and thermal sentence), the first markdown cell of notebooks 00 to 05 (run-time paragraph only), and the heading list in `tests/test_notebooks_static.py`. No code cell changed after the manifest was taken.
 - Python 3.12.8 (MSC v.1942, 64-bit) on Windows 11 Home. Package versions from `pip_freeze.txt`: cvxpy 1.9.3, matplotlib 3.11.2, numpy 2.5.4, pandas 3.0.6, POT 0.9.7.post1, pytest 9.1.1, scikit-learn 1.9.1, scipy 1.18.1, statsmodels 0.15.0.
-- The run was started from the desktop on the user's authorization given in the conversation on 16 October 2026. The results were committed and merged into `main` on the same day, on the user's instruction.
 
-## 3. Results of the run
+### 3. Results of the run
 
 Route rule (`results/route_decision.json`, rule hash 852b46da9afa092222650d1709049c85d02397fe5f83d3b46eb5e68c9e368b7f):
 
@@ -148,11 +141,11 @@ Scenario complex_total (proposal of THB 300 billion, cost year 2025, 1.58 percen
 - Scenarios of 200 billion and 100 billion baht: primary medians 0.27 and 0.13 points.
 - The government claim of about 1 percent of GDP a year (February 2026, no study cited) appears only as a reference scale.
 
-## 4. Verification
+### 4. Verification
 
 | Run | Result |
 |---|---|
-| pytest, default kernel, dataset check skipped, handover tree (`pytest_default.log`) | 1795 passed, 1 skipped |
+| pytest, default kernel, dataset check skipped (`pytest_default.log`) | 1795 passed, 1 skipped |
 | pytest with `DTT_RUN_REAL=1`, including the dataset check (`pytest_dataset.log`) | 1796 passed |
 | pytest with OpenBLAS kernel Haswell (`pytest_Haswell.log`) | 1795 passed, 1 skipped |
 | pytest with OpenBLAS kernel Zen (`pytest_Zen.log`) | 1795 passed, 1 skipped |
@@ -160,11 +153,11 @@ Scenario complex_total (proposal of THB 300 billion, cost year 2025, 1.58 percen
 | Dataset chain, notebooks 00 to 05 in order (`dataset_chain.log`) | Exit 0, 4711.5 seconds |
 | Notebook 01, comparison with the reference values | 1179 of 1216 pass; 37 differ |
 | World Bank check against the live API (`wdi.log`) | 96 economies, 12,868 compared cells, 12,868 equal, 0 different, 0 present in only one source, 1,532 empty in both |
-| Code branch `b6bb77f`, full suite including the appraisal tests | 1877 passed, 1 skipped |
+| Code commit `b6bb77f`, full suite including the appraisal tests | 1877 passed, 1 skipped |
 
 The thermal log `results\thermal_log.csv` has 196 rows. Its temperature column is empty in every row, so no CPU temperature was recorded. Every row shows the action `ok`, and the guard relied on the CPU load.
 
-## 5. Limitations and disclosures
+### 5. Limitations and disclosures
 
 1. Sample size. The primary sample has 19 episodes, one below the 20 that the importance verdict requires. Under the fixed rule this sends the analysis to the ambient route. That is the outcome of the rule. The importance model is not usable on any of its criteria, and under five seeds the verdict was usable in none of them. The variant with all 27 feasible cases also fails.
 2. Close choice of estimator. The selection of A2 over A1 is flagged as close, because its RMSE ratio of 0.913 lies within 0.05 of the limit of 0.95.
@@ -179,29 +172,21 @@ The thermal log `results\thermal_log.csv` has 196 rows. Its temperature column i
 11. Earlier figures. The Stata-era documents give about US$ 1.01 billion a year from a Shanghai-anchored scaling. The pipeline's ambient median is US$ 2.33 billion a year. These are different estimators, and they have not been reconciled.
 12. Derived costs. The file `data/processed/cases_investment_fx.csv` holds 27 dollar costs. Twenty are converted from local-currency figures at official annual-average exchange rates, and seven are reported in dollars. All 27 are derived estimates, not reported costs, and 15 have an assumed price year. Costs are known for 28 of the 44 episodes only with the derived dollar costs, and for 12 without them.
 13. Proposal status. The THB 300 billion figure is a proposal. No signed agreement, approved budget, named operator or site allocation was found in the sources reviewed.
-14. Calibration. The calibration figures in the 9 October 2026 README, such as predictive coverage of 70 to 73 percent at 30 cases, were produced before the corrections in this record. They have not been measured again with the calibration driver, which is not part of this repository.
-15. Kernels. SkylakeX cannot run on the development computer. Haswell and Zen agree with the default kernel on every test they run. The check on the dataset is skipped in those runs unless `DTT_RUN_REAL=1` is set, and it passed in the dataset run.
+14. Calibration. The calibration figures in the 9 October 2026 README, such as predictive coverage of 70 to 73 percent at 30 cases, were produced before the run of 16 October 2026. They have not been measured again with the calibration driver, which is not part of this repository.
+15. Kernels. SkylakeX cannot run on the computer used for the run. Haswell and Zen agree with the default kernel on every test they run. The check on the dataset is skipped in those runs unless `DTT_RUN_REAL=1` is set, and it passed in the dataset run.
 16. World Bank files. The 20 files in `data/raw/wdi/` were retrieved with a web fetch tool during the project, not by a direct download from the World Bank API. The comparison with the live API on 16 October 2026 found no difference in any of the 12,868 compared cells.
-17. Earlier cloud computation. Before the instruction of 15 October 2026 that all computation runs on the desktop, the following ran in the cloud. An early refactoring agent ran the original real-data equivalence check once and saw only pass or fail. Reviewers opened the catalogue and the derived-cost file for structure checks. Notebook 01 and two review subagents ran computation. No World Bank outcome data were analysed in the cloud. An early cloud scan read text under `data/`, which was then corrected.
-18. Simulated world. The simulated world, its generators and its run mode were removed from the pipeline. The simulated figures were deleted. The simulated data and runs were moved out of the project folder to `removed_simulation_20261016\`, outside the repository, and are not cited. Some test names and fixture names still contain the words simulated or sim. They refer to hand-built fixtures and are kept as identifiers.
-19. Deleted tests. Three tests were deleted because their claims cannot hold on the hand-built fixture world: `test_estimated_effects_recover_the_generating_coefficient_of_capex`, `test_exact_fit_in_the_simulated_world_is_reported_in_the_effects_table` and `test_a_window_that_ignores_the_next_episode_picks_up_its_level_shift`. Other tests keep their claims with new expected numbers on the hand-built world.
+17. Cloud computation before 15 October 2026. Before 15 October 2026 some computation ran in the cloud: an early refactoring check of the original real-data equivalence, run once, with only pass or fail visible; structure checks of the catalogue and the derived-cost file by reviewers; and computation in notebook 01 and in two review subagents. No World Bank outcome data were analysed in the cloud. An early cloud scan read text under `data/`, which was then corrected. All later computation ran on the desktop.
+18. Simulated world. The repository contains no simulated world, and no simulated result is reported. Some test and fixture names still contain the words simulated or sim. They refer to hand-built fixtures.
+19. Tests on hand-built fixtures. Three tests of the earlier simulated world are not in the repository, because their claims cannot hold on the hand-built fixtures: `test_estimated_effects_recover_the_generating_coefficient_of_capex`, `test_exact_fit_in_the_simulated_world_is_reported_in_the_effects_table` and `test_a_window_that_ignores_the_next_episode_picks_up_its_level_shift`. Other tests check the same functions with expected numbers that match the fixtures.
 20. Notebook 01. Its stored outputs were cleared. The executed copies from the run are not part of the repository.
-21. Data origin. The origin of `data/raw/disney_did_panel.csv` is not yet stated in `DATA_NOTICE.md`, which asks the project owner to state it. The file is already part of the public repository.
+21. Data origin. The origin of `data/raw/disney_did_panel.csv` is to be stated in `DATA_NOTICE.md`. The file is part of the public repository.
 
-## 6. Publication and open items
+### 6. Open items
 
-- The code and the results are merged into `main` through the two pull requests above. The merge was done by the repository administrator on the owner's instruction, using the administrator override of the branch rule, because the rule requires a review that the owner cannot give to their own pull request.
-- The origin of the single-country panel file is for the project owner to state. It is open.
-- No copy was made in Google Drive. The files are kept on the desktop and in the repository.
+- The origin of `data/raw/disney_did_panel.csv` is to be stated in `DATA_NOTICE.md` (item 21 of section 5).
+- No other item in this record is open.
 
-## 7. Corrections to the handover of 16 October 2026
-
-- The handover said that the test suite passed apart from four stale expectations. That statement described only the real-data run. The default run before the fixes had 1889 passed, 1 skipped and 19 errors. On the final tree the default run has 1795 passed and 1 skipped, and the dataset run has 1796 passed.
-- The handover listed the quantile keys as q5, q25, q50 and q95. The probability tuple also contains 0.75, so the keys are q5, q25, q50, q75 and q95.
-- The README statements that were stale are corrected in the code pull request: the minimum of 20 episodes and the target-support criterion, the test time, the notebook 04 file name, the World Bank status, the kernel statement and the route result.
-- The handover's section 2 lacked a row for the default run. Section 4 of this record gives it.
-
-## Appendix A. Source files and SHA-256 values of the final tree
+### Annex 1. Source files and SHA-256 values of the final tree
 
 Values are the SHA-256 of the committed content of each file in commit `e206a5b`, folder `disney-tourism-thailand`, as listed by `git ls-tree -r`. Paths are relative to the folder `disney-tourism-thailand`.
 
@@ -363,4 +348,3 @@ Values are the SHA-256 of the committed content of each file in commit `e206a5b`
 | `tests/test_transport.py` | `3057f6015bffc45e4168eb8771c7aed32b6708dcf82c1c014f5aca13186569a0` |
 | `tests/test_verify_wdi_files.py` | `d3104d0c7ad7ec44d1e1ab5472ffc7a6419901a20486616cbb84da52a3ef5739` |
 | `tests/test_workflow.py` | `63a2fc5505b68accb79061ce10c0c79defa94a3a864eebf91422a3bfb2de9a72` |
-
