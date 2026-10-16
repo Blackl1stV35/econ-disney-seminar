@@ -1,0 +1,26 @@
+08:12:45  handoff folder: C:\Users\user\Documents\DisneyDiD\handoff_2026-10-15
+08:12:46  START python version
+08:12:46  END python version: exit 0, 0.2 s
+08:12:46  START install requirements
+08:12:54  END install requirements: exit 0, 8.2 s
+08:12:54  START hash the delivered files
+08:13:03  END hash the delivered files: exit 0, 8.9 s
+08:13:03  START pip freeze
+08:13:06  END pip freeze: exit 0, 2.6 s
+08:13:06  START preflight: CPU, memory and related processes
+08:13:08  END preflight: CPU, memory and related processes: exit 0, 2.5 s
+08:13:08  START pytest (default)
+08:20:24  END pytest (default): exit 0, 436.3 s
+08:20:24  START dataset chain 00 to 05
+09:38:56  END dataset chain 00 to 05: exit 0, 4711.5 s
+09:38:56  START pytest with DTT_RUN_REAL=1
+09:45:58  END pytest with DTT_RUN_REAL=1: exit 0, 422.3 s
+09:45:58  START WDI check against the World Bank API
+09:46:02  END WDI check against the World Bank API: exit 0, 3.7 s
+09:46:02  START pytest with kernel Haswell
+09:53:50  END pytest with kernel Haswell: exit 0, 467.8 s
+09:53:50  START pytest with kernel Zen
+10:00:39  END pytest with kernel Zen: exit 0, 408.7 s
+10:00:39  START pytest with kernel SkylakeX
+10:01:05  END pytest with kernel SkylakeX: exit -1073741795, 25.8 s
+10:01:05  ALL STEPS FINISHED; a step failed: True

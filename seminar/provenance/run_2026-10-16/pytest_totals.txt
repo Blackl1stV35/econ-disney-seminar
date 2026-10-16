@@ -1,0 +1,5 @@
+pytest_default: 1795 passed, 1 skipped in 433.71s (0:07:13)
+pytest_dataset: 1796 passed in 419.75s (0:06:59)
+pytest_Haswell: 1795 passed, 1 skipped in 465.28s (0:07:45)
+pytest_Zen: 1795 passed, 1 skipped in 406.50s (0:06:46)
+pytest_SkylakeX: process stopped, Windows fatal exception 0xc000001d

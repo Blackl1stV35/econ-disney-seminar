@@ -1,0 +1,12 @@
+﻿python version: exit 0, 0.2 s
+install requirements: exit 0, 8.2 s
+hash the delivered files: exit 0, 8.9 s
+pip freeze: exit 0, 2.6 s
+preflight: CPU, memory and related processes: exit 0, 2.5 s
+pytest (default): exit 0, 436.3 s
+dataset chain 00 to 05: exit 0, 4711.5 s
+pytest with DTT_RUN_REAL=1: exit 0, 422.3 s
+WDI check against the World Bank API: exit 0, 3.7 s
+pytest with kernel Haswell: exit 0, 467.8 s
+pytest with kernel Zen: exit 0, 408.7 s
+pytest with kernel SkylakeX: exit -1073741795, 25.8 s

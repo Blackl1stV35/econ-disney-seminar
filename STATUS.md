@@ -4,7 +4,7 @@ Last updated: 2026-10-16. This page gives the approved seminar topic, the decisi
 
 ## 1. Seminar topic (approved 14 October 2026)
 
-**Title.** Appraising a Proposed Disney-type Theme-Park Complex in Thailand: Bottom-up Tourism, Financial, Fiscal and Economic Returns under Scenario Analysis
+**Title.** An Exploratory Appraisal of a Proposed Disney-Type Theme-Park Complex in Thailand: A Bottom-Up Scenario Analysis.
 
 **Scope.** The THB 300 billion sports and entertainment complex, which is the high-expectation scope selected for the appraisal. The park-only concepts of THB 100 to 200 billion are different projects with different demand, revenue and cost boundaries. They are not mixed with the complex and are not modelled in the primary appraisal.
 

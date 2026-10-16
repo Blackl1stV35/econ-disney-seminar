@@ -12,7 +12,7 @@ The analysis runs on the dataset only. The simulation generators and the simulat
 
 ## 2. Run provenance
 
-- Run folder on the computer used for the run: `logs\20261016_081245\`. The run started at 08:12:45 and finished at 10:01:05 on 16 October 2026 (UTC+7). It contains `status.txt`, `summary.txt`, `manifest_sha256.csv`, `pip_freeze.txt`, `python_version.txt`, `dataset_chain.log`, `pytest_default.log`, `pytest_dataset.log`, `pytest_Haswell.log`, `pytest_Zen.log`, `pytest_SkylakeX.log`, `wdi.log` and the folder `wdi\`.
+- Run record: the status, summary, manifest, package list, interpreter version, World Bank check and test totals of the run are in `seminar/provenance/run_2026-10-16/`. The run started at 08:12:45 and finished at 10:01:05 on 16 October 2026 (UTC+7).
 - Code of the run: the pipeline files of commit `b6bb77f` are identical to the files that ran. The notebooks ran with `DTT_RUN_REAL=1`. The notebook times were 00 11.6 s, 01 23.6 s, 02 36.0 s, 03 4511.4 s, 04 55.9 s and 05 28.0 s, 4711.5 s in total.
 - Manifest: `manifest_sha256.csv` was taken at 08:13, before the first step, and lists 160 files. Its entries for `results_20261016\`, `figures_20261016\` and `executed_20261016\` are outputs of an earlier run. They are not part of the final tree.
 - Text changes after the manifest was taken in `README.md` (World Bank status, kernel statement, result section and thermal sentence), the first markdown cell of notebooks 00 to 05 (run-time paragraph only), and the heading list in `tests/test_notebooks_static.py`. No code cell changed after the manifest was taken.
