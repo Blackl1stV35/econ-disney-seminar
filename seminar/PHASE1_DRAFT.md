@@ -56,7 +56,9 @@ An Exploratory Appraisal of a Proposed Disney-Type Theme-Park Complex in Thailan
 Sourced values in the input table include U-Tapao terminal capacity of 3.7 million passengers a year (EEC Office, page status October 2025); the AOT six-airport total of 124,033,786 passengers in calendar 2024 and 100,058,695 in fiscal 2023; Suvarnabhumi and Don Mueang traffic for 2019 and 2024 (AOT); Chon Buri occupancy of 80.42 percent in 2024 (National Statistical Office, Table 17.1); Chon Buri foreign visitors of 11,689,827 in 2024 (TAT Intelligence Center); the Bank of Thailand exchange rate; and the Revenue Department tax rates. Hotel and guesthouse rooms of 956,372 refer to calendar 2021 (NSO Statistical Yearbook Thailand 2024, Table 17.4). Pattaya hotel keys of 31,581 in H2 2024 and 34,743 in H2 2025 are CBRE broker data, not an official source; the 2024 figure is used as a proxy for the room stock of the complex.
 
 Team decisions, confirmed by the leader on 14 October 2026 and recorded as labelled assumptions in the assumptions table: WACC of 8 percent in the base case (10 and 7 percent in the low and high cases), and a project life of 20 years in the base case (20 and 25 years in the low and high cases). Attendance, incremental and displacement shares, domestic retention, the spending-per-visit placeholders and the 85 percent occupancy ceiling in the base case keep their working values. None is a sourced value. Inputs that could not be sourced are blank in the input table, and figures that were not confirmed are flagged unconfirmed, never sourced. The base case stops only when a sourced or proposal input is pending; team decisions do not stop it.
+
 **7.3 Three ledgers.**
+
 - **Operator ledger:** revenue minus operating costs and capital expenditure, giving the financial net present value, internal rate of return and break-even attendance at the financial cost of capital (WACC of 8 percent and a project life of 20 years in the base case, as recommended; the NESDC guide requires both to be stated and justified). Operating costs include depreciation, by the leader's decision.
 - **Fiscal ledger:** tax and fee revenue from the net spending minus public capital and operating costs.
 - **National economic ledger:** economic benefits minus economic costs, discounted at 7 percent. Economic costs use the conversion factor of 0.7 unless shadow prices are computed. The economic benefit is the net spending of the incremental visits, following ADB (2017) paragraph 146, which counts the net increase in local incomes from incremental tourist expenditure. The whole operating cost of the complex is charged.
@@ -82,6 +84,7 @@ The project is supported as a basis for decisions if H3 holds at the 7 percent s
 - The historical evidence does not identify the Disney-specific effect separately from concurrent policy changes.
 - The output is a set of scenario ranges, not confidence intervals.
 - The Hong Kong Disneyland and Ocean Park anchors rest on press reports and secondary copies; the operators' primary documents were not read.
+
 ## 10. Timeline and responsibilities
 
 | Date | Task | Owner |
