@@ -2,7 +2,7 @@
 
 Direction: the leader, Peem, has locked the seminar direction. The leader's decisions are final. Each brief states the deliverable, the corrections to the current group drafts, and the check before the item is accepted. Section numbers refer to `PHASE1_DRAFT.md`.
 
-Locked direction: Appraising a Proposed Disney-type Theme-Park Complex in Thailand, bottom-up. Primary scope: the THB 300 billion complex. Objectives and hypotheses H1 to H3 are approved; H4 is supplementary. Working hypothesis: public infrastructure variation is the main driver of the tourism effect, so incremental visits are capped by infrastructure headroom. Historical evidence is calibration and context only.
+Locked direction: An Exploratory Appraisal of a Proposed Disney-Type Theme-Park Complex in Thailand: A Bottom-Up Scenario Analysis. Primary scope: the THB 300 billion complex. Objectives and hypotheses H1 to H3 are approved; H4 is supplementary. Working hypothesis: public infrastructure variation is the main driver of the tourism effect, so incremental visits are capped by infrastructure headroom. Historical evidence is calibration and context only.
 
 ## Corrections to the current group drafts (apply to every section)
 
