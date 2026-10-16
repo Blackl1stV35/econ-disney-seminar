@@ -151,9 +151,10 @@ def test_adb_standard_discount_rate_is_recorded_as_sourced():
 
 
 def test_base_case_cannot_run_while_inputs_are_pending():
+    # The refusal rule is unchanged. The rows used here are still blank, so the rule applies to them.
     table = ap.load_inputs(INPUTS)
-    with pytest.raises(ValueError, match="attendance_million_per_year, incremental_share"):
-        ap.require_values(table, ["attendance_million_per_year", "incremental_share"])
+    with pytest.raises(ValueError, match="tat_spend_per_night_by_nationality_2024_2025, intl_first_visit_share_2024"):
+        ap.require_values(table, ["tat_spend_per_night_by_nationality_2024_2025", "intl_first_visit_share_2024"])
 
 
 def test_nesdc_social_discount_rate_matches_the_guide():
@@ -173,12 +174,15 @@ def test_sensitivity_cases_are_five_ten_and_twenty_percent():
     assert ap.SENSITIVITY_PERCENTS == (5, 10, 20)
 
 
-def test_project_life_and_financial_rate_stay_pending_until_the_team_states_them():
+def test_project_life_and_financial_rate_are_team_decisions_and_not_sourced():
+    # The leader confirmed the team recommendations on 14 October 2026. They are labelled decisions, not sourced values.
     table = ap.load_inputs(INPUTS)
-    for name in ("project_life_years", "wacc_financial"):
-        assert pd.isna(table.loc[name, "value"])
-        with pytest.raises(ValueError, match=name):
-            ap.require_values(table, [name])
+    expected = {"project_life_years": 20.0, "wacc_financial": 0.08}
+    for name, value in expected.items():
+        assert table.loc[name, "value"] == pytest.approx(value), name
+        assert table.loc[name, "status"].startswith("team decision"), name
+        assert not table.loc[name, "status"].startswith("sourced"), name
+        assert ap.require_values(table, [name])[name] == pytest.approx(value)
 
 
 def test_infrastructure_headroom_is_never_negative():
@@ -252,34 +256,31 @@ def test_sourced_thai_figures_match_their_cited_values():
     assert table.loc["hotel_guesthouse_rooms_2022", "value"] == 956372
 
 
-def test_secondary_relay_figures_stay_pending_until_the_primary_source_is_fetched():
+def test_secondary_relay_figures_stay_unconfirmed_until_the_primary_source_is_fetched():
     table = ap.load_inputs(INPUTS)
+    # These rows still rest on a relay (a news or aggregator page, or a Ministry figure read through a relay) and have no primary value.
+    # The AOT, U-Tapao, Don Mueang and MoTS rows were resolved from primary documents and are sourced now.
     relay_rows = [
-        "utapao_passengers_oct2023_sep2024",
-        "suvarnabhumi_passengers_2019",
-        "don_mueang_design_capacity_passengers_per_year",
-        "aot_six_airports_passengers_fy2023",
         "chonburi_tourists_jan_nov_2024",
         "chonburi_foreign_visitors_jan_nov_2024",
         "tat_spend_per_trip_all_nationalities_2023",
         "tat_spend_per_trip_middle_eastern_2023",
         "tat_spend_per_day_uae_2023",
-        "mots_spend_per_trip_all_tourists_2019",
-        "mots_spend_per_day_all_tourists_2019",
         "intl_avg_length_of_stay_2016_2017_days",
         "intl_arrivals_2025",
         "intl_tourism_receipts_2025_mots",
     ]
+    # The candidate values stay in the table, flagged unconfirmed, so none of them counts as sourced.
     for name in relay_rows:
-        assert pd.isna(table.loc[name, "value"]), name
-        assert table.loc[name, "status"].startswith("pending"), name
+        assert pd.notna(table.loc[name, "value"]), name
+        assert table.loc[name, "status"].startswith("unconfirmed"), name
 
 
-def test_accommodation_base_case_stays_pending_without_a_tat_occupancy_figure():
+def test_chon_buri_occupancy_is_a_sourced_value_that_the_base_case_can_use():
     table = ap.load_inputs(INPUTS)
-    assert pd.isna(table.loc["chonburi_occupancy_2024_tat", "value"])
-    with pytest.raises(ValueError, match="chonburi_occupancy_2024_tat"):
-        ap.require_values(table, ["chonburi_occupancy_2024_tat"])
+    assert table.loc["chonburi_occupancy_2024_tat", "status"].startswith("sourced (National Statistical Office")
+    assert table.loc["chonburi_occupancy_2024_tat", "value"] == pytest.approx(80.42)
+    assert ap.require_values(table, ["chonburi_occupancy_2024_tat"])["chonburi_occupancy_2024_tat"] == pytest.approx(80.42)
 
 
 def test_airport_passengers_convert_to_round_trip_visits():
@@ -620,15 +621,15 @@ def test_physical_cap_limits_all_international_visits_and_headroom_limits_the_in
 
 
 def test_base_case_net_spend_counts_only_the_capped_incremental_visits():
-    # Base case: free rooms 31,581 * (0.85 - 0.71) = 4,421.3, so the accommodation cap is 4,421.3 * 365 * 2.0 / 10.66 / 1e6 = 0.302775 million visits.
+    # Base case: free rooms 31,581 * (0.85 - 0.8042) = 1,446.4, so the accommodation cap is 1,446.4 * 365 * 2.0 / 10.66 / 1e6 = 0.0990506 million visits.
     # The physical cap is the airport total of 3,700,000 / 2 / 1e6 = 1.85 million, so the international visits 4.425 million are capped to 1.85 million.
-    # Incremental demand: 1.85 * 0.30 = 0.555 million, capped to 0.302775 million. Net spend: 0.302775 * 10,000 / 1000 * (1 - 0.3) = 2.11942 THB bn per year.
+    # Incremental demand: 1.85 * 0.30 = 0.555 million, capped to 0.0990506 million. Net spend: 0.0990506 * 10,000 / 1000 * (1 - 0.3) = 0.693354 THB bn per year.
     sourced, assumptions = ap.load_inputs(INPUTS), ap.load_assumptions(ASSUMPTIONS)
     annual = ap.case_annual(ap.case_inputs(sourced, assumptions, "base_case"))
     assert annual["binding_constraint"] == "accommodation"
     assert annual["physical_cap_m"] == pytest.approx(1.85, abs=1e-9)
-    assert annual["incr_m"] == pytest.approx(0.302775, abs=1e-6)
-    assert annual["net_spend_bn_per_year"] == pytest.approx(2.11942, abs=5e-5)
+    assert annual["incr_m"] == pytest.approx(0.0990506, abs=1e-6)
+    assert annual["net_spend_bn_per_year"] == pytest.approx(0.693354, abs=5e-5)
 
 
 def test_national_ledger_carries_the_whole_operating_cost_so_it_falls_when_visits_above_the_cap_rise():
@@ -664,14 +665,14 @@ def test_proposal_capital_cost_is_labelled_other_and_not_sourced():
     assert result["assumption_driven"] is True
 
 
-def test_pattaya_stock_and_occupancy_are_generalized_grid_rows_with_the_pattaya_values():
+def test_room_stock_is_the_pattaya_proxy_and_occupancy_is_the_chon_buri_figure():
     inputs = ap.load_inputs(INPUTS)
     assumptions = ap.load_assumptions(ASSUMPTIONS)
     for name in ("rooms_serving_site", "occupancy_serving_site"):
         assert assumptions.loc[name, "status"].startswith("generalized ("), name
         assert name not in ap.SOURCED_NAMES and name not in ap.PROPOSAL_NAMES
     assert assumptions.loc["rooms_serving_site", "base_case"] == pytest.approx(inputs.loc["pattaya_hotel_keys_h2_2024", "value"])
-    assert assumptions.loc["occupancy_serving_site", "base_case"] == pytest.approx(inputs.loc["pattaya_occupancy_2024_cbre", "value"] / 100.0)
+    assert assumptions.loc["occupancy_serving_site", "base_case"] == pytest.approx(inputs.loc["chonburi_occupancy_2024_tat", "value"] / 100.0)
 
 
 def test_not_fetched_rows_are_not_listed_as_plain_sourced_values():
