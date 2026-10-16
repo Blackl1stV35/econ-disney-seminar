@@ -259,16 +259,13 @@ def test_sourced_thai_figures_match_their_cited_values():
 def test_secondary_relay_figures_stay_unconfirmed_until_the_primary_source_is_fetched():
     table = ap.load_inputs(INPUTS)
     # These rows still rest on a relay (a news or aggregator page, or a Ministry figure read through a relay) and have no primary value.
-    # The AOT, U-Tapao, Don Mueang and MoTS rows were resolved from primary documents and are sourced now.
+    # The AOT, U-Tapao, Don Mueang, MoTS and national statistics rows were resolved from primary documents and are sourced now.
     relay_rows = [
         "chonburi_tourists_jan_nov_2024",
         "chonburi_foreign_visitors_jan_nov_2024",
         "tat_spend_per_trip_all_nationalities_2023",
         "tat_spend_per_trip_middle_eastern_2023",
         "tat_spend_per_day_uae_2023",
-        "intl_avg_length_of_stay_2016_2017_days",
-        "intl_arrivals_2025",
-        "intl_tourism_receipts_2025_mots",
     ]
     # The candidate values stay in the table, flagged unconfirmed, so none of them counts as sourced.
     for name in relay_rows:
