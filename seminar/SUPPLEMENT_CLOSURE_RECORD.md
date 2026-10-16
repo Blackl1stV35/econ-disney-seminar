@@ -8,7 +8,7 @@ Code commit `b6bb77f`. Results commit `e206a5b`. Both commits are in the history
 
 ## 1. Status
 
-The analysis runs on the dataset only. The simulation generators and the simulated run mode are not part of the repository. The clean run of 16 October 2026 completed every step, except the SkylakeX kernel, which cannot run on the computer used for the run. The route rule selects the ambient route, and the primary estimator is A2. The primary effect for the proposal of 300 billion baht has a median of 0.40 percentage points of GDP, with a 5 to 95 percent range from -1.14 to 1.94 points. At the 2025 baseline that is 2.33 billion US dollars a year (range -6.55 to 11.17 billion). The weighted transport gives a point estimate of -0.73 points, with the opposite sign. Both are reported.
+The analysis runs on the dataset only. The clean run of 16 October 2026 completed every step, except the SkylakeX kernel, which cannot run on the computer used for the run. The route rule selects the ambient route, and the primary estimator is A2. The primary effect for the proposal of 300 billion baht has a median of 0.40 percentage points of GDP, with a 5 to 95 percent range from -1.14 to 1.94 points. At the 2025 baseline that is 2.33 billion US dollars a year (range -6.55 to 11.17 billion). The weighted transport gives a point estimate of -0.73 points, with the opposite sign. Both are reported.
 
 ## 2. Run provenance
 
@@ -72,14 +72,12 @@ The thermal log `results\thermal_log.csv` has 196 rows. Its temperature column i
 15. Kernels. SkylakeX cannot run on the computer used for the run. Haswell and Zen agree with the default kernel on every test they run. The check on the dataset is skipped in those runs unless `DTT_RUN_REAL=1` is set, and it passed in the dataset run.
 16. World Bank files. The 20 files in `data/raw/wdi/` were retrieved with a web fetch tool during the project, not by a direct download from the World Bank API. The comparison with the live API on 16 October 2026 found no difference in any of the 12,868 compared cells.
 17. Cloud computation before 15 October 2026. Before 15 October 2026 some computation ran in the cloud: an early refactoring check of the original real-data equivalence, run once, with only pass or fail visible; structure checks of the catalogue and the derived-cost file by reviewers; and computation in notebook 01 and in two review subagents. No World Bank outcome data were analysed in the cloud. An early cloud scan read text under `data/`, which was then corrected. All later computation ran on the desktop.
-18. Simulated world. The repository contains no simulated world, and no simulated result is reported. Some test and fixture names still contain the words simulated or sim. They refer to hand-built fixtures.
-19. Tests on hand-built fixtures. Three tests of the earlier simulated world are not in the repository, because their claims cannot hold on the hand-built fixtures: `test_estimated_effects_recover_the_generating_coefficient_of_capex`, `test_exact_fit_in_the_simulated_world_is_reported_in_the_effects_table` and `test_a_window_that_ignores_the_next_episode_picks_up_its_level_shift`. Other tests check the same functions with expected numbers that match the fixtures.
-20. Notebook 01. Its stored outputs were cleared. The executed copies from the run are not part of the repository.
-21. Data origin. The origin of `data/raw/disney_did_panel.csv` is to be stated in `DATA_NOTICE.md`. The file is part of the public repository.
+18. Notebook 01. Its stored outputs were cleared. The executed copies from the run are not part of the repository.
+19. Data origin. The origin of `data/raw/disney_did_panel.csv` is to be stated in `DATA_NOTICE.md`. The file is part of the public repository.
 
 ## 6. Open items
 
-- The origin of `data/raw/disney_did_panel.csv` is to be stated in `DATA_NOTICE.md` (item 21 of section 5).
+- The origin of `data/raw/disney_did_panel.csv` is to be stated in `DATA_NOTICE.md` (item 19 of section 5).
 - No other item in this record is open.
 
 ## Annex 1. Source files and SHA-256 values of the final tree

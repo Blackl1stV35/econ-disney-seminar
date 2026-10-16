@@ -13,3 +13,4 @@ Exported: 16 October 2026. Font: Times New Roman for text, Courier New for code.
 - The Thai input table was updated from primary sources: 82 of 131 rows are sourced, 43 of them from Thai data sources. The Phase 1 text quotes these counts and the national statistics that are now sourced.
 - The supplement is the full closure record, as it stands.
 - The export is replaced, and this note is updated, whenever the Phase 1 text changes.
+- Out of date: after this export, the simulated-data statements were removed from both sources. The PDFs in this folder are the earlier export and will be replaced when the export is assigned.
