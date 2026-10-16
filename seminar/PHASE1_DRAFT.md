@@ -105,5 +105,14 @@ The project is supported as a basis for decisions if H3 holds at the 7 percent s
 - Plaza, B. (2006). The return on investment of the Guggenheim Museum Bilbao. *International Journal of Urban and Regional Research*, 30(2), 452-467.
 
 
+## Appendix A. Supplementary track: optimal transport
 
+Scope. This appendix reports the supplementary track. It covers one method, entropic unbalanced optimal transport with an importance-weighted cost, applied to past theme-park openings. The other estimation methods of the earlier analysis are dropped from this appendix. They are the synthetic-control and difference-in-differences effects, the ambient meta-analysis and the ambient fallback of the route rule. The track is supplementary to the bottom-up appraisal in Sections 7 and 8 and has no due date. Its results are diagnostic. They are not an estimate of a Thai effect or of the Thai net benefit.
 
+Method. Optimal transport moves the effects of 19 past openings to the yearly economy features of Thailand. The cost is the squared distance of standardized features, each weighted by its importance from a feature stacking model. The full specification is in the supplement.
+
+Validation. In leave-one-economy-out validation, the importance-weighted transport has an error of 1.015. The equal-weight mean has 1.134 and the uniform-weight transport has 1.006. The importance-weighted transport passes the test against the mean, with a ratio of 0.895. It fails the test against the uniform-weight transport, with a ratio of 1.009 against a limit of 0.95. The importance model is not usable. It has 19 cases against 20 required, a cross-validated R-squared of 0.072 against 0.10, and a permutation p-value of 0.436 against 0.10.
+
+Diagnostic result. For the proposed complex of THB 300 billion, the transported effect is -0.73 percentage points of GDP, with a bootstrap 5 to 95 percent band of -1.28 to -0.19. Because the validation criterion is not met, the band is not evidence of an effect. The result is reported only as a diagnostic.
+
+Later phases. If the team continues this method, the work remaining is to register the weighting choice before use, to extend the sample to at least 20 episodes and repeat the validation, to test the importance model across seeds, and to decide whether the transport enters the appraisal as a cross-check only. The supplement gives the full list and the reproduction steps.

@@ -67,14 +67,15 @@ Work is coordinated through GitHub Issues, using the template "Task", as describ
 
 The dates after 16 October are estimates. They will be confirmed after the Phase 1 review.
 
-## 5. Supplementary: historical analysis (preliminary)
+## 5. Supplementary: optimal transport (preliminary)
 
-Folder: `disney-tourism-thailand`. Question: did the Hong Kong and Shanghai openings change international tourism receipts relative to GDP?
+Folder: `disney-tourism-thailand`. Question: what change in international tourism receipts, relative to GDP, do past theme-park openings point to? The supplement is `seminar/SUPPLEMENT_OPTIMAL_TRANSPORT.md`, and Appendix A of the Phase 1 document summarises it. This track covers optimal transport only. The synthetic-control and difference-in-differences effects, the ambient meta-analysis, the scaling law and the ambient fallback of the route rule are dropped from this track and from the Phase 1 appendix. The single-country replication is dropped as well.
 
-- **Sample:** 44 openings (episodes), 27 feasible, 19 in the primary sample, in 19 economies. The importance route needs at least 20 episodes, so the pre-registered rule chose the ambient route.
-- **Estimator:** the scaling law in cost share (A2) is selected by the leave-one-economy-out rule. For the THB 300 billion complex the median effect is +0.40 percentage points of GDP (5 to 95 percent: -1.14 to +1.94). At the 2025 baseline that is +US$2.33 billion a year (-6.55 to +11.17); at the 2019 baseline it is +US$2.19 billion (-6.18 to +10.53). The 90 percent interval for a new study runs from -2.73 to +1.27 percentage points and includes zero. The weighted transport gives -0.73 points with the opposite sign; it is a diagnostic and not the primary route.
-- **Reading:** the data cannot separate the effect from zero. The historical results are not the Thai net benefit.
-- **Open items for this track:** 37 of the 1216 reference values of the original Stata analysis do not reproduce on the dataset (1179 match). The differences are in the synthetic-control weights, the balance and placebo statistics and one bootstrap interval endpoint. The data notice for the single-country panel and an independent review remain open.
+- **Sample:** 19 primary episodes in 19 host economies. The importance model requires 20.
+- **Validation:** the importance-weighted transport has a leave-one-economy-out error of 1.015. It is 0.895 of the equal-weight mean, which passes, and 1.009 of the uniform-weight transport, which fails the 0.95 limit. The importance model is not usable.
+- **Diagnostic result:** for the THB 300 billion complex the transported effect is -0.73 percentage points of GDP, with a bootstrap 5 to 95 percent band of -1.28 to -0.19. It is a diagnostic, not a Thai estimate and not a net benefit.
+- **Reading:** the validation does not support the importance weights, so the result cannot be taken as an effect.
+- **Open items for this track:** the later phases listed in the supplement, section 9.
 
 ## 6. Repository and reproducibility
 
@@ -104,7 +105,7 @@ Folder: `disney-tourism-thailand`. Question: did the Hong Kong and Shanghai open
 - The notebooks were re-run on the dataset with the code in the pull request "Remove the simulated world from the pipeline". The pipeline has no simulated mode. The simulation generators and the tests that used them are removed. The tests that needed a generated world now use hand-built fixtures in `tests/handmade_panels.py` and `tests/handmade_world.py`.
 - The new results are in `results/` and `figures/`, in the second pull request, which exists only for the re-run and names the commit and the run time, as CONTRIBUTING.md asks.
 - The full test suite passes on the code branch: 1877 passed and 1 skipped. The dataset check (`DTT_RUN_REAL=1`) passed in the run of 16 October 2026.
-- The route rule selects the ambient route. The importance model is not usable, the weighted transport does not beat the uniform transport by the 0.95 margin, the target is supported, and A2 is selected. Section 5 gives the effect.
+- The importance model is not usable, and the importance-weighted transport does not beat the uniform transport by the 0.95 margin. The target is supported. Section 5 gives the diagnostic result.
 - The Haswell and Zen kernels pass. The SkylakeX kernel cannot run on the development computer.
 
 ## How you can help
