@@ -862,6 +862,57 @@ def labelled_case(sourced, assumptions, case):
     }
 
 
+def onsite_revenue_case(sourced, assumptions, case, onsite_thb_per_visit):
+    """Return the operator results of one labelled case with on-site spending counted as operator revenue.
+
+    The on-site income is food, beverage and merchandise spending inside the complex, per operator visit, in THB. It is added to the
+    operator revenue and carries the same operating-cost share as the ticket revenue, which is the convention of the model. The national
+    ledger is left as it is, so this labelled case isolates the operator effect. Hotel income is not included, because no sourced value
+    for it is in the input table.
+
+    Parameters
+    ----------
+    sourced : pandas.DataFrame
+        Input table from :func:`load_inputs`.
+    assumptions : pandas.DataFrame
+        Assumptions table from :func:`load_assumptions`.
+    case : str
+        One of ``low_case``, ``base_case`` or ``high_case``.
+    onsite_thb_per_visit : float
+        On-site income per operator visit in THB. Must not be negative; zero gives the labelled case without on-site income.
+
+    Returns
+    -------
+    dict
+        Keys ``case``, ``onsite_thb_per_visit``, ``onsite_revenue_bn_per_year``, ``revenue_bn_per_year``, ``operator_npv_bn``,
+        ``operator_irr``, ``national_npv_bn`` and ``fiscal_npv_bn``. The national and fiscal values do not change with the on-site income.
+
+    Raises
+    ------
+    ValueError
+        If ``onsite_thb_per_visit`` is negative.
+    """
+    if onsite_thb_per_visit < 0:
+        raise ValueError("onsite_thb_per_visit must not be negative")
+    inp = case_inputs(sourced, assumptions, case)
+    annual = dict(case_annual(inp))
+    onsite_bn = annual["operator_visits_m"] * onsite_thb_per_visit / 1000.0
+    annual["revenue_bn_per_year"] = annual["revenue_bn_per_year"] + onsite_bn
+    annual["opex_bn_per_year"] = annual["opex_bn_per_year"] + inp["opex_share"] * onsite_bn
+    ledgers = _ledgers(inp, annual)
+    wacc = inp["wacc_financial"]
+    return {
+        "case": case,
+        "onsite_thb_per_visit": float(onsite_thb_per_visit),
+        "onsite_revenue_bn_per_year": float(onsite_bn),
+        "revenue_bn_per_year": float(annual["revenue_bn_per_year"]),
+        "operator_npv_bn": npv(ledgers["operator"], wacc),
+        "operator_irr": irr(ledgers["operator"]),
+        "national_npv_bn": npv(ledgers["national"], inp["social_discount_rate"]),
+        "fiscal_npv_bn": npv(ledgers["fiscal"], wacc),
+    }
+
+
 def sensitivity_table(sourced, assumptions, case):
     """Return the NPVs of one labelled case under the NESDC (2024) sensitivity cases.
 
