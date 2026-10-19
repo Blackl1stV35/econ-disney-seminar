@@ -1,41 +1,39 @@
 ﻿# Project status
 
-Last updated: 2026-10-16. This page gives the approved seminar topic, the decisions taken, the team roles, the work plan with dates, the supplementary historical analysis and the open items. Figures marked preliminary are not yet reviewed.
+Last updated: 2026-10-19. This page gives the approved seminar topic, the decisions taken, the team roles, the work plan with dates, the supplementary historical analysis and the open items. Figures marked preliminary are not yet reviewed.
 
-## 1. Seminar topic (approved 14 October 2026)
+## 1. Seminar topic (revised 19 October 2026: finance economics)
 
-**Title.** An Exploratory Appraisal of a Proposed Disney-Type Theme-Park Complex in Thailand: A Bottom-Up Scenario Analysis.
+**Title.** Financial and Economic Appraisal of a Proposed Disney-Type Theme-Park Complex in Thailand: A Scenario Analysis.
 
-**Scope.** The THB 300 billion sports and entertainment complex, which is the high-expectation scope selected for the appraisal. The park-only concepts of THB 100 to 200 billion are different projects with different demand, revenue and cost boundaries. They are not mixed with the complex and are not modelled in the primary appraisal.
+**Scope.** Finance economics. The THB 300 billion sports and entertainment complex is the primary appraisal, as before. The park-only concepts of THB 100 to 200 billion are different projects and are not appraised here.
 
-**Research question (draft).** What are the potential tourism and economic impacts of a Disney-type complex in Thailand, and does the project create net value for Thailand once displacement, leakage and public costs are counted?
+**Out of scope.** Tourism demand and receipts as research questions. Visitor numbers, spending and displacement are inputs to the three ledgers, not hypotheses. The historical evidence on openings elsewhere is out of scope (section 5).
+
+**Research question.** What are the financial and economic returns of a proposed Disney-type theme-park complex in Thailand at the documented cost of capital and social discount rate, and how sensitive are they to costs, revenue and opening delay?
 
 **Objectives.**
-1. Estimate the incremental international visitor expenditure that the complex generates in Thailand, relative to a no-project baseline (H1).
-2. Estimate the operator's financial net present value, internal rate of return and break-even attendance (H2).
-3. Estimate the national economic net present value after displacement, leakage and resource costs (H3).
-4. Estimate the fiscal net flows of public participation, as a supplementary check (H4).
+1. Estimate the operator's financial net present value, internal rate of return and break-even attendance (H1).
+2. Estimate the national economic net present value at the social discount rate (H2).
+3. Estimate the fiscal net flows of public participation, as a supplementary check (H3).
+4. Test the results under the sensitivity and switching cases (section 7.4 of the Phase 1 document).
 
 **Hypotheses.**
-- **H1.** The complex generates positive incremental international visitor expenditure in Thailand relative to the no-project scenario, after spending displaced from other Thai destinations is subtracted.
-- **H2.** The complex has a positive financial net present value under the documented Thai base-case demand and cost assumptions.
-- **H3.** The complex produces a positive economic net present value for Thailand after incremental resource costs, displaced activity and material social costs are accounted for.
-- **H4 (supplementary).** The discounted incremental tax and fee revenue attributable to the project exceeds its discounted project-specific public expenditure and fiscal costs under the stated policy scenario.
+- **H1.** The complex has a positive financial net present value under the documented base-case assumptions.
+- **H2.** The complex has a positive economic net present value for Thailand at 7 percent.
+- **H3 (supplementary).** The discounted incremental tax and fee revenue exceeds the discounted project-specific public expenditure under the stated policy scenario.
 
 **Method.** A bottom-up appraisal that follows the ADB (2017) Guidelines for the Economic Analysis of Projects and the NESDC (2024) Guide to Public Investment Project Appraisal.
-- **Demand:** visitor segments (Thai residents, international short-haul, international long-haul, repeat visitors), incremental attendance, length of stay, per-visitor spending, opening ramp-up and capacity.
-- **Netting:** spending displaced from other Thai destinations, imported inputs, profit repatriation, opportunity cost of land, labour and capital, congestion and environmental costs.
-- **Three ledgers:** operator (financial NPV, IRR, payback), fiscal (net flows) and national economic (economic NPV, benefit-cost ratio).
-- **Scenarios:** low, base and high cases, break-even attendance, incremental share and capex thresholds, and stress tests on opening delay and displacement.
-- **Historical evidence** (Hong Kong, Shanghai, Singapore and the international literature) provides calibration ranges and qualitative benchmarks. It does not determine the Thai net benefit directly.
-- **Cross-check:** a reference-class predictor from the replacement recommendation is used only as a benchmark against the historical cases, never as the net-benefit estimate.
+- **Three ledgers:** operator (financial NPV, IRR, payback, break-even attendance), national economic (economic NPV, conversion factor 0.7) and fiscal (net flows).
+- **Inputs:** demand (visitors, spending, capacity), costs, financing terms, tax rates and discount rates, each labelled by source status.
+- **Scenarios:** low, base and high cases, break-even attendance, and stress tests on cost, revenue and opening delay.
 
 ## 2. Decisions taken (14 October 2026)
-- The title, the objectives and hypotheses H1 to H3 are approved. H4 is supplementary.
+- The title, the objectives and hypotheses were approved on 14 October 2026. On 19 October 2026 the scope was narrowed to finance economics, and the hypotheses are restated as H1 to H3 (section 1).
 - The team roles in section 3 are confirmed.
 - The primary scope is the THB 300 billion complex.
 - The 13F investor-horizon project is removed from the repository and from the local working folder. Its history stays in git.
-- The historical econometric analysis of Hong Kong and Shanghai is supplementary.
+- Tourism demand and receipts, and the historical analysis of Hong Kong and Shanghai, are out of scope from 19 October 2026. They are kept in the repository as a record.
 
 ## 3. Team and roles
 
@@ -60,14 +58,16 @@ Work is coordinated through GitHub Issues, using the template "Task", as describ
 | 15 Oct | Method outline, scenario grid and break-even definition | LINK, with Peem | Method section |
 | 15 Oct | Integrate the sections and check consistency | chow, Peem | Draft |
 | 16 Oct | Submit the Phase 1 seminar document | Peem | Submitted |
-| From 19 Oct (estimate) | Source the Thai inputs: segment mix, attendance ramp, spending, capex, operating costs, tax rates, discount rate and shadow parameters from NESDC (2024) | Team | Input table: 82 sourced values (43 from Thai data sources), 14 unconfirmed, 9 pending or blank, 9 team decisions, 7 claims and proposal figures, 4 derived, 3 proxies, 3 generalized (see section 7) |
-| From 19 Oct (estimate) | Build the appraisal model in `disney-tourism-thailand`, with tests for the three ledgers, the scenario switch and break-even | Peem, with an agent | Model with labelled cases, the NESDC sensitivity table and tests; the appraisal and notebook tests pass. The NESDC values are sourced; WACC and project life are team recommendations, and the other team decisions are labelled |
-| From 26 Oct (estimate) | Stress tests following ADB (2017), sensitivity on displacement and incremental share, limitations and decision gates | Team | Results |
+| 19 Oct | Revise the Phase 1 document to the finance economics scope and re-export it | Peem, chow | Revised Phase 1 document |
+| 19 Oct | Confirm all assumptions in the assumptions table | Team | All statuses record the confirmation |
+| From 20 Oct (estimate) | Source the remaining pending inputs that the ledgers use (8 rows, each with a stated reason) | Team | Input table |
+| From 20 Oct (estimate) | Complete the three ledgers with break-even, IRR and payback outputs, with tests | Peem, with an agent | Model and tests |
+| From 27 Oct (estimate) | Stress tests following ADB (2017): cost, revenue and delay; switching values | Team | Results |
 | November (estimate) | Final report and presentation | Team | Final report |
 
 The dates after 16 October are estimates. They will be confirmed after the Phase 1 review.
 
-## 5. Supplementary: historical analysis (preliminary)
+## 5. Out of scope since 19 October 2026: historical analysis (kept as a record)
 
 Folder: `disney-tourism-thailand`. Question: did the Hong Kong and Shanghai openings change international tourism receipts relative to GDP, and what do the openings point to for a complex of the proposed size? The full closure record is `seminar/SUPPLEMENT_CLOSURE_RECORD.md`. Appendix A of the Phase 1 document contains the same text.
 
@@ -86,6 +86,7 @@ Folder: `disney-tourism-thailand`. Question: did the Hong Kong and Shanghai open
 ## 7. Open items
 
 - Thai inputs (inputs.csv, 131 rows): 87 sourced. Of these, 44 come from Thai data sources, and the rest are guidance values, illustrative examples and comparators outside Thailand. 9 are unconfirmed (candidate or secondary values, flagged and not used by the model). 8 are pending or blank, each with a stated reason. 1 is dropped from use (the Bank of Thailand receipts row). 9 are team decisions, 7 are claims or proposal figures, 4 are derived, and 6 are proxies or generalized values. The model reads the sourced names, the proposal capital cost and the labelled assumptions table, and no other input.
+- All assumptions in the assumptions table were confirmed by the team on 19 October 2026.
 - Team decisions confirmed by the leader on 14 October 2026, recorded as labelled assumptions: WACC 8 percent base (10 and 7 percent in the low and high cases); project life 20 years base (20 and 25 years in the low and high cases); attendance 7.5 million; incremental share 30 percent; displacement 30 percent; domestic retention 50 percent; spending-per-visit base 10,000 THB and high case 20,000 THB (the low case is the sourced on-site benchmark, below); occupancy ceiling 85 percent base. None is a sourced value. The observed 80.42 percent would remove all base headroom and is reported as the alternative.
 - Spending per visit, decided 16 October 2026: the low case is the sourced on-site benchmark of 1,862 THB (Oriental Land's Tokyo Disney Resort, FY3/2026, 8,796 yen per guest, converted at the Bank of Thailand JPY mid rate of 12 October 2026, 21.1734 THB per 100 yen). The base of 10,000 THB and the high case of 20,000 THB are kept. The per-trip figures (TAT 50,900 THB; MoTS 48,580 THB) are not per park visit and are not used.
 - Operating costs include depreciation, by the leader's decision. The overlap with capital cost is kept; the anchors have not been restated.

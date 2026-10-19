@@ -9,6 +9,7 @@ Exported: 16 October 2026. Font: Times New Roman for text, Courier New for code.
 
 ## Status of this export
 
+- Not re-exported after the finance economics revision of 19 October 2026, as the owner instructed, because the Phase 1 document has been reviewed. The PDF in this folder is the version committed as 0ab9666. The markdown source is newer and describes the finance scope; the two differ until the PDF is exported again.
 - Re-exported on 16 October 2026 after the re-run of the dataset chain (commit `a811b0b`). The Phase 1 document now carries the A2 interval for a new study (-1.52 to 2.33 points), the placebo null without rescaling, the Ocean Park secondary-source limitation, and the regenerated Appendix A. Section 10 (Timeline and responsibilities) remains removed.
 - The supplement PDF is not re-exported. Its source, SUPPLEMENT_CLOSURE_RECORD.md, changed after its export, so the supplement PDF stays out of date until the export is assigned.
 - The Phase 1 document was re-exported on 16 October 2026 after three changes: section 10 (Timeline and responsibilities) was removed and References renumbered to section 10; the public GitHub repository link was added to the front matter; and the Universal Studios Singapore citation in section 6(c) was replaced with Henderson (2012) and Henderson et al. (2013), both listed in the references.
