@@ -221,7 +221,7 @@ def make_figures(res, outdir):
     ax.axhline(PROPOSAL_CAPEX, color="0.3", linestyle=":", linewidth=1.2)
     ax.text(50, PROPOSAL_CAPEX + 8, "Proposal capital cost, 300 THB bn", ha="center", va="bottom", color="0.2")
     ax.axhline(res["inputs"]["hk_asset_base_thb_bn"], color="0.45", linestyle="-.", linewidth=1.0)
-    ax.text(50, res["inputs"]["hk_asset_base_thb_bn"] + 8, "Hong Kong Disneyland asset base, about 78 THB bn", ha="center", va="bottom", color="0.3")
+    ax.text(100, res["inputs"]["hk_asset_base_thb_bn"] - 6, "Hong Kong Disneyland asset base, about 78 THB bn", ha="right", va="top", color="0.3")
     ax.set_xlabel("Operating-cost share of revenue (%)")
     ax.set_ylabel("Capital cost at operator NPV = 0 (THB bn)")
     ax.set_title("Capital cost the operator can carry, by operating-cost share", fontsize=11)
