@@ -241,7 +241,7 @@ def make_figures(res, outdir):
     for i, c in enumerate(sample):
         ys = [operator_npv(with_capex(sourced, c), cash, v) for v in levels]
         col, ls = shades[i]
-        ax.plot(levels, ys, marker="o", color=col, linestyle=ls, label=f"Capital cost {c:.0f} THB bn")
+        ax.plot(levels, ys, marker="o", color=col, linestyle=ls, label=f"Capital cost {c:.0f} THB bn" if round(c) == c else f"Capital cost {c:.1f} THB bn")
     ax.axhline(0, color="0.2", linewidth=0.8)
     ax.set_xlabel("On-site income per operator visit (THB)")
     ax.set_ylabel("Operator NPV at 8% (THB bn)")
