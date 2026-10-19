@@ -9,6 +9,7 @@ Exported: 16 October 2026. Font: Times New Roman for text, Courier New for code.
 
 ## Status of this export
 
+- Final results document: `Final_results_2026-10-19.pdf` (5 pages, 7576627 bytes, SHA-256 `9f822f6223291b2a71ad301a3a06b02e00faee1ceade47ec4d3745c59f65a927`), built from `seminar/FINAL_RESULTS_2026-10-19.md` with its three figures in `seminar/figures/`. It reports the confirmed base, the labelled and scenario cases, the break-even capital costs and the recommendation. It does not replace the Phase 1 PDF.
 - Not re-exported after the finance economics revision of 19 October 2026, as the owner instructed, because the Phase 1 document has been reviewed. The PDF in this folder is the version committed as 0ab9666. The markdown source is newer and describes the finance scope; the two differ until the PDF is exported again.
 - Re-exported on 16 October 2026 after the re-run of the dataset chain (commit `a811b0b`). The Phase 1 document now carries the A2 interval for a new study (-1.52 to 2.33 points), the placebo null without rescaling, the Ocean Park secondary-source limitation, and the regenerated Appendix A. Section 10 (Timeline and responsibilities) remains removed.
 - The supplement PDF is not re-exported. Its source, SUPPLEMENT_CLOSURE_RECORD.md, changed after its export, so the supplement PDF stays out of date until the export is assigned.
