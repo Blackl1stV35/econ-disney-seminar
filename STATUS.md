@@ -1,37 +1,37 @@
 ﻿# Project status
 
-Last updated: 2026-10-19. This page gives the approved seminar topic, the decisions taken, the team roles, the work plan with dates, the supplementary historical analysis and the open items. Figures marked preliminary are not yet reviewed.
+Last updated: 2026-10-21. This page gives the approved seminar topic, the decisions taken, the team roles, the work plan with dates, the supplementary historical analysis and the open items. Figures marked preliminary are not yet reviewed.
 
-## 1. Seminar topic (revised 19 October 2026: finance economics)
+## 1. Seminar topic (revised 21 October 2026: financial appraisal of the park-only operator ledger)
 
-**Title.** Financial and Economic Appraisal of a Proposed Disney-Type Theme-Park Complex in Thailand: A Scenario Analysis.
+**Title.** Scenario-Based Financial Feasibility and Break-Even Analysis of a Proposed Disney-Type Theme Park in Thailand.
 
-**Scope.** Finance economics. The THB 300 billion sports and entertainment complex is the primary appraisal, as before. The park-only concepts of THB 100 to 200 billion are different projects and are not appraised here.
+**Scope.** Financial appraisal of the park-only operator ledger. The capital boundary is the park-only proposal of about THB 200 billion (not verified), matched to the theme-park revenue. The THB 300 billion sports and entertainment complex is kept only as a reconciliation to the earlier model.
 
-**Out of scope.** Tourism demand and receipts as research questions. Visitor numbers, spending and displacement are inputs to the three ledgers, not hypotheses. The historical evidence on openings elsewhere is out of scope (section 5).
+**Out of scope.** The national economic appraisal, the fiscal flows of public participation, and tourism demand and receipts as research questions. Visitor numbers, spending and displacement are inputs to the operator ledger, not hypotheses. The historical evidence on openings elsewhere is out of scope (section 5).
 
-**Research question.** What are the financial and economic returns of a proposed Disney-type theme-park complex in Thailand at the documented cost of capital and social discount rate, and how sensitive are they to costs, revenue and opening delay?
+**Research question.** Is a proposed Disney-type theme park in Thailand financially viable for an operator at the documented cost of capital, what break-even attendance and capital cost does it need, and how sensitive is that to costs, revenue and opening delay?
 
 **Objectives.**
 1. Estimate the operator's financial net present value, internal rate of return and break-even attendance (H1).
-2. Estimate the national economic net present value at the social discount rate (H2).
-3. Estimate the fiscal net flows of public participation, as a supplementary check (H3).
+2. Estimate the break-even capital cost of the park-only ledger (H1).
+3. Report the reconciliation to the earlier 300 bn model, and the tax and replacement-capex sensitivities.
 4. Test the results under the sensitivity and switching cases (section 7.4 of the Phase 1 document).
 
 **Hypotheses.**
-- **H1.** The complex has a positive financial net present value under the documented base-case assumptions.
-- **H2.** The complex has a positive economic net present value for Thailand at 7 percent.
-- **H3 (supplementary).** The discounted incremental tax and fee revenue exceeds the discounted project-specific public expenditure under the stated policy scenario.
+- **H1.** The theme park has a positive financial net present value after tax under the documented base-case assumptions.
+- **H2 and H3 retired (20 and 21 October 2026).** The economic and fiscal hypotheses are not tested in this frame.
 
 **Method.** A bottom-up appraisal that follows the ADB (2017) Guidelines for the Economic Analysis of Projects and the NESDC (2024) Guide to Public Investment Project Appraisal.
-- **Three ledgers:** operator (financial NPV, IRR, payback, break-even attendance), national economic (economic NPV, conversion factor 0.7) and fiscal (net flows).
+- **Operator ledger:** revenue less cash operating costs, capital, replacement capex and corporate income tax; financial NPV, IRR, break-even capital cost and break-even attendance. The earlier national and fiscal ledgers are not used.
 - **Inputs:** demand (visitors, spending, capacity), costs, financing terms, tax rates and discount rates, each labelled by source status.
 - **Scenarios:** low, base and high cases, break-even attendance, and stress tests on cost, revenue and opening delay.
 
 ## 2. Decisions taken (14 October 2026)
 - The title, the objectives and hypotheses were approved on 14 October 2026. On 19 October 2026 the scope was narrowed to finance economics, and the hypotheses are restated as H1 to H3 (section 1).
 - The team roles in section 3 are confirmed.
-- The primary scope is the THB 300 billion complex.
+- The primary scope was the THB 300 billion complex until 21 October 2026. From 21 October 2026 the primary boundary is the park-only operator ledger (THB 200 billion proposal, matched to the theme-park revenue). The complex is kept as a reconciliation in `seminar/workbook/Phase1_financial_appraisal_v2.xlsx`.
+- 20 and 21 October 2026: Financial Appraisal only (decision `decision-financial-only-20261020`); cash operating costs as the primary basis; corporate income tax at 20 percent; replacement capex zero in the base case, because no source exists.
 - The 13F investor-horizon project is removed from the repository and from the local working folder. Its history stays in git.
 - Tourism demand and receipts, and the historical analysis of Hong Kong and Shanghai, are out of scope from 19 October 2026. They are kept in the repository as a record.
 
@@ -89,7 +89,7 @@ Folder: `disney-tourism-thailand`. Question: did the Hong Kong and Shanghai open
 - All assumptions in the assumptions table were confirmed by the team on 19 October 2026.
 - Team decisions confirmed by the leader on 14 October 2026, recorded as labelled assumptions: WACC 8 percent base (10 and 7 percent in the low and high cases); project life 20 years base (20 and 25 years in the low and high cases); attendance 7.5 million; incremental share 30 percent; displacement 30 percent; domestic retention 50 percent; spending-per-visit base 10,000 THB and high case 20,000 THB (the low case is the sourced on-site benchmark, below); occupancy ceiling 85 percent base. None is a sourced value. The observed 80.42 percent would remove all base headroom and is reported as the alternative.
 - Spending per visit, decided 16 October 2026: the low case is the sourced on-site benchmark of 1,862 THB (Oriental Land's Tokyo Disney Resort, FY3/2026, 8,796 yen per guest, converted at the Bank of Thailand JPY mid rate of 12 October 2026, 21.1734 THB per 100 yen). The base of 10,000 THB and the high case of 20,000 THB are kept. The per-trip figures (TAT 50,900 THB; MoTS 48,580 THB) are not per park visit and are not used.
-- Operating costs include depreciation, by the leader's decision. The overlap with capital cost is kept; the anchors have not been restated.
+- Operating costs include depreciation, by the leader's decision, in the earlier confirmed basis. From 21 October 2026 the primary operator ledger uses cash operating costs with depreciation excluded, pending the team's decision on the overlap. The confirmed basis is kept as a reconciliation.
 - Sources conflict on the high-speed rail opening year (2031 from the EEC Office; 2029 in the Wikipedia infobox and 2030 in its later status entry; not used). Chon Buri foreign visitors in 2024 are 11,689,827 (TAT workbook); the figure of 28,156,302 is a Thai plus foreign total and is not used.
 - U-Tapao has no sourced calendar 2019 figure, because AOT does not operate it. The calendar 2024 figure is the derived 384,881 passengers from the Ministry open-data file, and the draft uses it. The operator's budget-year figures are labelled comparators: 370,210 for October 2023 to September 2024 (sourced), and 1,665,004 for 2019 (proxy).
 - References: Chan (2004) is verified. Plaza (2006) is read in full from the attached copy and is cited without a link. Tan, How and Koh is not verified and is not cited. Milman (2010) is removed: its full text is paywalled, and its author list conflicts (one author in the publisher's author section; three in the citation line and the UCF STARS record). Abadie (2021), Burgan and Mules (2001), Cameron and Miller (2015) and Dwyer et al. (2000) are removed as paywalled and unread.
