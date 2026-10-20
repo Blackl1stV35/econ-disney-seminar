@@ -4,7 +4,7 @@ Exported: 21 October 2026. Font: Times New Roman for text, Courier New for code.
 
 | File | Pages | Bytes | SHA-256 | Source | Fonts embedded |
 |---|---|---|---|---|---|
-| Phase1_seminar_document_2026-10-21.pdf | 5 | 161333 | `2f30015149010fb5085793f16af8d4bca68bb0f52c050d3f366abb12b53ce2f4` | seminar/PHASE1_DRAFT.md as revised on 21 October 2026 (park-only operator boundary, cash tax, replacement capex) | TimesNewRomanPS-BoldMT, TimesNewRomanPSMT, TimesNewRomanPS-ItalicMT, CourierNewPSMT |
+| Phase1_seminar_document_2026-10-21.pdf | 5 | 162428 | `80bd56d396d82db875f7aebc53498f7df95b62dc4e1f3ce17c9506ac6452c7d0` | seminar/PHASE1_DRAFT.md as revised on 21 October 2026 (park-only operator boundary, cash tax, replacement capex) | TimesNewRomanPS-BoldMT, TimesNewRomanPSMT, TimesNewRomanPS-ItalicMT, CourierNewPSMT |
 | Supplement_closure_record_2026-10-16.pdf | 12 | 330610 | `6cc8f8e1d837b8de60624de33ad6fe67aa5ce024b38294622a77c301a0cf2c8d` | seminar/SUPPLEMENT_CLOSURE_RECORD.md | AAAAAA+TimesNewRomanPS-BoldMT, BAAAAA+TimesNewRomanPSMT, CAAAAA+CourierNewPSMT |
 
 ## Status of this export

@@ -63,7 +63,7 @@ All assumptions in the assumptions table were confirmed by the team on 19 Octobe
 - **Replacement capital expenditure.** No source is in the repository, so the base case is zero. A sensitivity case uses the depreciation share of the Hong Kong Disneyland noncurrent assets (about 7.9 percent a year) as a proxy. It is a depreciation rate, not a replacement estimate.
 - **Corporate income tax.** 20 percent on taxable income, with straight-line tax depreciation of the capital over the 20-year tourism asset life from opening. Losses are carried forward without a time limit, which is a proxy for the five-year Thai rule. Cumulative taxable income is negative over the life in the base case, so the tax is zero and the rule has no effect on the result.
 
-The earlier confirmed basis (operating costs at 0.9383 of revenue, which includes depreciation, with capital charged again) and the 300 billion complex capital are kept as a reconciliation column. The reconciliation reproduces the earlier cash-basis result of the legacy model, so the change of boundary and cost basis is traceable. The team has not yet decided the depreciation overlap, so the primary result is provisional.
+The earlier confirmed basis (operating costs at 0.9383 of revenue, which includes depreciation, with capital charged again) and the 300 billion complex capital are kept as a reconciliation column. The reconciliation reproduces the earlier cash-basis result of the legacy model, so the change of boundary and cost basis is traceable. The depreciation overlap is decided by kamolpeen on 21 October 2026, with the same weight as team approval. The primary result remains subject to the open items in section 9.
 
 **7.4 Sensitivity and risk.** Single-factor cases of 5, 10 and 20 percent on construction cost, operating cost and revenue, a one-year opening delay, two-factor cases of cost and revenue together, and a replacement-capex proxy case, following ADB (2017) Section VII. The sensitivities are applied to the parameters behind the aggregates, not as mechanical percentage changes.
 
@@ -80,7 +80,8 @@ The project is supported as a basis for decisions if H1 holds at the financial c
 - The proposal has no signed agreement, approved budget, named operator or site allocation. The park-only capital of about THB 200 billion is a news figure, not an official statement.
 - The output is a set of scenario ranges, not confidence intervals.
 - The replacement capital expenditure is unsourced and zero in the base case. The tax loss rule is a proxy. Working capital and the public-funding flows are not in the operator ledger.
-- The depreciation overlap is undecided by the team. The confirmed basis, which charges depreciation inside operating costs and the capital separately, is kept as a reconciliation only.
+- The depreciation overlap is decided by kamolpeen (21 October 2026), with the same weight as team approval. The confirmed basis, which charges depreciation inside operating costs and the capital separately, is kept as a reconciliation only.
+- The primary result is ticket-only revenue. With on-site income at the sourced 1,862 THB benchmark, the park-only NPV is -144.05 bn before tax (workbook scenario table, row 104), which is the basis the cash-cost ratio was taken from.
 - Several comparator anchors rest on secondary copies: the Ocean Park attendance for FY2018/19 (a search summary of the results announcement), the Lotte World ticket price for 2026 (a news report) and the Shanghai Disneyland attendance for 2019 (a copy of an index). The Ocean Park operating costs for FY2018/19 come from its annual report.
 - The economic and fiscal ledgers of the earlier draft are not reported here. No national welfare conclusion is drawn.
 
