@@ -32,6 +32,7 @@ Last updated: 2026-10-21. This page gives the approved seminar topic, the decisi
 - The team roles in section 3 are confirmed.
 - The primary scope was the THB 300 billion complex until 21 October 2026. From 21 October 2026 the primary boundary is the park-only operator ledger (THB 200 billion proposal, matched to the theme-park revenue). The complex is kept as a reconciliation in `seminar/workbook/Phase1_financial_appraisal_v2.xlsx`.
 - 20 and 21 October 2026: Financial Appraisal only (decision `decision-financial-only-20261020`); cash operating costs as the primary basis; corporate income tax at 20 percent; replacement capex zero in the base case, because no source exists.
+- 21 October 2026, decided by kamolpeen with the same weight as team approval: on-site income at the sourced 1,862 THB per operator visit is part of the primary revenue (primary NPV -144.05 bn before tax; the ticket-only result, -163.12 bn, is a memo); the HK depreciation proxy for replacement capex is not appropriate as a base and is kept only as a labelled stress; the attendance benchmark table (Magic Kingdom 17.8 million in 2024) is added to the Phase 1 document; a dated note is added to the 19 October final-results record.
 - The 13F investor-horizon project is removed from the repository and from the local working folder. Its history stays in git.
 - Tourism demand and receipts, and the historical analysis of Hong Kong and Shanghai, are out of scope from 19 October 2026. They are kept in the repository as a record.
 
