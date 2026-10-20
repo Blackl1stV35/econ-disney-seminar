@@ -1,5 +1,7 @@
 # Final results: financial and economic appraisal of the proposed theme-park complex
 
+> **Note of 21 October 2026.** This record keeps the results and assumptions of the model as of 19 October 2026, for reference. The confirmed base case named here is the 19 October version: operating costs of 0.9383 of revenue (which include depreciation) with capital charged separately, on ticket-only revenue. It is not the basis of the current Financial Appraisal. The primary result from 21 October 2026 is the park-only operator ledger on cash operating costs (0.7712), with ticket plus on-site income: NPV -144.05 bn before tax at 8 percent, break-even capital cost 50.4 bn, and break-even attendance 43 million visits a year (`seminar/workbook/Phase1_financial_appraisal_v2.xlsx`). The figures in this record are used for reconciliation only. The PDF of this record is unchanged.
+
 Date: 19 October 2026. Scope: finance economics (revision of 19 October 2026).
 
 Model: `disney-tourism-thailand/src/dtt/appraisal.py`. Scenarios: `disney-tourism-thailand/scripts/appraisal_scenarios.py`. Code commits `f209377` and `3d85df1`.
