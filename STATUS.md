@@ -1,6 +1,14 @@
 ﻿# Project status
 
-Last updated: 2026-10-21. This page gives the approved seminar topic, the decisions taken, the team roles, the work plan with dates, the supplementary historical analysis and the open items. Figures marked preliminary are not yet reviewed.
+Last updated: 2026-10-25. This page gives the approved seminar topic, the decisions taken, the team roles, the work plan with dates, the supplementary historical analysis and the open items. Figures marked preliminary are not yet reviewed.
+
+## Status on 25 October 2026
+
+- **Topic.** Financial appraisal only. The economic, fiscal and causal-effect questions (national welfare, tourism receipts, historical openings) are removed from the seminar. One hypothesis remains: H1, a positive after-tax operator net present value.
+- **Model.** `seminar/workbook/Phase1_financial_appraisal_v2.xlsx`: a park-only operator ledger (THB 200 bn capital, not verified), cash operating cost at 77.1 percent of revenue, ticket plus on-site income, 20 percent tax, WACC 8 percent and a 20-year life. Each input carries its source on the Inputs sheet.
+- **Results (provisional).** NPV -144.1 bn; IRR -5.2 percent; break-even capital cost 50.4 bn; break-even attendance 43.2 million visits a year (2.4 times Magic Kingdom); nominal payback about 39 years from the start of construction; discounted payback never. Every sensitivity case and scenario is negative.
+- **Open.** The THB 200 bn capital figure is a news report; replacement capex is zero because no source exists; the Tokyo Disney Resort attendance benchmark is not verified.
+- **Message to the professor.** `seminar/PROGRESS_MESSAGE_2026-10-25.md`, in English and Thai.
 
 ## 1. Seminar topic (revised 21 October 2026: financial appraisal of the park-only operator ledger)
 
@@ -28,7 +36,7 @@ Last updated: 2026-10-21. This page gives the approved seminar topic, the decisi
 - **Scenarios:** low, base and high cases, break-even attendance, and stress tests on cost, revenue and opening delay.
 
 ## 2. Decisions taken (14 October 2026)
-- The title, the objectives and hypotheses were approved on 14 October 2026. On 19 October 2026 the scope was narrowed to finance economics, and the hypotheses are restated as H1 to H3 (section 1).
+- The title, the objectives and hypotheses were approved on 14 October 2026. On 19 October 2026 the scope was narrowed to finance economics. On 20 October 2026 it was narrowed to Financial Appraisal only, and from 21 October 2026 only H1 is tested (section 1).
 - The team roles in section 3 are confirmed.
 - The primary scope was the THB 300 billion complex until 21 October 2026. From 21 October 2026 the primary boundary is the park-only operator ledger (THB 200 billion proposal, matched to the theme-park revenue). The complex is kept as a reconciliation in `seminar/workbook/Phase1_financial_appraisal_v2.xlsx`.
 - 20 and 21 October 2026: Financial Appraisal only (decision `decision-financial-only-20261020`); cash operating costs as the primary basis; corporate income tax at 20 percent; replacement capex zero in the base case, because no source exists.
@@ -62,9 +70,9 @@ Work is coordinated through GitHub Issues, using the template "Task", as describ
 | 16 Oct | Submit the Phase 1 seminar document | Peem | Submitted |
 | 19 Oct | Revise the Phase 1 document to the finance economics scope and re-export it | Peem, chow | Revised Phase 1 document |
 | 19 Oct | Confirm all assumptions in the assumptions table | Team | All statuses record the confirmation |
-| From 20 Oct (estimate) | Source the remaining pending inputs that the ledgers use (8 rows, each with a stated reason) | Team | Input table |
-| From 20 Oct (estimate) | Complete the three ledgers with break-even, IRR and payback outputs, with tests | Peem, with an agent | Model and tests |
-| From 27 Oct (estimate) | Stress tests following ADB (2017): cost, revenue and delay; switching values | Team | Results |
+| 20 to 21 Oct | Narrow the topic to Financial Appraisal only; build the financial workbook v2: sourced inputs, park-only operator ledger, NPV, IRR, payback, break-even, scenarios, two-way sensitivity and charts | Peem, with an agent | Workbook v2 and the Phase 1 document of 21 October (PDF in `seminar/submission/`) |
+| 25 Oct | Send the progress message to the professor in English and Thai | Peem, chow | `seminar/PROGRESS_MESSAGE_2026-10-25.md` |
+| From 26 Oct (estimate) | Verify the park-only capital figure, source the replacement capex and verify the Tokyo attendance benchmark | Team | Input table and workbook |
 | November (estimate) | Final report and presentation | Team | Final report |
 
 The dates after 16 October are estimates. They will be confirmed after the Phase 1 review.
