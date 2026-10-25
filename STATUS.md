@@ -5,7 +5,7 @@ Last updated: 2026-10-25. This page gives the approved seminar topic, the decisi
 ## Status on 25 October 2026
 
 - **Topic.** Financial appraisal only. The economic, fiscal and causal-effect questions (national welfare, tourism receipts, historical openings) are removed from the seminar. One hypothesis remains: H1, a positive after-tax operator net present value.
-- **Model.** `seminar/workbook/Phase1_financial_appraisal_v2.xlsx`: a park-only operator ledger (THB 200 bn capital, not verified), cash operating cost at 77.1 percent of revenue, ticket plus on-site income, 20 percent tax, WACC 8 percent and a 20-year life. Each input carries its source on the Inputs sheet.
+- **Model.** `seminar/workbook/Phase1_financial_appraisal_v3.xlsx`: a park-only operator ledger (THB 200 bn capital, not verified), cash operating cost at 77.1 percent of revenue, ticket plus on-site income, 20 percent tax, WACC 8 percent and a 20-year life. Each input carries its source on the Inputs sheet. Version 3 (25 October 2026) removes the THB 300 bn complex column and the complex sensitivity columns, so the workbook covers the park-only ledger only.
 - **Results (provisional).** NPV -144.1 bn; IRR -5.2 percent; break-even capital cost 50.4 bn; break-even attendance 43.2 million visits a year (2.4 times Magic Kingdom); nominal payback about 39 years from the start of construction; discounted payback never. Every sensitivity case and scenario is negative.
 - **Open.** The THB 200 bn capital figure is a news report; replacement capex is zero because no source exists; the Tokyo Disney Resort attendance benchmark is not verified.
 - **Message to the professor.** `seminar/PROGRESS_MESSAGE_2026-10-25.md`, in English and Thai.
@@ -14,7 +14,7 @@ Last updated: 2026-10-25. This page gives the approved seminar topic, the decisi
 
 **Title.** Scenario-Based Financial Feasibility and Break-Even Analysis of a Proposed Disney-Type Theme Park in Thailand.
 
-**Scope.** Financial appraisal of the park-only operator ledger. The capital boundary is the park-only proposal of about THB 200 billion (not verified), matched to the theme-park revenue. The THB 300 billion sports and entertainment complex is kept only as a reconciliation to the earlier model.
+**Scope.** Financial appraisal of the park-only operator ledger. The capital boundary is the park-only proposal of about THB 200 billion (not verified), matched to the theme-park revenue. The THB 300 billion sports and entertainment complex is not in the workbook; the earlier model that covered it stays in the repository as a record.
 
 **Out of scope.** The national economic appraisal, the fiscal flows of public participation, and tourism demand and receipts as research questions. Visitor numbers, spending and displacement are inputs to the operator ledger, not hypotheses. The historical evidence on openings elsewhere is out of scope (section 5).
 
@@ -23,7 +23,7 @@ Last updated: 2026-10-25. This page gives the approved seminar topic, the decisi
 **Objectives.**
 1. Estimate the operator's financial net present value, internal rate of return and break-even attendance (H1).
 2. Estimate the break-even capital cost of the park-only ledger (H1).
-3. Report the reconciliation to the earlier 300 bn model, and the tax and replacement-capex sensitivities.
+3. Report the tax and replacement-capex sensitivities.
 4. Test the results under the sensitivity and switching cases (section 7.4 of the Phase 1 document).
 
 **Hypotheses.**
@@ -38,7 +38,7 @@ Last updated: 2026-10-25. This page gives the approved seminar topic, the decisi
 ## 2. Decisions taken (14 October 2026)
 - The title, the objectives and hypotheses were approved on 14 October 2026. On 19 October 2026 the scope was narrowed to finance economics. On 20 October 2026 it was narrowed to Financial Appraisal only, and from 21 October 2026 only H1 is tested (section 1).
 - The team roles in section 3 are confirmed.
-- The primary scope was the THB 300 billion complex until 21 October 2026. From 21 October 2026 the primary boundary is the park-only operator ledger (THB 200 billion proposal, matched to the theme-park revenue). The complex is kept as a reconciliation in `seminar/workbook/Phase1_financial_appraisal_v2.xlsx`.
+- The primary scope was the THB 300 billion complex until 21 October 2026. From 21 October 2026 the primary boundary is the park-only operator ledger (THB 200 billion proposal, matched to the theme-park revenue). The complex was a reconciliation column in workbook v2 and is removed in `seminar/workbook/Phase1_financial_appraisal_v3.xlsx` (25 October 2026).
 - 20 and 21 October 2026: Financial Appraisal only (decision `decision-financial-only-20261020`); cash operating costs as the primary basis; corporate income tax at 20 percent; replacement capex zero in the base case, because no source exists.
 - 21 October 2026, decided by kamolpeen with the same weight as team approval: on-site income at the sourced 1,862 THB per operator visit is part of the primary revenue (primary NPV -144.05 bn before tax; the ticket-only result, -163.12 bn, is a memo); the HK depreciation proxy for replacement capex is not appropriate as a base and is kept only as a labelled stress; the attendance benchmark table (Magic Kingdom 17.8 million in 2024) is added to the Phase 1 document; a dated note is added to the 19 October final-results record.
 - 21 October 2026: the Appraisal ledger runs to year 44 (Option A), so operating lives are covered up to construction plus life of 45 years. The check in Appraisal row 31 reports coverage. The base results are unchanged. With a 25-year life the ledger now equals the closed-form scenario (-139.82 bn before tax), where before it was 3.25 bn lower.
@@ -72,6 +72,7 @@ Work is coordinated through GitHub Issues, using the template "Task", as describ
 | 19 Oct | Confirm all assumptions in the assumptions table | Team | All statuses record the confirmation |
 | 20 to 21 Oct | Narrow the topic to Financial Appraisal only; build the financial workbook v2: sourced inputs, park-only operator ledger, NPV, IRR, payback, break-even, scenarios, two-way sensitivity and charts | Peem, with an agent | Workbook v2 and the Phase 1 document of 21 October (PDF in `seminar/submission/`) |
 | 25 Oct | Send the progress message to the professor in English and Thai | Peem, chow | `seminar/PROGRESS_MESSAGE_2026-10-25.md` |
+| 25 Oct | Remove the THB 300 bn complex from the workbook, so that it covers the park-only ledger only (workbook v3) | Peem, with an agent | `seminar/workbook/Phase1_financial_appraisal_v3.xlsx` |
 | From 26 Oct (estimate) | Verify the park-only capital figure, source the replacement capex and verify the Tokyo attendance benchmark | Team | Input table and workbook |
 | November (estimate) | Final report and presentation | Team | Final report |
 

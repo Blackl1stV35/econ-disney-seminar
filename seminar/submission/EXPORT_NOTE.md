@@ -15,4 +15,5 @@ Exported: 21 October 2026. Font: Times New Roman for text, Courier New for code.
 - The economic hypothesis H2 and the fiscal hypothesis H3 of the 19 October source are not in this document. The national NPV is not reported as a conclusion.
 - Not re-exported in this change: the supplement PDF. Its source, SUPPLEMENT_CLOSURE_RECORD.md, changed after its export, so the supplement PDF stays out of date until its re-export is assigned.
 - Final results document: Final_results_2026-10-19.pdf (5 pages, 7576627 bytes, SHA-256 `9f822f6223291b2a71ad301a3a06b02e00faee1ceade47ec4d3745c59f65a927`), built from seminar/FINAL_RESULTS_2026-10-19.md with its three figures in seminar/figures/. It records the 19 October economic and financial results and does not replace the Phase 1 PDF.
+- The Phase 1 PDF of 21 October 2026 describes workbook v2, which carried the 300 bn complex as a reconciliation column. Workbook v3 (25 October 2026) removes that column, and the Phase 1 source was edited to match. The PDF is not re-exported.
 - The export is replaced, and this note is updated, whenever the Phase 1 text changes.

@@ -1,6 +1,6 @@
 # Phase 1 seminar document
 
-Submission deadline: 16 October 2026. Revised on 19 October 2026 to the finance economics scope, on 20 October 2026 to Financial Appraisal only, and on 21 October 2026 to the park-only operator boundary with cash tax and replacement capex (workbook v2), with ticket plus on-site income as the primary revenue.
+Submission deadline: 16 October 2026. Revised on 19 October 2026 to the finance economics scope, on 20 October 2026 to Financial Appraisal only, and on 21 October 2026 to the park-only operator boundary with cash tax and replacement capex (workbook v2), and on 25 October 2026 to workbook v3, which no longer carries the 300 bn complex column, with ticket plus on-site income as the primary revenue.
 
 Public repository: https://github.com/Blackl1stV35/econ-disney-seminar
 
@@ -20,7 +20,7 @@ Scenario-Based Financial Feasibility and Break-Even Analysis of a Proposed Disne
 
 1. Estimate the operator's financial net present value, internal rate of return, break-even attendance and break-even capital cost (H1).
 2. Test the results under the sensitivity and switching cases of section 7.4.
-3. Show the depreciation treatment explicitly: depreciation is excluded from cash flows, and the earlier confirmed basis is kept as a reconciliation (section 7.3).
+3. Show the depreciation treatment explicitly: depreciation is excluded from cash flows, and the earlier confirmed basis is described in section 7.3 for comparison.
 
 ## 4. Hypothesis
 
@@ -30,7 +30,7 @@ Scenario-Based Financial Feasibility and Break-Even Analysis of a Proposed Disne
 
 ## 5. Scope and scenarios
 
-**Scope.** The topic is financial appraisal of the operator's park-only ledger. The capital boundary is the park-only proposal of about THB 200 billion (the high park scenario of the Thai proposals, reported in the news and not verified by an official statement). It is matched to the theme-park revenue model, so that capital and revenue cover the same asset. The THB 300 billion sports and entertainment complex is not the primary boundary: its capital covers assets whose revenue this model does not model. It is kept as a reconciliation to the earlier model and reported separately (section 7.3).
+**Scope.** The topic is financial appraisal of the operator's park-only ledger. The capital boundary is the park-only proposal of about THB 200 billion (the high park scenario of the Thai proposals, reported in the news and not verified by an official statement). It is matched to the theme-park revenue model, so that capital and revenue cover the same asset. The THB 300 billion sports and entertainment complex is not the primary boundary: its capital covers assets whose revenue this model does not model. It is not carried in the workbook (removed in workbook v3 on 25 October 2026); the earlier model that covered it stays in the repository as a record (section 7.3).
 
 **Outside the scope.** The national economic appraisal (national benefit, economic costs and the conversion factor), the fiscal flows of public participation, and tourism demand and receipts as research questions. Visitor numbers, spending and displacement enter only as inputs to the operator ledger. The historical evidence on openings elsewhere is not part of this document. The sports and entertainment complex is not appraised as a separate asset.
 
@@ -79,7 +79,7 @@ All assumptions in the assumptions table were confirmed by the team on 19 Octobe
 
 Primary result (provisional, pre-tax, 8 percent): park-only NPV -144.05 bn; break-even capital cost 50.4 bn; break-even attendance 43 million visits a year, about 2.4 times the Magic Kingdom attendance. The after-tax result equals the pre-tax result, because taxable income is negative in every operating year.
 
-The earlier confirmed basis (operating costs at 0.9383 of revenue, which includes depreciation, with capital charged again) and the 300 billion complex capital are kept as a reconciliation column. The reconciliation reproduces the earlier cash-basis result of the legacy model, so the change of boundary and cost basis is traceable. The depreciation overlap is decided by kamolpeen on 21 October 2026, with the same weight as team approval. The primary result remains subject to the open items in section 9.
+The earlier confirmed basis (operating costs at 0.9383 of revenue, which includes depreciation, with capital charged again) and the 300 billion complex capital were carried as a reconciliation column in workbook v2. Workbook v3 does not carry them, so the workbook covers the park-only ledger only; the earlier model and its 19 October results stay in the repository as a record. The depreciation overlap is decided by kamolpeen on 21 October 2026, with the same weight as team approval. The primary result remains subject to the open items in section 9.
 
 **7.4 Sensitivity and risk.** Single-factor cases of 5, 10 and 20 percent on construction cost, operating cost and revenue, a one-year opening delay, two-factor cases of cost and revenue together, and a replacement-capex proxy case, following ADB (2017) Section VII. The sensitivities are applied to the parameters behind the aggregates, not as mechanical percentage changes.
 
@@ -96,8 +96,8 @@ The project is supported as a basis for decisions if H1 holds at the financial c
 - The proposal has no signed agreement, approved budget, named operator or site allocation. The park-only capital of about THB 200 billion is a news figure, not an official statement.
 - The output is a set of scenario ranges, not confidence intervals.
 - The replacement capital expenditure is unsourced and zero in the base case. The tax loss rule is a proxy. Working capital and the public-funding flows are not in the operator ledger.
-- The depreciation overlap is decided by kamolpeen (21 October 2026), with the same weight as team approval. The confirmed basis, which charges depreciation inside operating costs and the capital separately, is kept as a reconciliation only.
-- The primary result includes on-site income at the sourced 1,862 THB benchmark per operator visit. The ticket-only result (-163.12 bn before tax) is kept as a memo (workbook scenario table, row 104).
+- The depreciation overlap is decided by kamolpeen (21 October 2026), with the same weight as team approval. The confirmed basis, which charges depreciation inside operating costs and the capital separately, is not carried in the workbook and stays in the 19 October results record.
+- The primary result includes on-site income at the sourced 1,862 THB benchmark per operator visit. The ticket-only result (-163.12 bn before tax) is kept as a memo (workbook scenario table, row 126).
 - Several comparator anchors rest on secondary copies: the Ocean Park attendance for FY2018/19 (a search summary of the results announcement), the Lotte World ticket price for 2026 (a news report) and the Shanghai Disneyland attendance for 2019 (a copy of an index). The Ocean Park operating costs for FY2018/19 come from its annual report.
 - The economic and fiscal ledgers of the earlier draft are not reported here. No national welfare conclusion is drawn.
 

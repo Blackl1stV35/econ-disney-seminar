@@ -1,6 +1,6 @@
 # Progress message to the professor, 25 October 2026
 
-Figures are from `seminar/workbook/Phase1_financial_appraisal_v2.xlsx` (provisional).
+Figures are from `seminar/workbook/Phase1_financial_appraisal_v3.xlsx` (provisional).
 
 ## English
 
